@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "948412189680",
+    "project_id": "smart-inventory-c5d64",
+    "storage_bucket": "smart-inventory-c5d64.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:948412189680:android:7c16893fb0cee69b82ab35",
+        "android_client_info": {
+          "package_name": "com.example.pharmacy_inventory_management"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "948412189680-9lpcpfsd6itrecrihuu1er19h6ag4fk6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzYhLd9CjnYu3vdsCAc9wiK9KcYnygkjo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "948412189680-9lpcpfsd6itrecrihuu1er19h6ag4fk6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

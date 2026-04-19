@@ -1,0 +1,31 @@
+# Basic
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+*.obj
+*.pdb
+
+# Windows
+windows/flutter/ephemeral/
+windows/flutter/generated_config.cmake
+windows/x64/
+
+# Android
+.gradle/
+android/app/build/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# iOS/macOS
+ios/Flutter/.last_build_id
+.DS_Store
+DerivedData/

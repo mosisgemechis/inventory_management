@@ -1,0 +1,31 @@
+﻿
+  error - lib\core\services\im
+port_service.dart:14:20 - The 
+method 'CsvToListConverter' 
+isn't defined for the type 
+'ImportService'. Try 
+correcting the name to the 
+name of an existing method, 
+or defining a method named 
+'CsvToListConverter'. - 
+undefined_method
+  error - lib\core\services\re
+porting_native.dart:11:24 - 
+The method 
+'ListToCsvConverter' isn't 
+defined for the type 
+'ReportingServiceImpl'. Try 
+correcting the name to the 
+name of an existing method, 
+or defining a method named 
+'ListToCsvConverter'. - 
+undefined_method
+  error - lib\core\services\re
+porting_web.dart:11:30 - The 
+name 'ListToCsvConverter' 
+isn't a class. Try correcting 
+the name to match an existing 
+class. - 
+creation_with_non_type
+
+
