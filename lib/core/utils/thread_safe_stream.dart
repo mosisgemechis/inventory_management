@@ -1,23 +1,24 @@
 import 'dart:async';
-import 'package:flutter/scheduler.dart';
 
 /// Extension to ensure stream events are delivered on the main UI thread.
 /// This prevents "non-platform thread" errors on Windows when Firebase 
 /// callbacks arrive from background C++ threads.
 extension MainThreadExtension<T> on Stream<T> {
   Stream<T> toMainThread() {
-    final controller = StreamController<T>(sync: false);
+    final controller = StreamController<T>.broadcast(sync: false);
     StreamSubscription<T>? subscription;
 
     controller.onListen = () {
-      subscription = this.listen(
+      subscription = listen(
         (data) {
-          SchedulerBinding.instance.addPostFrameCallback((_) {
+          // Use Timer(Duration.zero) to ensure immediate dispatch to the main event loop
+          // which is more robust on Windows than post-frame callbacks for data delivery.
+          Future.delayed(Duration.zero, () {
             if (!controller.isClosed) controller.add(data);
           });
         },
-        onError: (err) {
-          if (!controller.isClosed) controller.addError(err);
+        onError: (e) {
+          if (!controller.isClosed) controller.addError(e);
         },
         onDone: () {
           if (!controller.isClosed) controller.close();

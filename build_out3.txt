@@ -1,0 +1,609 @@
+﻿[ +327 ms] Artifact Instance of 'MaterialFonts' is not required, skipping update.
+[   +1 ms] Artifact Instance of 'GradleWrapper' is not required, skipping update.
+[        ] Artifact Instance of 'AndroidGenSnapshotArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'AndroidInternalBuildArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IOSEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterWebSdk' is not required, skipping update.
+[   +1 ms] Artifact Instance of 'LegacyCanvasKitRemover' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterSdk' is not required, skipping update.
+[        ] Artifact Instance of 'WindowsEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'MacOSEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'LinuxEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'LinuxFuchsiaSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'MacOSFuchsiaSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterRunnerSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterRunnerDebugSymbols' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FontSubsetArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'PubDependencies' is not required, skipping update.
+[   +1 ms] executing: [C:\flutter 2\flutter/] git -c log.showSignature=false log HEAD -n 1 --pretty=format:%ad --date=iso
+[  +85 ms] Exit code 0 from: git -c log.showSignature=false log HEAD -n 1 --pretty=format:%ad --date=iso
+[        ] 2026-03-25 16:21:00 -0700
+[  +23 ms] Artifact Instance of 'AndroidGenSnapshotArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'AndroidInternalBuildArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IOSEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterWebSdk' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterEngineStamp' is not required, skipping update.
+[        ] Artifact Instance of 'LegacyCanvasKitRemover' is not required, skipping update.
+[   +4 ms] Artifact Instance of 'WindowsEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'MacOSEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'LinuxEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'LinuxFuchsiaSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'MacOSFuchsiaSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterRunnerSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterRunnerDebugSymbols' is not required, skipping update.
+[  +68 ms] Artifact Instance of 'MaterialFonts' is not required, skipping update.
+[        ] Artifact Instance of 'GradleWrapper' is not required, skipping update.
+[        ] Artifact Instance of 'AndroidGenSnapshotArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'AndroidInternalBuildArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IOSEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterWebSdk' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterEngineStamp' is not required, skipping update.
+[        ] Artifact Instance of 'LegacyCanvasKitRemover' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterSdk' is not required, skipping update.
+[   +2 ms] Artifact Instance of 'MacOSEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'LinuxEngineArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'LinuxFuchsiaSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'MacOSFuchsiaSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterRunnerSDKArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FlutterRunnerDebugSymbols' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'FontSubsetArtifacts' is not required, skipping update.
+[        ] Artifact Instance of 'PubDependencies' is not required, skipping update.
+[  +30 ms] Skipping pub get: version match.
+[ +292 ms] Found plugin sqflite at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite-2.4.2\
+[  +12 ms] Found plugin sqflite_darwin at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_darwin-2.4.2\
+[   +5 ms] Found plugin sqflite_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_android-2.4.2+3\
+[   +4 ms] Found plugin shared_preferences at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences-2.5.5\
+[   +2 ms] Found plugin shared_preferences_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_windows-2.4.1\
+[   +7 ms] Found plugin path_provider_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_windows-2.3.0\
+[   +6 ms] Found plugin shared_preferences_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_web-2.4.3\
+[   +4 ms] Found plugin shared_preferences_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_linux-2.4.1\
+[   +3 ms] Found plugin path_provider_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_linux-2.2.1\
+[   +5 ms] Found plugin shared_preferences_foundation at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_foundation-2.5.6\
+[   +2 ms] Found plugin shared_preferences_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_android-2.4.23\
+[   +9 ms] Found plugin printing at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\printing-5.14.3\
+[  +21 ms] Found plugin permission_handler at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler-11.4.0\
+[   +3 ms] Found plugin permission_handler_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_windows-0.2.1\
+[   +5 ms] Found plugin permission_handler_html at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_html-0.1.3+5\
+[   +4 ms] Found plugin permission_handler_apple at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_apple-9.4.7\
+[   +3 ms] Found plugin permission_handler_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_android-12.1.0\
+[   +8 ms] Found plugin path_provider at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider-2.1.5\
+[   +6 ms] Found plugin path_provider_foundation at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_foundation-2.4.2\
+[   +2 ms] Found plugin path_provider_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.19\
+[   +3 ms] Found plugin mobile_scanner at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\mobile_scanner-7.2.0\
+[  +22 ms] Found plugin flutter_local_notifications at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_local_notifications-17.2.4\
+[   +8 ms] Found plugin flutter_local_notifications_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_local_notifications_linux-4.0.1\
+[  +15 ms] Found plugin firebase_messaging at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_messaging-15.2.10\
+[   +2 ms] Found plugin firebase_messaging_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_messaging_web-3.10.10\
+[   +5 ms] Found plugin firebase_core at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_core-3.15.2\
+[   +2 ms] Found plugin firebase_core_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_core_web-2.24.1\
+[   +8 ms] Found plugin firebase_auth at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_auth-5.7.0\
+[   +3 ms] Found plugin firebase_auth_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_auth_web-5.15.3\
+[   +5 ms] Found plugin file_picker at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\file_picker-8.3.7\
+[   +9 ms] Found plugin flutter_plugin_android_lifecycle at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_plugin_android_lifecycle-2.0.34\
+[  +10 ms] Found plugin cloud_firestore at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore-5.6.12\
+[   +3 ms] Found plugin cloud_firestore_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore_web-4.4.12\
+[  +10 ms] Found plugin macos_ui at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\macos_ui-2.2.0\
+[   +3 ms] Found plugin macos_window_utils at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\macos_window_utils-1.9.1\
+[   +5 ms] Found plugin appkit_ui_element_colors at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\appkit_ui_element_colors-1.0.1\
+[   +5 ms] Found plugin dynamic_color at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\dynamic_color-1.8.1\
+[ +221 ms] Found plugin sqflite at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite-2.4.2\
+[   +6 ms] Found plugin sqflite_darwin at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_darwin-2.4.2\
+[   +2 ms] Found plugin sqflite_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_android-2.4.2+3\
+[   +2 ms] Found plugin shared_preferences at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences-2.5.5\
+[   +3 ms] Found plugin shared_preferences_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_windows-2.4.1\
+[   +3 ms] Found plugin path_provider_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_windows-2.3.0\
+[   +3 ms] Found plugin shared_preferences_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_web-2.4.3\
+[   +3 ms] Found plugin shared_preferences_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_linux-2.4.1\
+[   +1 ms] Found plugin path_provider_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_linux-2.2.1\
+[   +4 ms] Found plugin shared_preferences_foundation at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_foundation-2.5.6\
+[   +2 ms] Found plugin shared_preferences_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_android-2.4.23\
+[   +5 ms] Found plugin printing at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\printing-5.14.3\
+[  +12 ms] Found plugin permission_handler at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler-11.4.0\
+[   +1 ms] Found plugin permission_handler_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_windows-0.2.1\
+[   +3 ms] Found plugin permission_handler_html at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_html-0.1.3+5\
+[   +1 ms] Found plugin permission_handler_apple at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_apple-9.4.7\
+[   +1 ms] Found plugin permission_handler_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_android-12.1.0\
+[   +2 ms] Found plugin path_provider at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider-2.1.5\
+[   +2 ms] Found plugin path_provider_foundation at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_foundation-2.4.2\
+[   +1 ms] Found plugin path_provider_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.19\
+[   +2 ms] Found plugin mobile_scanner at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\mobile_scanner-7.2.0\
+[  +11 ms] Found plugin flutter_local_notifications at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_local_notifications-17.2.4\
+[   +4 ms] Found plugin flutter_local_notifications_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_local_notifications_linux-4.0.1\
+[   +9 ms] Found plugin firebase_messaging at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_messaging-15.2.10\
+[   +2 ms] Found plugin firebase_messaging_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_messaging_web-3.10.10\
+[   +3 ms] Found plugin firebase_core at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_core-3.15.2\
+[   +1 ms] Found plugin firebase_core_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_core_web-2.24.1\
+[   +4 ms] Found plugin firebase_auth at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_auth-5.7.0\
+[   +1 ms] Found plugin firebase_auth_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_auth_web-5.15.3\
+[   +3 ms] Found plugin file_picker at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\file_picker-8.3.7\
+[   +4 ms] Found plugin flutter_plugin_android_lifecycle at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_plugin_android_lifecycle-2.0.34\
+[   +6 ms] Found plugin cloud_firestore at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore-5.6.12\
+[   +1 ms] Found plugin cloud_firestore_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore_web-4.4.12\
+[   +7 ms] Found plugin macos_ui at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\macos_ui-2.2.0\
+[   +2 ms] Found plugin macos_window_utils at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\macos_window_utils-1.9.1\
+[   +4 ms] Found plugin appkit_ui_element_colors at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\appkit_ui_element_colors-1.0.1\
+[   +4 ms] Found plugin dynamic_color at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\dynamic_color-1.8.1\
+[  +24 ms] Skipping generating web_plugin_registrant.dart because it is up-to-date.
+[ +167 ms] Found plugin sqflite at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite-2.4.2\
+[   +7 ms] Found plugin sqflite_darwin at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_darwin-2.4.2\
+[   +2 ms] Found plugin sqflite_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_android-2.4.2+3\
+[   +2 ms] Found plugin shared_preferences at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences-2.5.5\
+[   +2 ms] Found plugin shared_preferences_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_windows-2.4.1\
+[   +3 ms] Found plugin path_provider_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_windows-2.3.0\
+[   +3 ms] Found plugin shared_preferences_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_web-2.4.3\
+[   +3 ms] Found plugin shared_preferences_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_linux-2.4.1\
+[   +2 ms] Found plugin path_provider_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_linux-2.2.1\
+[   +4 ms] Found plugin shared_preferences_foundation at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_foundation-2.5.6\
+[   +1 ms] Found plugin shared_preferences_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\shared_preferences_android-2.4.23\
+[   +5 ms] Found plugin printing at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\printing-5.14.3\
+[  +12 ms] Found plugin permission_handler at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler-11.4.0\
+[   +1 ms] Found plugin permission_handler_windows at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_windows-0.2.1\
+[   +3 ms] Found plugin permission_handler_html at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_html-0.1.3+5\
+[   +2 ms] Found plugin permission_handler_apple at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_apple-9.4.7\
+[   +2 ms] Found plugin permission_handler_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\permission_handler_android-12.1.0\
+[   +2 ms] Found plugin path_provider at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider-2.1.5\
+[   +2 ms] Found plugin path_provider_foundation at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_foundation-2.4.2\
+[   +2 ms] Found plugin path_provider_android at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\path_provider_android-2.2.19\
+[   +2 ms] Found plugin mobile_scanner at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\mobile_scanner-7.2.0\
+[  +12 ms] Found plugin flutter_local_notifications at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_local_notifications-17.2.4\
+[   +5 ms] Found plugin flutter_local_notifications_linux at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_local_notifications_linux-4.0.1\
+[  +11 ms] Found plugin firebase_messaging at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_messaging-15.2.10\
+[   +1 ms] Found plugin firebase_messaging_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_messaging_web-3.10.10\
+[   +3 ms] Found plugin firebase_core at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_core-3.15.2\
+[   +2 ms] Found plugin firebase_core_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_core_web-2.24.1\
+[   +6 ms] Found plugin firebase_auth at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_auth-5.7.0\
+[   +2 ms] Found plugin firebase_auth_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\firebase_auth_web-5.15.3\
+[   +3 ms] Found plugin file_picker at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\file_picker-8.3.7\
+[   +4 ms] Found plugin flutter_plugin_android_lifecycle at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_plugin_android_lifecycle-2.0.34\
+[   +8 ms] Found plugin cloud_firestore at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore-5.6.12\
+[   +2 ms] Found plugin cloud_firestore_web at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore_web-4.4.12\
+[   +6 ms] Found plugin macos_ui at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\macos_ui-2.2.0\
+[   +2 ms] Found plugin macos_window_utils at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\macos_window_utils-1.9.1\
+[   +3 ms] Found plugin appkit_ui_element_colors at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\appkit_ui_element_colors-1.0.1\
+[   +4 ms] Found plugin dynamic_color at C:\Users\hp\AppData\Local\Pub\Cache\hosted\pub.dev\dynamic_color-1.8.1\
+[  +15 ms] Generating C:\projects\inventory_management\android\app\src\main\java\io\flutter\plugins\GeneratedPluginRegistrant.java
+[   +3 ms] Skipping generating GeneratedPluginRegistrant.java because it is up-to-date.
+[  +11 ms] Skipping generating generated_plugin_registrant.h because it is up-to-date.
+[   +2 ms] Skipping generating generated_plugin_registrant.cc because it is up-to-date.
+[   +2 ms] Skipping generating generated_plugins.cmake because it is up-to-date.
+[   +4 ms] Skipping generating generated_plugin_registrant.h because it is up-to-date.
+[   +3 ms] Skipping generating generated_plugin_registrant.cc because it is up-to-date.
+[   +3 ms] Skipping generating generated_plugins.cmake because it is up-to-date.
+[   +5 ms] Skipping generating GeneratedPluginRegistrant.h because it is up-to-date.
+[   +2 ms] Skipping generating GeneratedPluginRegistrant.m because it is up-to-date.
+[   +3 ms] Skipping generating GeneratedPluginRegistrant.swift because it is up-to-date.
+[ +198 ms] executing: C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe -format json -products * -utf8 -latest -version 16 -requires Microsoft.VisualStudio.Workload.NativeDesktop Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.CMake.Project
+[  +84 ms] Exit code 0 from: C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe -format json -products * -utf8 -latest -version 16 -requires Microsoft.VisualStudio.Workload.NativeDesktop Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.CMake.Project
+[        ] [
+             {
+               "instanceId": "8b83f6f3",
+               "installDate": "2026-04-07T14:47:19Z",
+               "installationName": "VisualStudio/18.4.3+11626.88",
+               "installationPath": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community",
+               "installationVersion": "18.4.11626.88",
+               "productId": "Microsoft.VisualStudio.Product.Community",
+               "productPath": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\devenv.exe",
+               "state": 4294967295,
+               "isComplete": true,
+               "isLaunchable": true,
+               "isPrerelease": false,
+               "isRebootRequired": false,
+               "displayName": "Visual Studio Community 2026",
+               "description": "Everything you need to build modern apps ΓÇô free for you, built for impact.",
+               "channelId": "VisualStudio.18.Release",
+               "channelUri": "https://aka.ms/vs/18/stable/channel",
+               "enginePath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\resources\\app\\ServiceHub\\Services\\Microsoft.VisualStudio.Setup.Service",
+               "expirationDate": "2026-06-24T17:00:00+00:00",
+               "installedChannelId": "VisualStudio.18.Release",
+               "installedChannelUri": "https://aka.ms/vs/18/stable/channel",
+               "releaseNotes": "https://docs.microsoft.com/en-us/visualstudio/releases/18/release-notes-v18.4#18.4.3",
+               "resolvedInstallationPath": "C:\\Program Files\\Microsoft Visual Studio\\18\\Community",
+               "retirementDate": "2026-09-22T17:00:00+00:00",
+               "thirdPartyNotices": "https://go.microsoft.com/fwlink/?LinkId=661480",
+               "updateDate": "2026-04-07T14:47:19.797509Z",
+               "catalog": {
+                 "buildBranch": "stable",
+                 "buildVersion": "18.4.11626.88",
+                 "featureReleaseMonth": "03",
+                 "featureReleaseYear": "2026",
+                 "id": "VisualStudio/18.4.3+11626.88",
+                 "includeBuildVersionInDisplayVersion": "False",
+                 "localBuild": "build-lab",
+                 "manifestName": "VisualStudio",
+                 "manifestType": "installer",
+                 "productDisplayVersion": "18.4.3",
+                 "productLine": "Dev18",
+                 "productLineVersion": "18",
+                 "productMilestone": "RTW",
+                 "productMilestoneIsPreRelease": "False",
+                 "productName": "Visual Studio",
+                 "productPatchVersion": "3",
+                 "productPreReleaseMilestoneSuffix": "1.0",
+                 "productRelease": "RTW",
+                 "productSemanticVersion": "18.4.3+11626.88",
+                 "requiredEngineVersion": "4.4.38.63497"
+               },
+               "properties": {
+                 "appLocalWPF": "false",
+                 "campaignId": "2500:4d79cd24d30d4676a662cf4a7dffe57d",
+                 "canceled": "0",
+                 "channelManifestId": "VisualStudio.18.Release/18.4.3+11626.88",
+                 "includeRecommended": "1",
+                 "nickname": "",
+                 "setupEngineFilePath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\setup.exe"
+               }
+             }
+           ]
+[  +10 ms] Building Windows application...
+[  +10 ms] executing: C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe -S C:\projects\inventory_management\windows -B C:\projects\inventory_management\build\windows\x64 -G Visual Studio 18 2026 -A x64 -DFLUTTER_TARGET_PLATFORM=windows-x64
+[  +96 ms] -- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+[  +53 ms] -- Using cached Firebase SDK zip file
+[        ] -- Using cached extracted Firebase SDK
+[  +39 ms] -- Could NOT find PkgConfig (missing: PKG_CONFIG_EXECUTABLE) 
+[+2382 ms] Feeds used:
+[        ]   C:\Users\hp\.nuget\packages\
+[        ]   https://api.nuget.org/v3/index.json
+[ +132 ms] Package "Microsoft.Windows.CppWinRT.2.0.210806.1" is already installed.
+[+1549 ms] -- Downloading/updating pdfium
+[  +76 ms] -- Selecting Windows SDK version 10.0.26100.0 to target Windows 10.0.26200.
+[ +605 ms] -- Configuring done (0.6s)
+[  +57 ms] -- Generating done (0.1s)
+[   +2 ms] -- Build files have been written to: C:/projects/inventory_management/build/windows/x64/pdfium-download
+[ +178 ms] MSBuild version 18.4.0+6e61e96ac for .NET Framework
+[ +734 ms] -- Configuring done (5.9s)
+[ +303 ms] -- Generating done (0.3s)
+[   +4 ms] -- Build files have been written to: C:/projects/inventory_management/build/windows/x64
+[  +39 ms] executing: C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe --build C:\projects\inventory_management\build\windows\x64 --config Release --target INSTALL --verbose
+[  +92 ms] Change Dir: 'C:/projects/inventory_management/build/windows/x64'
+[        ] Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" INSTALL.vcxproj /p:Configuration=Release /p:Platform=x64 /p:VisualStudioVersion=18.0 /v:n
+[  +96 ms] MSBuild version 18.4.0+6e61e96ac for .NET Framework
+[  +67 ms] Build started 4/27/2026 10:07:32 PM.
+[ +245 ms] Project "C:\projects\inventory_management\build\windows\x64\INSTALL.vcxproj" on node 1 (default targets).
+[        ] Project "C:\projects\inventory_management\build\windows\x64\INSTALL.vcxproj" (1) is building "C:\projects\inventory_management\build\windows\x64\ZERO_CHECK.vcxproj" (2) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +9 ms] InitializeBuildStatus:
+[        ]   Creating "x64\Release\ZERO_CHECK\ZERO_CHECK.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "x64\Release\ZERO_CHECK\ZERO_CHECK.tlog\unsuccessfulbuild".
+[  +21 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +58 ms] FinalizeBuildStatus:
+[        ]   Deleting file "x64\Release\ZERO_CHECK\ZERO_CHECK.tlog\unsuccessfulbuild".
+[        ]   Touching "x64\Release\ZERO_CHECK\ZERO_CHECK.tlog\ZERO_CHECK.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\ZERO_CHECK.vcxproj" (default targets).
+[ +161 ms] Project "C:\projects\inventory_management\build\windows\x64\INSTALL.vcxproj" (1) is building "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (3) on node 1 (default targets).
+[        ] Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (3) is building "C:\projects\inventory_management\build\windows\x64\plugins\cloud_firestore\cloud_firestore_plugin.vcxproj" (4) on node 1 (default targets).
+[        ] Project "C:\projects\inventory_management\build\windows\x64\plugins\cloud_firestore\cloud_firestore_plugin.vcxproj" (4) is building "C:\projects\inventory_management\build\windows\x64\flutter\flutter_assemble.vcxproj" (5) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "x64\Release\flutter_assemble\flutter_assemble.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "x64\Release\flutter_assemble\flutter_assemble.tlog\unsuccessfulbuild".
+[   +8 ms] CustomBuild:
+[        ]   "The build of 'C:\projects\inventory_management\build\windows\x64\CMakeFiles\2d65cd57c12f79c33244ee1cf575d143\flutter_assemble.rule' depends on 'C:\PROJECTS\INVENTORY_MANAGEMENT\WINDOWS\FLUTTER\EPHEMERAL\FLUTTER_WINDOWS.DLL' which is produced by the build of 'C:\projects\inventory_management\build\windows\x64\CMakeFiles\0e51b98dcbf7ee4b11f7d1ddf417eddf\flutter_windows.dll.rule'. The items cannot be built in parallel."
+[ +107 ms]   Generating C:/projects/inventory_management/windows/flutter/ephemeral/flutter_windows.dll, C:/projects/inventory_management/windows/flutter/ephemeral/flutter_export.h, C:/projects/inventory_management/windows/flutter/ephemeral/flutter_windows.h, C:/projects/inventory_management/windows/flutter/ephemeral/flutter_messenger.h, C:/projects/inventory_management/windows/flutter/ephemeral/flutter_plugin_registrar.h, C:/projects/inventory_management/windows/flutter/ephemeral/flutter_texture_registrar.h, C:/projects/inventory_management/windows/flutter/ephemeral/cpp_client_wrapper/core_implementations.cc, C:/projects/inventory_management/windows/flutter/ephemeral/cpp_client_wrapper/standard_codec.cc, C:/projects/inventory_management/windows/flutter/ephemeral/cpp_client_wrapper/plugin_registrar.cc, C:/projects/inventory_management/windows/flutter/ephemeral/cpp_client_wrapper/flutter_engine.cc, C:/projects/inventory_management/windows/flutter/ephemeral/cpp_client_wrapper/flutter_view_controller.cc, _phony_
+[+2051 ms]   [ +366 ms] Artifact Instance of 'MaterialFonts' is not required, skipping update.
+[        ]   [   +2 ms] Artifact Instance of 'GradleWrapper' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'AndroidGenSnapshotArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'AndroidInternalBuildArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IOSEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterWebSdk' is not required, skipping update.
+[        ]   [   +2 ms] Artifact Instance of 'LegacyCanvasKitRemover' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterSdk' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'WindowsEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'MacOSEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LinuxEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LinuxFuchsiaSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'MacOSFuchsiaSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterRunnerSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterRunnerDebugSymbols' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FontSubsetArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'PubDependencies' is not required, skipping update.
+[   +8 ms]   [  +25 ms] Artifact Instance of 'AndroidGenSnapshotArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'AndroidInternalBuildArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IOSEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterWebSdk' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterEngineStamp' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LegacyCanvasKitRemover' is not required, skipping update.
+[   +5 ms]   [   +5 ms] Artifact Instance of 'WindowsEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'MacOSEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LinuxEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LinuxFuchsiaSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'MacOSFuchsiaSDKArtifacts' is not required, skipping update.
+[   +1 ms]   [   +1 ms] Artifact Instance of 'FlutterRunnerSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterRunnerDebugSymbols' is not required, skipping update.
+[ +136 ms]   [ +136 ms] Artifact Instance of 'MaterialFonts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'GradleWrapper' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'AndroidGenSnapshotArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'AndroidInternalBuildArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IOSEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterWebSdk' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterEngineStamp' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LegacyCanvasKitRemover' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterSdk' is not required, skipping update.
+[   +2 ms]   [   +3 ms] Artifact Instance of 'MacOSEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LinuxEngineArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'LinuxFuchsiaSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'MacOSFuchsiaSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterRunnerSDKArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FlutterRunnerDebugSymbols' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'IosUsbArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'FontSubsetArtifacts' is not required, skipping update.
+[        ]   [        ] Artifact Instance of 'PubDependencies' is not required, skipping update.
+[  +65 ms]   [  +65 ms] Initializing file store
+[  +42 ms]   [  +42 ms] Done initializing file store
+[ +178 ms]   [ +178 ms] Skipping target: dart_build
+[   +3 ms]   [   +3 ms] Skipping target: gen_dart_plugin_registrant
+[+4395 ms]   [+4395 ms] Skipping target: unpack_windows
+[  +18 ms]   [  +18 ms] Skipping target: install_code_assets
+[        ]   [        ] Skipping target: gen_localizations
+[+1786 ms]   [+1786 ms] Skipping target: kernel_snapshot_program
+[  +94 ms]   [  +94 ms] Skipping target: aot_elf_release
+[  +78 ms]   [  +78 ms] Skipping target: windows_aot_bundle
+[ +138 ms]   [ +138 ms] Skipping target: release_bundle_windows-x64_assets
+[   +1 ms]   [   +1 ms] Persisting file store
+[  +35 ms]   [  +34 ms] Done persisting file store
+[  +65 ms]   [  +65 ms] build succeeded.
+[   +2 ms]   [   +2 ms] "flutter assemble" took 7,082ms.
+[ +112 ms]   [ +112 ms] Running 1 shutdown hook
+[   +2 ms]   [   +1 ms] Shutdown hooks complete
+[ +272 ms]   [ +271 ms] exiting with code 0
+[ +144 ms] FinalizeBuildStatus:
+[        ]   Deleting file "x64\Release\flutter_assemble\flutter_assemble.tlog\unsuccessfulbuild".
+[        ]   Touching "x64\Release\flutter_assemble\flutter_assemble.tlog\flutter_assemble.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\flutter\flutter_assemble.vcxproj" (default targets).
+[  +94 ms] Project "C:\projects\inventory_management\build\windows\x64\plugins\cloud_firestore\cloud_firestore_plugin.vcxproj" (4) is building "C:\projects\inventory_management\build\windows\x64\plugins\firebase_core\firebase_core_plugin.vcxproj" (6) on node 1 (default targets).
+[        ] Project "C:\projects\inventory_management\build\windows\x64\plugins\firebase_core\firebase_core_plugin.vcxproj" (6) is building "C:\projects\inventory_management\build\windows\x64\flutter\flutter_wrapper_plugin.vcxproj" (7) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "flutter_wrapper_plugin.dir\Release\flutter_.AAB9F4CE.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "flutter_wrapper_plugin.dir\Release\flutter_.AAB9F4CE.tlog\unsuccessfulbuild".
+[   +2 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +86 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[  +53 ms] Lib:
+[        ]   All outputs are up-to-date.
+[   +2 ms]   flutter_wrapper_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\flutter\Release\flutter_wrapper_plugin.lib
+[  +23 ms] FinalizeBuildStatus:
+[        ]   Deleting file "flutter_wrapper_plugin.dir\Release\flutter_.AAB9F4CE.tlog\unsuccessfulbuild".
+[        ]   Touching "flutter_wrapper_plugin.dir\Release\flutter_.AAB9F4CE.tlog\flutter_wrapper_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\flutter\flutter_wrapper_plugin.vcxproj" (default targets).
+[  +11 ms] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "firebase_core_plugin.dir\Release\firebase.3A6EC713.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "firebase_core_plugin.dir\Release\firebase.3A6EC713.tlog\unsuccessfulbuild".
+[   +2 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +20 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[   +5 ms] Lib:
+[        ]   All outputs are up-to-date.
+[        ]   firebase_core_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\plugins\firebase_core\Release\firebase_core_plugin.lib
+[  +13 ms] FinalizeBuildStatus:
+[        ]   Deleting file "firebase_core_plugin.dir\Release\firebase.3A6EC713.tlog\unsuccessfulbuild".
+[        ]   Touching "firebase_core_plugin.dir\Release\firebase.3A6EC713.tlog\firebase_core_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\plugins\firebase_core\firebase_core_plugin.vcxproj" (default targets).
+[  +11 ms] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +3 ms] InitializeBuildStatus:
+[        ]   Creating "cloud_firestore_plugin.dir\Release\cloud_fi.650454A1.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "cloud_firestore_plugin.dir\Release\cloud_fi.650454A1.tlog\unsuccessfulbuild".
+[   +2 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +23 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[   +6 ms] Lib:
+[        ]   All outputs are up-to-date.
+[   +8 ms]   cloud_firestore_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\plugins\cloud_firestore\Release\cloud_firestore_plugin.lib
+[  +12 ms] FinalizeBuildStatus:
+[        ]   Deleting file "cloud_firestore_plugin.dir\Release\cloud_fi.650454A1.tlog\unsuccessfulbuild".
+[        ]   Touching "cloud_firestore_plugin.dir\Release\cloud_fi.650454A1.tlog\cloud_firestore_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\plugins\cloud_firestore\cloud_firestore_plugin.vcxproj" (default targets).
+[  +44 ms] Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (3) is building "C:\projects\inventory_management\build\windows\x64\plugins\dynamic_color\dynamic_color_plugin.vcxproj" (8) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "dynamic_color_plugin.dir\Release\dynamic_.6020E283.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "dynamic_color_plugin.dir\Release\dynamic_.6020E283.tlog\unsuccessfulbuild".
+[   +2 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +17 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[  +49 ms] Link:
+[        ]   All outputs are up-to-date.
+[   +4 ms]   dynamic_color_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\plugins\dynamic_color\Release\dynamic_color_plugin.dll
+[  +10 ms] FinalizeBuildStatus:
+[        ]   Deleting file "dynamic_color_plugin.dir\Release\dynamic_.6020E283.tlog\unsuccessfulbuild".
+[        ]   Touching "dynamic_color_plugin.dir\Release\dynamic_.6020E283.tlog\dynamic_color_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\plugins\dynamic_color\dynamic_color_plugin.vcxproj" (default targets).
+[  +52 ms] Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (3) is building "C:\projects\inventory_management\build\windows\x64\plugins\firebase_auth\firebase_auth_plugin.vcxproj" (9) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "firebase_auth_plugin.dir\Release\firebase.5955CCC2.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "firebase_auth_plugin.dir\Release\firebase.5955CCC2.tlog\unsuccessfulbuild".
+[   +2 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +23 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[   +6 ms] Lib:
+[        ]   All outputs are up-to-date.
+[        ]   firebase_auth_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\plugins\firebase_auth\Release\firebase_auth_plugin.lib
+[  +12 ms] FinalizeBuildStatus:
+[        ]   Deleting file "firebase_auth_plugin.dir\Release\firebase.5955CCC2.tlog\unsuccessfulbuild".
+[        ]   Touching "firebase_auth_plugin.dir\Release\firebase.5955CCC2.tlog\firebase_auth_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\plugins\firebase_auth\firebase_auth_plugin.vcxproj" (default targets).
+[  +42 ms] Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (3) is building "C:\projects\inventory_management\build\windows\x64\flutter\flutter_wrapper_app.vcxproj" (10) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +3 ms] InitializeBuildStatus:
+[        ]   Creating "flutter_wrapper_app.dir\Release\flutter_.660EA63E.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "flutter_wrapper_app.dir\Release\flutter_.660EA63E.tlog\unsuccessfulbuild".
+[   +3 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +20 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[   +7 ms] Lib:
+[        ]   All outputs are up-to-date.
+[        ]   flutter_wrapper_app.vcxproj -> C:\projects\inventory_management\build\windows\x64\flutter\Release\flutter_wrapper_app.lib
+[  +12 ms] FinalizeBuildStatus:
+[        ]   Deleting file "flutter_wrapper_app.dir\Release\flutter_.660EA63E.tlog\unsuccessfulbuild".
+[        ]   Touching "flutter_wrapper_app.dir\Release\flutter_.660EA63E.tlog\flutter_wrapper_app.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\flutter\flutter_wrapper_app.vcxproj" (default targets).
+[  +80 ms] Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (3) is building "C:\projects\inventory_management\build\windows\x64\runner\inventory_manager.vcxproj" (11) on node 1 (default targets).
+[        ] Project "C:\projects\inventory_management\build\windows\x64\runner\inventory_manager.vcxproj" (11) is building "C:\projects\inventory_management\build\windows\x64\plugins\permission_handler_windows\permission_handler_windows_plugin.vcxproj" (12) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +3 ms] InitializeBuildStatus:
+[        ]   Creating "permission_handler_windows_plugin.dir\Release\permissi.C8598BB5.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "permission_handler_windows_plugin.dir\Release\permissi.C8598BB5.tlog\unsuccessfulbuild".
+[   +2 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +22 ms] ComputeStdModulesCompileInputs:
+[        ]   Reading library manifest file 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\modules\modules.json' which provides data for library 'microsoft/STL'.
+[        ]   Adding module source 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\modules\std.ixx' from library 'microsoft/STL' to be built with this project.
+[        ]   Adding module source 'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\modules\std.compat.ixx' from library 'microsoft/STL' to be built with this project.
+[  +33 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[  +10 ms] Link:
+[        ]   All outputs are up-to-date.
+[        ]   permission_handler_windows_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\plugins\permission_handler_windows\Release\permission_handler_windows_plugin.dll
+[  +16 ms] FinalizeBuildStatus:
+[        ]   Deleting file "permission_handler_windows_plugin.dir\Release\permissi.C8598BB5.tlog\unsuccessfulbuild".
+[        ]   Touching "permission_handler_windows_plugin.dir\Release\permissi.C8598BB5.tlog\permission_handler_windows_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\plugins\permission_handler_windows\permission_handler_windows_plugin.vcxproj" (default targets).
+[  +50 ms] Project "C:\projects\inventory_management\build\windows\x64\runner\inventory_manager.vcxproj" (11) is building "C:\projects\inventory_management\build\windows\x64\plugins\printing\printing_plugin.vcxproj" (13) on node 1 (default targets).
+[        ] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +5 ms] InitializeBuildStatus:
+[        ]   Creating "printing_plugin.dir\Release\printing_plugin.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "printing_plugin.dir\Release\printing_plugin.tlog\unsuccessfulbuild".
+[   +3 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +16 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[  +14 ms] Link:
+[        ]   All outputs are up-to-date.
+[        ]   printing_plugin.vcxproj -> C:\projects\inventory_management\build\windows\x64\plugins\printing\Release\printing_plugin.dll
+[  +10 ms] FinalizeBuildStatus:
+[        ]   Deleting file "printing_plugin.dir\Release\printing_plugin.tlog\unsuccessfulbuild".
+[        ]   Touching "printing_plugin.dir\Release\printing_plugin.tlog\printing_plugin.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\plugins\printing\printing_plugin.vcxproj" (default targets).
+[  +22 ms] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "inventory_manager.dir\Release\inventor.B5E7E8C1.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "inventory_manager.dir\Release\inventor.B5E7E8C1.tlog\unsuccessfulbuild".
+[   +4 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +49 ms] ClCompile:
+[        ]   All outputs are up-to-date.
+[  +10 ms] ResourceCompile:
+[        ]   All outputs are up-to-date.
+[  +16 ms] Link:
+[        ]   All outputs are up-to-date.
+[   +1 ms]   inventory_manager.vcxproj -> C:\projects\inventory_management\build\windows\x64\runner\Release\inventory_manager.exe
+[  +17 ms] FinalizeBuildStatus:
+[        ]   Deleting file "inventory_manager.dir\Release\inventor.B5E7E8C1.tlog\unsuccessfulbuild".
+[        ]   Touching "inventory_manager.dir\Release\inventor.B5E7E8C1.tlog\inventory_manager.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\runner\inventory_manager.vcxproj" (default targets).
+[  +15 ms] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +4 ms] InitializeBuildStatus:
+[        ]   Creating "x64\Release\ALL_BUILD\ALL_BUILD.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "x64\Release\ALL_BUILD\ALL_BUILD.tlog\unsuccessfulbuild".
+[   +3 ms] CustomBuild:
+[        ]   All outputs are up-to-date.
+[  +16 ms] FinalizeBuildStatus:
+[        ]   Deleting file "x64\Release\ALL_BUILD\ALL_BUILD.tlog\unsuccessfulbuild".
+[        ]   Touching "x64\Release\ALL_BUILD\ALL_BUILD.tlog\ALL_BUILD.lastbuildstate".
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (default targets).
+[  +11 ms] PrepareForBuild:
+[        ]   Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+[   +3 ms] InitializeBuildStatus:
+[        ]   Creating "x64\Release\INSTALL\INSTALL.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+[        ]   Touching "x64\Release\INSTALL\INSTALL.tlog\unsuccessfulbuild".
+[  +55 ms] CustomBuild:
+[        ]   1>
+[  +27 ms] PostBuildEvent:
+[        ]   setlocal
+[        ]   "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -DBUILD_TYPE=Release -P cmake_install.cmake
+[        ]   if %errorlevel% neq 0 goto :cmEnd
+[        ]   :cmEnd
+[        ]   endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+[        ]   :cmErrorLevel
+[        ]   exit /b %1
+[        ]   :cmDone
+[        ]   if %errorlevel% neq 0 goto :VCEnd
+[        ]   :VCEnd
+[  +73 ms]   -- Install configuration: "Release"
+[   +5 ms]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/data/icudtl.dat
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/flutter_windows.dll
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/cloud_firestore_plugin.lib
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/dynamic_color_plugin.dll
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/firebase_auth_plugin.lib
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/firebase_core_plugin.lib
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/permission_handler_windows_plugin.dll
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/printing_plugin.dll
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/pdfium.dll
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release
+[        ]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/sqlite3.dll
+[  +25 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets
+[   +1 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/AssetManifest.bin
+[   +2 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/FontManifest.json
+[   +1 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/fonts
+[  +12 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/fonts/MaterialIcons-Regular.otf
+[  +12 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/kernel_blob.bin
+[ +704 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/NativeAssetsManifest.json
+[   +3 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/NOTICES.Z
+[   +4 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages
+[   +2 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages/font_awesome_flutter
+[   +2 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages/font_awesome_flutter/lib
+[   +2 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages/font_awesome_flutter/lib/fonts
+[   +2 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages/font_awesome_flutter/lib/fonts/fa-brands-400.ttf
+[   +4 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages/font_awesome_flutter/lib/fonts/fa-regular-400.ttf
+[   +4 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/packages/font_awesome_flutter/lib/fonts/fa-solid-900.ttf
+[  +18 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/shaders
+[   +2 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/shaders/ink_sparkle.frag
+[   +3 ms]   -- Installing: C:/projects/inventory_management/build/windows/x64/runner/Release/data/flutter_assets/shaders/stretch_effect.frag
+[   +4 ms]   -- Up-to-date: C:/projects/inventory_management/build/windows/x64/runner/Release/data/app.so
+[  +34 ms] FinalizeBuildStatus:
+[        ]   Deleting file "x64\Release\INSTALL\INSTALL.tlog\unsuccessfulbuild".
+[        ]   Touching "x64\Release\INSTALL\INSTALL.tlog\INSTALL.lastbuildstate".
+[   +2 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\INSTALL.vcxproj" (default targets).
+[   +3 ms] Build succeeded.
+[        ]     0 Warning(s)
+[        ]     0 Error(s)
+[        ] Time Elapsed 00:00:12.54
+[  +68 ms] Building Windows application... (completed in 19.2s)
+[   +2 ms] ΓêÜ Built build\windows\x64\runner\Release\inventory_manager.exe
+[   +1 ms] "flutter windows" took 20,916ms.
+[ +109 ms] Running 1 shutdown hook
+[   +3 ms] Shutdown hooks complete
+[ +271 ms] exiting with code 0

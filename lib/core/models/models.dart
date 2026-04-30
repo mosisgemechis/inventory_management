@@ -1,15 +1,32 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hive/hive.dart';
 
-enum UserRole { admin, staff, cashier, manager, stockist, billing, none }
+part 'models.g.dart';
 
+@HiveType(typeId: 4)
+enum UserRole { 
+  @HiveField(0) admin, 
+  @HiveField(1) staff, 
+  @HiveField(2) manager, 
+  @HiveField(3) none 
+}
+
+@HiveType(typeId: 0)
 class AppUser {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String email;
+  @HiveField(2)
   final String username;
   final List<UserRole>? _roles;
+  @HiveField(3)
   List<UserRole> get roles => _roles ?? [UserRole.staff];
+  @HiveField(4)
   final String shopId;
+  @HiveField(5)
   final String branchId;
+  @HiveField(6)
   final String? branchName;
 
   AppUser({
@@ -74,20 +91,35 @@ class AppUser {
   }
 }
 
+@HiveType(typeId: 1)
 class Product {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String shopId;
+  @HiveField(2)
   final String branchId;
+  @HiveField(3)
   final String name;
+  @HiveField(4)
   final String barcode;
+  @HiveField(5)
   final double quantity;
+  @HiveField(6)
   final double buyingPrice;
+  @HiveField(7)
   final double sellingPrice;
+  @HiveField(8)
   final int lowStockThreshold;
+  @HiveField(9)
   final DateTime? expiryDate;
+  @HiveField(10)
   final String? batchNumber;
+  @HiveField(11)
   final bool isBundle;
+  @HiveField(12)
   final List<String>? bundleItems;
+  @HiveField(13)
   final DateTime? lastUpdated;
 
   Product({
@@ -118,11 +150,11 @@ class Product {
       buyingPrice: (map['buyingPrice'] ?? 0.0).toDouble(),
       sellingPrice: (map['sellingPrice'] ?? 0.0).toDouble(),
       lowStockThreshold: map['lowStockThreshold'] ?? 5,
-      expiryDate: map['expiryDate'] != null ? (map['expiryDate'] as Timestamp).toDate() : null,
+      expiryDate: parseDT(map['expiryDate']),
       batchNumber: map['batchNumber'],
       isBundle: map['isBundle'] ?? false,
       bundleItems: map['bundleItems'] != null ? List<String>.from(map['bundleItems']) : null,
-      lastUpdated: map['lastUpdated'] != null ? (map['lastUpdated'] as Timestamp).toDate() : null,
+      lastUpdated: parseDT(map['lastUpdated']),
     );
   }
 
@@ -145,21 +177,37 @@ class Product {
   }
 }
 
+@HiveType(typeId: 2)
 class Sale {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String shopId;
+  @HiveField(2)
   final String branchId;
+  @HiveField(3)
   final String itemId;
+  @HiveField(4)
   final String itemName;
+  @HiveField(5)
   final int quantity;
+  @HiveField(6)
   final double totalPrice;
+  @HiveField(7)
   final double profit;
+  @HiveField(8)
   final String userId;
+  @HiveField(9)
   final String username;
+  @HiveField(10)
   final DateTime timestamp;
+  @HiveField(11)
   final String? customerName;
+  @HiveField(12)
   final bool isDebt;
+  @HiveField(13)
   final double amountPaid;
+  @HiveField(14)
   final double debtRemaining;
 
   Sale({
@@ -192,7 +240,7 @@ class Sale {
       profit: (map['profit'] ?? 0.0).toDouble(),
       userId: map['userId'] ?? '',
       username: map['username'] ?? 'User',
-      timestamp: map['timestamp'] != null ? (map['timestamp'] as Timestamp).toDate() : DateTime.now(),
+      timestamp: parseDT(map['timestamp']) ?? DateTime.now(),
       customerName: map['customerName'] ?? map['buyerName'],
       isDebt: map['isDebt'] ?? false,
       amountPaid: (map['amountPaid'] ?? 0.0).toDouble(),
@@ -267,15 +315,25 @@ class Supplier {
   }
 }
 
+@HiveType(typeId: 3)
 class PurchaseRecord {
+  @HiveField(0)
   final String id;
+  @HiveField(1)
   final String shopId;
+  @HiveField(2)
   final String? supplierId;
+  @HiveField(3)
   final String itemId;
+  @HiveField(4)
   final String itemName;
+  @HiveField(5)
   final double quantity;
+  @HiveField(6)
   final double unitCost;
+  @HiveField(7)
   final double totalCost;
+  @HiveField(8)
   final DateTime timestamp;
 
   PurchaseRecord({
@@ -300,7 +358,7 @@ class PurchaseRecord {
       quantity: (map['quantity'] ?? 0.0).toDouble(),
       unitCost: (map['unitCost'] ?? 0.0).toDouble(),
       totalCost: (map['totalCost'] ?? 0.0).toDouble(),
-      timestamp: map['timestamp'] != null ? (map['timestamp'] as Timestamp).toDate() : DateTime.now(),
+      timestamp: parseDT(map['timestamp']) ?? DateTime.now(),
     );
   }
 
@@ -345,7 +403,7 @@ class AuditLog {
       username: map['username'] ?? '',
       action: map['action'] ?? '',
       details: map['details'] ?? '',
-      timestamp: map['timestamp'] != null ? (map['timestamp'] as Timestamp).toDate() : DateTime.now(),
+      timestamp: parseDT(map['timestamp']) ?? DateTime.now(),
     );
   }
 
@@ -384,7 +442,7 @@ class AppNotification {
       shopId: map['shopId'] ?? 'default_shop',
       message: map['message'] ?? '',
       type: map['type'] ?? 'staff',
-      timestamp: map['timestamp'] != null ? (map['timestamp'] as Timestamp).toDate() : DateTime.now(),
+      timestamp: parseDT(map['timestamp']) ?? DateTime.now(),
       isRead: map['isRead'] ?? false,
     );
   }
@@ -397,5 +455,55 @@ class AppNotification {
       'timestamp': Timestamp.fromDate(timestamp),
       'isRead': isRead,
     };
+  }
+}
+
+@HiveType(typeId: 6)
+class CartItem {
+  @HiveField(0)
+  final String id;
+  @HiveField(1)
+  final String name;
+  @HiveField(2)
+  final double price;
+  @HiveField(3)
+  int quantity;
+  @HiveField(4)
+  final String? batchNumber;
+  @HiveField(5)
+  final double? cost;
+
+  CartItem({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.quantity,
+    this.batchNumber,
+    this.cost,
+  });
+
+  double get total => price * quantity;
+}
+
+DateTime? parseDT(dynamic timestamp) {
+  if (timestamp == null) return null;
+  if (timestamp is Timestamp) return timestamp.toDate();
+  if (timestamp is String) return DateTime.tryParse(timestamp);
+  if (timestamp is DateTime) return timestamp;
+  return null;
+}
+
+class TimestampAdapter extends TypeAdapter<Timestamp> {
+  @override
+  final int typeId = 20;
+
+  @override
+  Timestamp read(BinaryReader reader) {
+    return Timestamp.fromMillisecondsSinceEpoch(reader.readInt());
+  }
+
+  @override
+  void write(BinaryWriter writer, Timestamp obj) {
+    writer.writeInt(obj.millisecondsSinceEpoch);
   }
 }

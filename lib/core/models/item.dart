@@ -67,14 +67,14 @@ class Item {
     DateTime? updatedAt,
   }) {
     return Item(
-      id: this.id,
-      shopId: this.shopId,
+      id: id,
+      shopId: shopId,
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
       buyingPrice: buyingPrice ?? this.buyingPrice,
       sellingPrice: sellingPrice ?? this.sellingPrice,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
-      createdAt: this.createdAt,
+      createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }

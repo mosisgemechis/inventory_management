@@ -44,6 +44,11 @@ class ReportingServiceImpl implements ReportingInterface {
     }
     return "Browser Download Initiated";
   }
+
+  @override
+  Future<String> exportToPdf(String fileName, Map<String, dynamic> data) async {
+    return "PDF Export not yet optimized for Web. Use Desktop or Mobile.";
+  }
 }
 
 ReportingInterface getReportingService() => ReportingServiceImpl();

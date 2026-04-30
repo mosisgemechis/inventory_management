@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../models/models.dart';
 import 'notification_service.dart';
@@ -96,7 +95,43 @@ class AuthService with ChangeNotifier {
     await _db.collection('users').doc(currentUser.uid).update({'email': newEmail});
   }
 
+  Future<void> signUp(String email, String password, String username, String shopName) async {
+    try {
+      // 1. Create Auth User
+      UserCredential res = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      
+      if (res.user != null) {
+        // 2. Setup Shop
+        final shopDoc = await _db.collection('shops').add({
+          'name': shopName,
+          'createdAt': DateTime.now().toIso8601String(),
+          'plan': 'enterprise_trial',
+        });
+
+        // 3. Setup User Profile
+        final userData = {
+          'email': email,
+          'username': username.toLowerCase().trim(),
+          'roles': ['admin'],
+          'shopId': shopDoc.id,
+          'branchId': 'main',
+          'branchName': 'Main Branch',
+        };
+
+        await _db.collection('users').doc(res.user!.uid).set(userData);
+
+        _user = AppUser.fromMap(userData, res.user!.uid);
+        _safeNotify();
+      }
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? "Registration failed");
+    } catch (e) {
+      throw Exception("Setup failed: $e");
+    }
+  }
+
   Future<void> signOut() async {
     await _auth.signOut();
   }
 }
+

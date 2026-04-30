@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,25 +21,39 @@ class LocalDatabaseImpl implements LocalDatabase {
 
     _db = await openDatabase(
       path,
-      version: 5,
+      version: 9,
       onCreate: (db, version) async {
-        await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY, shopId TEXT, branchId TEXT, name TEXT, barcode TEXT, quantity INTEGER, buyingPrice REAL, sellingPrice REAL, lowStockThreshold INTEGER, batchNumber TEXT, expiryDate TEXT, lastUpdated TEXT, isSynced INTEGER DEFAULT 0)');
-        await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, shopId TEXT, branchId TEXT, itemId TEXT, itemName TEXT, quantity INTEGER, totalPrice REAL, profit REAL, customerName TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+        await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY, shopId TEXT, branchId TEXT, name TEXT, barcode TEXT, quantity REAL, buyingPrice REAL, sellingPrice REAL, lowStockThreshold INTEGER, batchNumber TEXT, expiryDate TEXT, lastUpdated TEXT, isSynced INTEGER DEFAULT 0)');
+        await db.execute('CREATE INDEX idx_products_lookup ON products(shopId, name, barcode)');
+        await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, shopId TEXT, branchId TEXT, itemId TEXT, itemName TEXT, quantity REAL, totalPrice REAL, profit REAL, customerName TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+        await db.execute('CREATE INDEX idx_sales_date ON sales(shopId, timestamp)');
         await db.execute('CREATE TABLE suppliers (id TEXT PRIMARY KEY, shopId TEXT, name TEXT, outstandingDebt REAL, totalPaid REAL, lastUpdated TEXT, isSynced INTEGER DEFAULT 1)');
-        await db.execute('CREATE TABLE purchases (id TEXT PRIMARY KEY, shopId TEXT, itemId TEXT, itemName TEXT, quantity INTEGER, unitCost REAL, batchNumber TEXT, expiryDate TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+        await db.execute('CREATE TABLE purchases (id TEXT PRIMARY KEY, shopId TEXT, itemId TEXT, itemName TEXT, barcode TEXT, quantity REAL, unitCost REAL, totalCost REAL, supplierName TEXT, batchNumber TEXT, expiryDate TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
         await db.execute('CREATE TABLE audit_logs (id TEXT PRIMARY KEY, shopId TEXT, username TEXT, action TEXT, details TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+        await db.execute('CREATE TABLE batches (id TEXT PRIMARY KEY, shopId TEXT, itemId TEXT, quantity REAL, buyingPrice REAL, expiryDate TEXT, batchNumber TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
       },
       onUpgrade: (db, oldV, newV) async {
-        // Handle migrations
-        if (oldV < 5) {
-           // Ensure all columns exist
-           var tables = ['products', 'sales', 'suppliers', 'purchases', 'audit_logs'];
-           for(var t in tables) {
-             try { await db.execute('ALTER TABLE $t ADD COLUMN isSynced INTEGER DEFAULT 0'); } catch(_) {}
-           }
+        if (oldV < 9) {
+          // Destructive upgrade complex tables for this phase (mirrored in Firestore)
+          await db.execute('DROP TABLE IF EXISTS products');
+          await db.execute('DROP TABLE IF EXISTS sales');
+          await db.execute('DROP TABLE IF EXISTS suppliers');
+          await db.execute('DROP TABLE IF EXISTS purchases');
+          await db.execute('DROP TABLE IF EXISTS audit_logs');
+          await db.execute('DROP TABLE IF EXISTS batches');
+          
+          await db.execute('CREATE TABLE products (id TEXT PRIMARY KEY, shopId TEXT, branchId TEXT, name TEXT, barcode TEXT, quantity REAL, buyingPrice REAL, sellingPrice REAL, lowStockThreshold INTEGER, batchNumber TEXT, expiryDate TEXT, lastUpdated TEXT, isSynced INTEGER DEFAULT 0)');
+          await db.execute('CREATE INDEX idx_products_lookup ON products(shopId, name, barcode)');
+          await db.execute('CREATE TABLE sales (id TEXT PRIMARY KEY, shopId TEXT, branchId TEXT, itemId TEXT, itemName TEXT, quantity REAL, totalPrice REAL, profit REAL, customerName TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+          await db.execute('CREATE INDEX idx_sales_date ON sales(shopId, timestamp)');
+          await db.execute('CREATE TABLE suppliers (id TEXT PRIMARY KEY, shopId TEXT, name TEXT, outstandingDebt REAL, totalPaid REAL, lastUpdated TEXT, isSynced INTEGER DEFAULT 1)');
+          await db.execute('CREATE TABLE purchases (id TEXT PRIMARY KEY, shopId TEXT, itemId TEXT, itemName TEXT, barcode TEXT, quantity REAL, unitCost REAL, totalCost REAL, supplierName TEXT, batchNumber TEXT, expiryDate TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+          await db.execute('CREATE TABLE audit_logs (id TEXT PRIMARY KEY, shopId TEXT, username TEXT, action TEXT, details TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
+          await db.execute('CREATE TABLE batches (id TEXT PRIMARY KEY, shopId TEXT, itemId TEXT, quantity REAL, buyingPrice REAL, expiryDate TEXT, batchNumber TEXT, timestamp TEXT, isSynced INTEGER DEFAULT 0)');
         }
       }
     );
+
   }
 
   @override

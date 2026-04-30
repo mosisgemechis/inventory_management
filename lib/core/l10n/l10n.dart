@@ -35,7 +35,7 @@ class LocalizationService with ChangeNotifier {
       'language': 'Language',
       'amharic': 'Amharic (አማርኛ)',
       'english': 'English',
-      'kibid': 'Customer Debt (Kibid)',
+      'debt': 'Customer Debt',
       'batch_no': 'Batch Number',
       'expiry': 'Expiry Date',
       'daily_sales': 'Daily Sales',
@@ -47,6 +47,12 @@ class LocalizationService with ChangeNotifier {
       'add_user': 'Add User',
       'set_price': 'Set Price',
       'branch': 'Branch',
+      'dashboard': 'Dashboard',
+      'sales_pos': 'Sales (POS)',
+      'inventory_control': 'Inventory Control',
+      'audit_history': 'Audit History',
+      'request_deletion': 'Request Deletion',
+      'low_stock_limit': 'Low Stock Alert',
     },
     'am': {
       'app_title': 'ስማርት ኢንቬንተሪ ERP',
@@ -77,7 +83,7 @@ class LocalizationService with ChangeNotifier {
       'language': 'ቋንቋ',
       'amharic': 'አማርኛ',
       'english': 'እንግሊዝኛ',
-      'kibid': 'የደንበኛ ዕዳ (ኪቢድ)',
+      'debt': 'የደንበኛ ዕዳ',
       'batch_no': 'ባች ቁጥር',
       'expiry': 'የአገልግሎት ማብቂያ ቀን',
       'daily_sales': 'የቀን ሽያጭ',
@@ -89,6 +95,12 @@ class LocalizationService with ChangeNotifier {
       'add_user': 'ተጠቃሚ ጨምር',
       'set_price': 'ዋጋ ወስን',
       'branch': 'ቅርንጫፍ',
+      'dashboard': 'ዳሽቦርድ',
+      'sales_pos': 'POS ሽያጭ',
+      'inventory_control': 'ክምችት ተቆጣጣሪ',
+      'audit_history': 'የኦዲት ታሪክ',
+      'request_deletion': 'የስረዛ ጥያቄ',
+      'low_stock_limit': 'የክምችት ማስጠንቀቂያ',
     }
   };
 
