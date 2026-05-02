@@ -133,5 +133,24 @@ class AuthService with ChangeNotifier {
   Future<void> signOut() async {
     await _auth.signOut();
   }
+
+  // ── SHOP PROFILE MANAGEMENT ──────────────────────────────────────────────
+  
+  Stream<DocumentSnapshot> get shopStream {
+    if (_user == null) return const Stream.empty();
+    return _db.collection('shops').doc(_user!.shopId).snapshots().toMainThread();
+  }
+
+  Future<void> updateShop(String name, String phone) async {
+    if (_user == null) throw Exception("Not logged in");
+    await _db.collection('shops').doc(_user!.shopId).update({
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+    
+    // Log as Audit log if needed, but here we just ensure Firestore is updated.
+    _safeNotify();
+  }
 }
 

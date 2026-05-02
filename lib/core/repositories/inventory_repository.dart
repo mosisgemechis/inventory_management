@@ -63,6 +63,8 @@ class InventoryRepository {
         'supplierName': finalData['supplierName'],
       });
     }
+
+    await recordAuditLog(user.shopId, user.username, 'ADD_PRODUCT', 'Added new product: ${finalData['name']} (Initial: $initialQty)');
   }
 
   /// THE BATCH ENGINE: Direct/Global Restock Logic 
@@ -71,7 +73,8 @@ class InventoryRepository {
     // Requires: itemId, itemName, addedQuantity, buyingPrice, expiryDate
     // NO duplicate detector constraint here because it operates on existing items.
     
-    final String itemId = restockData['itemId'];
+    final String? itemId = restockData['itemId'];
+    if (itemId == null) throw Exception("System Error: Item Identity is missing for restock.");
     final double incomingQty = (restockData['addedQuantity'] ?? 0).toDouble();
     if (incomingQty <= 0) throw Exception("Restock quantity must be greater than zero.");
 
@@ -128,12 +131,13 @@ class InventoryRepository {
     // 4. Update the Product's flat quantity cache temporarily to ensure UI compatibility
     final summary = await _recalculateItemStock(user.shopId, itemId);
 
-    // 5. Fire-and-forget sync for Batch and absolute product summary
     _remote.recordBatch(batchData, itemSummaryUpdate: summary).then((_) {
       _local.markSynced('batches', activeBatchId);
     }).catchError((e) {
       debugPrint("Batch Sync Error: $e");
     });
+
+    await recordAuditLog(user.shopId, user.username, 'RESTOCK', 'Restocked ${restockData['itemName']}: +$incomingQty units');
   }
 
   /// Sums all active unexpired batches for this product and returns the item cached `quantity` and `expiryDate`

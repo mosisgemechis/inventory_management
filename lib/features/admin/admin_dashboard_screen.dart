@@ -43,8 +43,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _reportFilter = 'Daily';
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 0));
   DateTime _endDate = DateTime.now();
-  String _inventoryFilter = 'All';
   String _purchaseSupplierFilter = 'All Suppliers';
+
+  // Streams cached to prevent infinite rebuild/semantics loops
+  Stream<QuerySnapshot>? _notificationStream;
+  Stream<QuerySnapshot>? _homeSalesStream;
+  Stream<QuerySnapshot>? _homeInventoryStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _setFilter('Daily');
+    // Cache common streams once.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchPurchases();
+      final user = Provider.of<AuthService>(context, listen: false).user;
+      if (user != null) {
+        setState(() {
+          _notificationStream = FirebaseFirestore.instance
+              .collection('deletion_requests')
+              .where('shopId', isEqualTo: user.shopId)
+              .where('status', isEqualTo: 'pending')
+              .snapshots()
+              .toMainThread();
+          
+          _homeSalesStream = _db.getSales(user.shopId).toMainThread();
+          _homeInventoryStream = _db.getInventory(user.shopId).toMainThread();
+        });
+      }
+    });
+  }
 
   void _setFilter(String type) {
     setState(() {
@@ -67,6 +95,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final currencyFormat =
       NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
   String _searchQuery = "";
+  final TextEditingController _posBarcodeC = TextEditingController(); // For POS Barcode scanning
   final String _selectedBranchId = "all";
   List<CartItem> _posCart = [];
   double _cartTotal = 0;
@@ -286,14 +315,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<DocumentSnapshot>? _purchases;
   bool _isLoadingPurchases = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _setFilter('Daily');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchPurchases();
-    });
-  }
 
   void _fetchPurchases() {}
   // Refactored to unified StreamBuilder in Phase 4.4.1.1
@@ -301,64 +322,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.select<AuthService, AppUser?>((auth) => auth.user);
-    if (user == null)
+    if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-    return LayoutBuilder(builder: (outerCtx, outerConstraints) {
-      final desktop = outerConstraints.maxWidth > 900;
-      final sidebarItems = _getSidebarItems(user);
+    final bool desktop = MediaQuery.sizeOf(context).width > 900;
+    final sidebarItems = _getSidebarItems(user);
 
-      return Scaffold(
-        key: const ValueKey('admin_scaffold'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: desktop ? null : _buildMobileAppBar(user),
-        drawer: desktop ? null : Drawer(
-          width: 280,
-          child: Column(
-            children: [
-              DrawerHeader(
-                decoration: const BoxDecoration(color: AppColors.primary),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.admin_panel_settings_rounded, size: 48, color: Colors.white),
-                      const SizedBox(height: 12),
-                      Text("SmartInventory ERP", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: sidebarItems.length,
-                  itemBuilder: (context, i) {
-                    final item = sidebarItems[i];
-                    return ListTile(
-                      leading: Icon(item.icon, color: _selectedIndex == i ? AppColors.secondary : null),
-                      title: Text(item.label, style: TextStyle(
-                        fontWeight: _selectedIndex == i ? FontWeight.bold : null,
-                        color: _selectedIndex == i ? AppColors.secondary : null,
-                      )),
-                      selected: _selectedIndex == i,
-                      onTap: () {
-                        setState(() => _selectedIndex = i);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-              const Divider(),
-              _buildLogoutButton(),
-            ],
-          ),
-        ),
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Scaffold(
+      key: const ValueKey('admin_scaffold'),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: desktop ? null : _buildMobileAppBar(user),
+      drawer: desktop ? null : Drawer(
+        width: 280,
+        child: Column(
           children: [
-            if (desktop)
-              Column(
+            DrawerHeader(
+              decoration: const BoxDecoration(color: AppColors.primary),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.admin_panel_settings_rounded, size: 48, color: Colors.white),
+                    const SizedBox(height: 12),
+                    Text("SmartInventory ERP", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: sidebarItems.length,
+                itemBuilder: (context, i) {
+                  final item = sidebarItems[i];
+                  return ListTile(
+                    leading: Icon(item.icon, color: _selectedIndex == i ? AppColors.secondary : null),
+                    title: Text(item.label, style: TextStyle(
+                      fontWeight: _selectedIndex == i ? FontWeight.bold : null,
+                      color: _selectedIndex == i ? AppColors.secondary : null,
+                    )),
+                    selected: _selectedIndex == i,
+                    onTap: () {
+                      setState(() => _selectedIndex = i);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+            const Divider(),
+            _buildLogoutButton(),
+          ],
+        ),
+      ),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (desktop)
+            SizedBox(
+              width: 260,
+              child: Column(
                 children: [
                   Expanded(
                     child: ERPSidebar(
@@ -371,21 +394,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _buildLogoutButton(),
                 ],
               ),
-            Expanded(
-              child: Column(
-                key: const ValueKey('admin_main_content'),
-                children: [
-                  if (desktop) _buildDesktopHeader(user),
-                  Expanded(child: _buildBody(user)),
-                ],
-              ),
             ),
-          ],
-        ),
-        bottomNavigationBar: desktop ? null : _buildBottomNav(),
-        floatingActionButton: _buildCorrectFAB(user, sidebarItems),
-      );
-    });
+          Expanded(
+            child: Column(
+              key: const ValueKey('admin_main_content'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (desktop) _buildDesktopHeader(user),
+                Expanded(child: _buildBody(user)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: desktop ? null : _buildBottomNav(),
+      floatingActionButton: _buildCorrectFAB(user, sidebarItems),
+    );
   }
 
   Widget? _buildCorrectFAB(AppUser user, List<SidebarItem> items) {
@@ -429,29 +453,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         user.roles.contains(UserRole.manager);
     return [
       SidebarItem(
-          uid: 'overview', icon: Icons.grid_view_rounded, label: 'Dashboard'),
+          uid: 'overview', icon: Icons.grid_view_rounded, label: 'dashboard'.tr(context)),
       SidebarItem(
           uid: 'inventory',
           icon: Icons.inventory_2_outlined,
-          label: 'Inventory'),
+          label: 'inventory'.tr(context)),
       SidebarItem(
           uid: 'sales',
           icon: Icons.shopping_cart_outlined,
-          label: 'Sales (POS)'),
+          label: 'sales_pos'.tr(context)),
       SidebarItem(
           uid: 'purchases',
           icon: Icons.receipt_long_outlined,
-          label: 'Purchases'),
-      SidebarItem(uid: 'debt', icon: Icons.payments_rounded, label: 'Debt'),
+          label: 'purchases'.tr(context)),
+      SidebarItem(uid: 'debt', icon: Icons.payments_rounded, label: 'debt'.tr(context)),
       SidebarItem(
-          uid: 'reports', icon: Icons.analytics_outlined, label: 'Reports'),
+          uid: 'reports', icon: Icons.analytics_outlined, label: 'reports'.tr(context)),
       if (isAdminOrManager)
         SidebarItem(
-            uid: 'users', icon: Icons.people_outline_rounded, label: 'Users'),
+            uid: 'users', icon: Icons.people_outline_rounded, label: 'add_user'.tr(context)),
       SidebarItem(
-          uid: 'audit', icon: Icons.history_rounded, label: 'Audit Trail'),
+          uid: 'audit', icon: Icons.history_rounded, label: 'audit_history'.tr(context)),
       SidebarItem(
-          uid: 'settings', icon: Icons.settings_outlined, label: 'Settings'),
+          uid: 'settings', icon: Icons.settings_outlined, label: 'settings'.tr(context)),
     ];
   }
 
@@ -480,45 +504,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_getTabTitle(),
-                  style: GoogleFonts.outfit(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.secondary)),
-              const SizedBox(height: 4),
-              Text("Welcome back, ${user.username}",
-                  style:
-                      TextStyle(color: AppColors.textSecondary, fontSize: 16)),
-            ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_getTabTitle(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.secondary)),
+                const SizedBox(height: 4),
+                Text("Welcome back, ${user.username}",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: AppColors.textSecondary, fontSize: 16)),
+              ],
+            ),
           ),
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_month_rounded,
-                        size: 18, color: AppColors.textSecondary),
-                    const SizedBox(width: 8),
-                    Text(DateFormat('MMM d, yyyy').format(DateTime.now()),
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.keyboard_arrow_down_rounded,
-                        size: 18, color: AppColors.textSecondary),
-                  ],
+          const SizedBox(width: 16),
+          Flexible(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_month_rounded,
+                            size: 18, color: AppColors.textSecondary),
+                        const SizedBox(width: 8),
+                        Text(DateFormat('MMM d, yyyy').format(DateTime.now()),
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 18, color: AppColors.textSecondary),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              _buildNotificationBadge(user),
-            ],
+                const SizedBox(width: 16),
+                _buildNotificationBadge(user),
+              ],
+            ),
           ),
         ],
       ),
@@ -528,37 +567,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _getTabTitle() {
     switch (_selectedIndex) {
       case 0:
-        return 'Admin Overview';
+        return 'dashboard'.tr(context);
       case 1:
-        return 'Inventory Control';
+        return 'inventory_control'.tr(context);
       case 2:
-        return 'Sales (POS)';
+        return 'sales_pos'.tr(context);
       case 3:
-        return 'Purchases';
+        return 'purchases'.tr(context);
       case 4:
-        return 'Debt Ledger';
+        return 'debt'.tr(context);
       case 5:
-        return 'Financial Reports';
+        return 'reports'.tr(context);
       case 6:
-        return 'User Management';
+        return 'add_user'.tr(context);
       case 7:
-        return 'Audit Trail';
+        return 'audit_history'.tr(context);
       case 8:
-        return 'Settings';
+        return 'settings'.tr(context);
       default:
         return 'Dashboard';
     }
   }
 
   Widget _buildNotificationBadge(AppUser user) {
-    final shopId = user.shopId;
+    if (_notificationStream == null) return const SizedBox();
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('deletion_requests')
-          .where('shopId', isEqualTo: shopId)
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .toMainThread(),
+      stream: _notificationStream,
       builder: (context, snapshot) {
         final delCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
         return badges.Badge(
@@ -691,11 +725,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildHomeTab(AppUser user, List<SidebarItem> sidebarItems) {
+    if (_homeSalesStream == null || _homeInventoryStream == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return StreamBuilder<QuerySnapshot>(
-      stream: _db.getSales(user.shopId).toMainThread(),
+      stream: _homeSalesStream,
       builder: (context, salesSnap) {
         return StreamBuilder<QuerySnapshot>(
-          stream: _db.getInventory(user.shopId).toMainThread(),
+          stream: _homeInventoryStream,
           builder: (context, invSnap) {
             double rev = 0;
             double prof = 0;
@@ -1388,431 +1425,85 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildInventoryTab(AppUser user) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(32),
-          child: TextField(
-            controller: _searchInventoryC,
-            onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-            decoration: InputDecoration(
-              hintText: 'Search products by name or barcode...',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_searchInventoryC.text.isNotEmpty)
-                    IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18),
-                        onPressed: () {
-                          _searchInventoryC.clear();
-                          setState(() => _searchQuery = '');
-                        }),
-                  IconButton(
-                      icon: const Icon(Icons.qr_code_scanner_rounded,
-                          size: 18, color: AppColors.secondary),
-                      onPressed: () => _launchScanner(_searchInventoryC)),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: StreamBuilder<QuerySnapshot>(
-              stream: _db.getInventory(user.shopId).toMainThread(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox.shrink();
-                final all = snapshot.data!.docs;
+    return ExcludeSemantics(
+      child: _InventoryTabView(
+        user: user,
+        db: _db,
+        onAddItem: (data, id) => _showAddItemDialog(user, data, id),
+        onAddItemNew: () => _showAddItemDialog(user),
+        onRestock: (prefill) => _showAdminPurchaseDialog(user, prefillProduct: prefill),
+        onDelete: (id, name) => _handleDeleteProduct(user, id, name),
+        onImport: () => _handleImport(user),
+        onRestockSearch: () => _showGlobalRestockSearchDialog(user),
+        onScanSearch: () => _launchScanner(_searchInventoryC),
+        currencyFormat: currencyFormat,
+      ),
+    );
+  }
 
-                bool hasHealthy = false,
-                    hasLow = false,
-                    hasOut = false,
-                    hasExpired = false,
-                    hasSoon = false;
-                for (var doc in all) {
-                  final m = doc.data() as Map;
-                  final qty = (m['quantity'] ?? 0);
-                  final lt = (m['lowStockThreshold'] ?? 5);
-                  final ed = m['expiryDate'];
-                  final expiry = ed != null
-                      ? (ed is Timestamp
-                          ? ed.toDate()
-                          : DateTime.tryParse(ed.toString()))
-                      : null;
-                  final now = DateTime.now();
 
-                  if (expiry != null && expiry.isBefore(now))
-                    hasExpired = true;
-                  else if (expiry != null &&
-                      expiry.difference(now).inDays <= 30) hasSoon = true;
 
-                  if (qty <= 0)
-                    hasOut = true;
-                  else if (qty <= lt)
-                    hasLow = true;
-                  else
-                    hasHealthy = true;
-                }
 
-                final List<String> availableFilters = ['All'];
-                if (hasHealthy) availableFilters.add('Healthy');
-                if (hasLow) availableFilters.add('Low Stock');
-                if (hasOut) availableFilters.add('Out of Stock');
-                if (hasSoon) availableFilters.add('Expiring Soon');
-                if (hasExpired) availableFilters.add('Expired');
 
-                if (!availableFilters.contains(_inventoryFilter))
-                  _inventoryFilter = 'All';
 
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: availableFilters
-                        .map((f) => Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(f,
-                                    style: const TextStyle(fontSize: 12)),
-                                selected: _inventoryFilter == f,
-                                onSelected: (val) =>
-                                    setState(() => _inventoryFilter = f),
-                                selectedColor: AppColors.secondary,
-                                labelStyle: TextStyle(
-                                    color: _inventoryFilter == f
-                                        ? Colors.white
-                                        : null),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                );
-              }),
-        ),
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _db.getInventory(user.shopId).toMainThread(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData)
-                return const Center(child: CircularProgressIndicator());
-              final items = snapshot.data!.docs.where((d) {
-                final m = d.data() as Map;
-                final name = (m['name']?.toString().toLowerCase() ?? '');
-                final barcode = (m['barcode']?.toString().toLowerCase() ?? '');
-                final qty = (m['quantity'] ?? 0);
-                final lowThresh = (m['lowStockThreshold'] ?? 5);
-                final ed = m['expiryDate'];
-                final expiry = ed != null
-                    ? (ed is Timestamp
-                        ? ed.toDate()
-                        : DateTime.tryParse(ed.toString()))
-                    : null;
-                final now = DateTime.now();
 
-                bool matchesFilter = true;
-                if (_inventoryFilter == 'Healthy')
-                  matchesFilter = qty > lowThresh;
-                if (_inventoryFilter == 'Low Stock')
-                  matchesFilter = qty > 0 && qty <= lowThresh;
-                if (_inventoryFilter == 'Out of Stock')
-                  matchesFilter = qty <= 0;
-                if (_inventoryFilter == 'Expiring Soon') {
-                  matchesFilter = expiry != null &&
-                      expiry.difference(now).inDays <= 30 &&
-                      expiry.difference(now).inDays > 0;
-                }
-                if (_inventoryFilter == 'Expired') {
-                  matchesFilter = expiry != null && expiry.isBefore(now);
-                }
-
-                return (_selectedBranchId == 'all' ||
-                        m['branchId'] == _selectedBranchId) &&
-                    (name.contains(_searchQuery) ||
-                        barcode.contains(_searchQuery)) &&
-                    matchesFilter;
-              }).toList();
-
-              return ListView.separated(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                itemCount: items.length,
-                separatorBuilder: (c, i) => const SizedBox(height: 8),
-                itemBuilder: (context, i) {
-                  final d = items[i].data() as Map<String, dynamic>;
-                  final qty = (d['quantity'] ?? 0);
-                  final isOut = qty <= 0;
-                  final lowThresh = (d['lowStockThreshold'] ?? 5);
-                  final isLow = !isOut && qty <= lowThresh;
-
-                  bool isExpired = false;
-                  bool isExpiringSoon = false;
-                  final expiryData = d['expiryDate'];
-                  if (expiryData != null) {
-                    final expiry = (expiryData is Timestamp)
-                        ? expiryData.toDate()
-                        : DateTime.tryParse(expiryData.toString());
-                    if (expiry != null) {
-                      final diff = expiry.difference(DateTime.now()).inDays;
-                      if (expiry.isBefore(DateTime.now()))
-                        isExpired = true;
-                      else if (diff <= 30 && diff > 0) isExpiringSoon = true;
-                    }
-                  }
-
-                  return LayoutBuilder(builder: (context, constraints) {
-                    final bool isCompact = constraints.maxWidth < 600;
-                    
-                    if (isCompact) {
-                      return Card(
-                        elevation: 0,
-                        margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: AppColors.border, width: 0.5)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(d['name'] ?? '',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  ),
-                                  Text(currencyFormat.format(d['sellingPrice'] ?? 0),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.secondary,
-                                          fontSize: 16)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isOut
-                                          ? AppColors.danger.withOpacity(0.1)
-                                          : (isLow ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1)),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                        isOut ? "OUT OF STOCK" : (isLow ? "LOW STOCK: $qty" : "HEALTHY: $qty"),
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: isOut ? AppColors.danger : (isLow ? Colors.orange : Colors.green))),
-                                  ),
-                                  if (isExpired)
-                                    _buildBadge("EXPIRED", AppColors.danger)
-                                  else if (isExpiringSoon)
-                                    _buildBadge("EXPIRING SOON", Colors.red),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text("Barcode: ${d['barcode'] ?? '-'}",
-                                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                              const Divider(height: 24),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_rounded, size: 20),
-                                    onPressed: () => _showAddItemDialog(user, d, items[i].id),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.add_to_photos_rounded, color: AppColors.info, size: 20),
-                                    onPressed: () => _showAdminPurchaseDialog(user, prefillProduct: {
-                                      'id': items[i].id,
-                                      'name': d['name'],
-                                      'barcode': d['barcode'],
-                                      'buyingPrice': d['buyingPrice'],
-                                      'sellingPrice': d['sellingPrice'],
-                                    }),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger, size: 20),
-                                    onPressed: () => _handleDeleteProduct(user, items[i].id, d['name'] ?? ''),
-                                  ),
-                                ],
-                              )
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Card(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(
-                              color: AppColors.border, width: 0.5)),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
-                        title: Text(d['name'] ?? '',
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isOut
-                                        ? AppColors.danger.withOpacity(0.1)
-                                        : (isLow
-                                            ? Colors.orange.withOpacity(0.1)
-                                            : Colors.green.withOpacity(0.1)),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                      isOut
-                                          ? "OUT OF STOCK"
-                                          : (isLow
-                                              ? "LOW STOCK: $qty"
-                                              : "HEALTHY: $qty"),
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: isOut
-                                              ? AppColors.danger
-                                              : (isLow
-                                                  ? Colors.orange
-                                                  : Colors.green))),
-                                ),
-                                if (isExpired)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                        color: AppColors.danger.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6)),
-                                    child: const Text("EXPIRED",
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.danger)),
-                                  )
-                                else if (isExpiringSoon)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                        color: Colors.red.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(6)),
-                                    child: const Text("EXPIRING SOON",
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red)),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text("Barcode: ${d['barcode'] ?? '-'}",
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary)),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(currencyFormat.format(d['sellingPrice'] ?? 0),
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.secondary,
-                                    fontSize: 16)),
-                            const SizedBox(width: 12),
-                            IconButton(
-                              icon: const Icon(Icons.edit_rounded, size: 20),
-                              tooltip: 'Edit Product',
-                              onPressed: () =>
-                                  _showAddItemDialog(user, d, items[i].id),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_to_photos_rounded,
-                                  color: AppColors.info, size: 20),
-                              tooltip: 'Restock / Add Batch',
-                              onPressed: () {
-                                _showAdminPurchaseDialog(user, prefillProduct: {
-                                  'id': items[i].id,
-                                  'name': d['name'],
-                                  'barcode': d['barcode'],
-                                  'buyingPrice': d['buyingPrice'],
-                                  'sellingPrice': d['sellingPrice'],
-                                });
-                              },
-                            ),
-                            IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded,
-                                    color: AppColors.danger, size: 20),
-                                tooltip: 'Delete Product',
-                                onPressed: () => _handleDeleteProduct(
-                                    user, items[i].id, d['name'] ?? '')),
-                          ],
-                        ),
-                      ),
-                    );
-                  });
-                },
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(32),
-          child: SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.start,
-              children: [
-                ElevatedButton.icon(
+  Widget _buildInventoryFloatingButtons(AppUser user) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.9),
+        border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
                   onPressed: () => _showAddItemDialog(user),
-                  icon: const Icon(Icons.add),
+                  icon: const Icon(Icons.add, size: 20),
                   label: const Text("New Product"),
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(140, 48)),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-                ElevatedButton.icon(
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
                   onPressed: () => _showGlobalRestockSearchDialog(user),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.info,
                     foregroundColor: Colors.white,
-                    minimumSize: const Size(140, 48),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.add_to_photos_rounded),
-                  label: const Text("Restock Existing"),
+                  icon: const Icon(Icons.add_to_photos_rounded, size: 20),
+                  label: const Text("Restock"),
                 ),
-                OutlinedButton.icon(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
                   onPressed: () => _handleImport(user),
-                  icon: const Icon(Icons.file_upload_outlined),
+                  icon: const Icon(Icons.file_upload_outlined, size: 20),
                   label: const Text("Bulk Import"),
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(140, 48)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1821,29 +1512,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(32, 24, 32, 0),
-          child: TextField(
-            onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-            decoration: InputDecoration(
-              hintText: 'Search products to sell...',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.border, width: 1.5),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _posBarcodeC,
+                  onChanged: (v) => _handlePOSSearch(v, user),
+                  decoration: InputDecoration(
+                    hintText: 'Search product or scan barcode...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_posBarcodeC.text.isNotEmpty)
+                          IconButton(
+                              icon: const Icon(Icons.clear), 
+                              onPressed: () { _posBarcodeC.clear(); _handlePOSSearch('', user); }),
+                        IconButton(
+                          icon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.secondary),
+                          onPressed: () => _launchScanner(_posBarcodeC),
+                        ),
+                      ],
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
+                  ),
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.border, width: 1.5),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.secondary, width: 1.5),
-              ),
-            ),
+            ],
           ),
         ),
         Expanded(
@@ -2378,32 +2075,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const Text("Purchase Log",
                       style:
                           TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () => _showGlobalRestockSearchDialog(user),
-                        icon: const Icon(Icons.add_to_photos_rounded, size: 18),
-                        label: const Text('Restock Existing'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          backgroundColor: AppColors.info,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAdminPurchaseDialog(user),
-                        icon: const Icon(Icons.receipt_rounded, size: 18),
-                        label: const Text('New Intake Log'),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          backgroundColor: AppColors.secondary,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2500,7 +2171,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                   Expanded(
                     child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.only(left: 32, right: 32, bottom: 120),
                       itemCount: docs.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
@@ -2583,7 +2254,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             },
           ),
         ),
-                  const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showGlobalRestockSearchDialog(user),
+                  icon: const Icon(Icons.add_to_photos_rounded, size: 20),
+                  label: const Text('Restock'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: AppColors.info,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showAdminPurchaseDialog(user),
+                  icon: const Icon(Icons.receipt_rounded, size: 18),
+                  label: const Text('Add Purchase', // Shortened for mobile fit
+                      overflow: TextOverflow.ellipsis), 
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -2986,48 +2691,113 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           if (val == 'excel') {
                             pathStr = await _reporting.exportSalesExcel(filtered);
                           } else if (val == 'pdf') {
-                            // Calculate simple summary for the PDF
-                            double totalRev = 0, totalProf = 0, totalUnpaid = 0;
-                            Map<String, double> topProductsMap = {};
+                            // ── Aggregate data for professional PDF ──
+                            double totalRev = 0, totalProf = 0, totalUnpaid = 0, totalPurch = 0;
+                            Map<String, double> productRevMap = {};
+                            Map<String, double> productQtyMap = {};
+                            // Daily aggregation — deduplicated by date key
+                            Map<String, Map<String, dynamic>> dailyMap = {};
+
                             for (var d in filtered) {
                               final m = d.data() as Map;
                               final rev = (m['totalPrice'] ?? 0).toDouble();
+                              final prof = (m['profit'] ?? 0).toDouble();
                               totalRev += rev;
-                              totalProf += (m['profit'] ?? 0).toDouble();
+                              totalProf += prof;
                               if (m['isDebt'] == true) {
                                 totalUnpaid += (m['debtRemaining'] ?? m['totalPrice'] ?? 0).toDouble();
                               }
                               final name = m['itemName'] ?? 'Unknown';
-                              topProductsMap[name] = (topProductsMap[name] ?? 0) + (m['quantity'] ?? 0).toDouble();
-                            }
-                            final topProducts = topProductsMap.entries.map((e) => {'name': e.key, 'qty': e.value, 'rev': 0}).toList()
-                              ..sort((a, b) => (b['qty'] as num).compareTo(a['qty'] as num));
+                              productRevMap[name] = (productRevMap[name] ?? 0) + rev;
+                              productQtyMap[name] = (productQtyMap[name] ?? 0) + (m['quantity'] ?? 0).toDouble();
 
-                            int lowCount = 0, outCount = 0, soonCount = 0;
+                              final ts = parseDT(m['timestamp']);
+                              if (ts != null) {
+                                final key = DateFormat('yyyy-MM-dd').format(ts);
+                                final label = DateFormat('dd MMM').format(ts);
+                                dailyMap[key] ??= {'date': label, 'revenue': 0.0, 'profit': 0.0, 'orders': 0};
+                                dailyMap[key]!['revenue'] = (dailyMap[key]!['revenue'] as double) + rev;
+                                dailyMap[key]!['profit'] = (dailyMap[key]!['profit'] as double) + prof;
+                                dailyMap[key]!['orders'] = (dailyMap[key]!['orders'] as int) + 1;
+                              }
+                            }
+
+                            final sortedDays = dailyMap.entries.toList()
+                              ..sort((a, b) => a.key.compareTo(b.key));
+
+                            // Product insights
+                            final sortedByQty = productQtyMap.entries.toList()
+                              ..sort((a, b) => b.value.compareTo(a.value));
+                            final topProducts = sortedByQty.take(5).map((e) => {
+                              'name': e.key, 'qty': e.value.toInt(),
+                              'rev': productRevMap[e.key] ?? 0,
+                            }).toList();
+                            final leastProducts = sortedByQty.reversed.take(5).map((e) => {
+                              'name': e.key, 'qty': e.value.toInt(),
+                              'rev': productRevMap[e.key] ?? 0,
+                            }).toList();
+
+                            // Inventory alert counts
+                            int lowCount = 0, outCount = 0, soonCount = 0, expiredCount = 0;
+                            final now = DateTime.now();
                             for (var d in invSnap.data?.docs ?? []) {
                               final m = d.data() as Map;
                               final qty = m['quantity'] ?? 0;
-                              if (qty == 0) outCount++;
-                              else if (qty <= (m['lowStockThreshold'] ?? 5)) lowCount++;
+                              final thresh = m['lowStockThreshold'] ?? 5;
+                              if (qty <= 0) outCount++;
+                              else if (qty <= thresh) lowCount++;
+
+                              final expiry = m['expiryDate'];
+                              if (expiry != null) {
+                                final date = (expiry is Timestamp)
+                                    ? expiry.toDate()
+                                    : DateTime.tryParse(expiry.toString());
+                                if (date != null) {
+                                  if (date.isBefore(now)) expiredCount++;
+                                  else if (date.difference(now).inDays <= 30) soonCount++;
+                                }
+                              }
                             }
 
-                            pathStr = await _reporting.exportToPdf('Report_${DateTime.now().millisecondsSinceEpoch}', {
+                            final periodLabel = _reportFilter == 'Custom'
+                                ? '${DateFormat('dd MMM yyyy').format(_startDate)} – ${DateFormat('dd MMM yyyy').format(_endDate)}'
+                                : _reportFilter;
+                            // Fetch shop meta for reports
+                            final shopSnap = await FirebaseFirestore.instance.collection('shops').doc(user.shopId).get();
+                            final shopName = shopSnap.get('name') ?? 'SmartInventory ERP';
+                            final shopPhone = shopSnap.get('phone') ?? '+251...';
+
+                            pathStr = await _reporting.exportToPdf(
+                                'Report_${DateTime.now().millisecondsSinceEpoch}', {
                               'revenue': totalRev,
                               'profit': totalProf,
                               'orders': filtered.length,
                               'debt': totalUnpaid,
+                              'purchases': totalPurch,
                               'lowStockCount': lowCount,
                               'outStockCount': outCount,
-                              'expiredCount': 0,
-                              'soonCount': 0,
-                              'topProducts': topProducts.take(5).toList(),
+                              'expiredCount': expiredCount,
+                              'soonCount': soonCount,
+                              'topProducts': topProducts,
+                              'leastProducts': leastProducts,
+                              'dailySales': sortedDays.map((e) => e.value).toList(),
+                              'companyName': shopName,
+                              'companyPhone': shopPhone,
+                              'period': periodLabel,
                             });
                           }
 
                           if (mounted) {
+                            final msg = (pathStr == 'Cancelled')
+                                ? 'Export cancelled.'
+                                : '✅ Saved to: $pathStr';
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text('Report exported to: $pathStr'),
-                                backgroundColor: AppColors.success));
+                                content: Text(msg,
+                                    style: const TextStyle(fontSize: 12)),
+                                duration: const Duration(seconds: 6),
+                                backgroundColor: pathStr == 'Cancelled'
+                                    ? AppColors.warning
+                                    : AppColors.success));
                           }
                         } catch (e) {
                           if (mounted) {
@@ -3522,51 +3292,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("Sales History Log",
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 18)),
-                          SizedBox(
-                            width: 280,
-                            child: TextField(
-                              controller: _searchSalesC,
-                              onChanged: (_) => setState(() {}),
-                              decoration: InputDecoration(
-                                hintText: "Search by product or customer...",
-                                prefixIcon:
-                                    const Icon(Icons.search_rounded, size: 18),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 10, horizontal: 12),
-                                border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                                suffixIcon: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_searchSalesC.text.isNotEmpty)
-                                      IconButton(
-                                          icon: const Icon(Icons.clear_rounded,
-                                              size: 16),
-                                          onPressed: () {
-                                            _searchSalesC.clear();
-                                            setState(() {});
-                                          }),
-                                    IconButton(
-                                        icon: const Icon(
-                                            Icons.qr_code_scanner_rounded,
-                                            size: 16,
-                                            color: AppColors.secondary),
-                                        onPressed: () =>
-                                            _launchScanner(_searchSalesC)),
-                                  ],
-                                ),
-                              ),
+                      LayoutBuilder(builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 600;
+                        final searchField = TextField(
+                          controller: _searchSalesC,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: isMobile
+                                ? "Search sales..."
+                                : "Search by product or customer...",
+                            prefixIcon:
+                                const Icon(Icons.search_rounded, size: 18),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 10, horizontal: 12),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_searchSalesC.text.isNotEmpty)
+                                  IconButton(
+                                      icon: const Icon(Icons.clear_rounded,
+                                          size: 16),
+                                      onPressed: () {
+                                        _searchSalesC.clear();
+                                        setState(() {});
+                                      }),
+                                IconButton(
+                                    icon: const Icon(
+                                        Icons.qr_code_scanner_rounded,
+                                        size: 16,
+                                        color: AppColors.secondary),
+                                    onPressed: () =>
+                                        _launchScanner(_searchSalesC)),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        );
+                        if (isMobile) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Sales History Log",
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18)),
+                              const SizedBox(height: 12),
+                              searchField,
+                            ],
+                          );
+                        }
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text("Sales History Log",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 18)),
+                            SizedBox(width: 280, child: searchField),
+                          ],
+                        );
+                      }),
                       const SizedBox(height: 16),
                       Builder(builder: (_) {
                         var saleDocs = snap.data?.docs ?? [];
@@ -3882,33 +3668,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ? null
                     : () => showDialog(
                         context: context,
-                        builder: (ctx) => AlertDialog(
-                              title: const Text("Shop Details"),
+                        builder: (ctx) => StreamBuilder<DocumentSnapshot>(
+                          stream: Provider.of<AuthService>(context).shopStream,
+                          builder: (context, snap) {
+                            final shopData = snap.data?.data() as Map<String, dynamic>?;
+                            final nameC = TextEditingController(text: shopData?['name'] ?? 'SmartInventory ERP');
+                            final phoneC = TextEditingController(text: shopData?['phone'] ?? '+251...');
+
+                            return AlertDialog(
+                              title: const Text("Edit Shop Profile"),
                               content: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   TextField(
-                                      decoration: const InputDecoration(
-                                          labelText: "Shop Name"),
-                                      controller: TextEditingController(
-                                          text: "SmartInventory ERP")),
+                                    decoration: const InputDecoration(labelText: "Business Name"),
+                                    controller: nameC,
+                                  ),
                                   const SizedBox(height: 12),
                                   TextField(
-                                      decoration: const InputDecoration(
-                                          labelText: "Contact No"),
-                                      controller: TextEditingController(
-                                          text: "+251911...")),
+                                    decoration: const InputDecoration(labelText: "Public Phone Number"),
+                                    controller: phoneC,
+                                  ),
                                 ],
                               ),
                               actions: [
-                                TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text("Cancel")),
+                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
                                 ElevatedButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text("Save Changes")),
+                                  onPressed: () async {
+                                    final auth = Provider.of<AuthService>(context, listen: false);
+                                    await auth.updateShop(nameC.text, phoneC.text);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                  },
+                                  child: const Text("Save Changes"),
+                                ),
                               ],
-                            )),
+                            );
+                          }
+                        )),
                 enabled: isAdmin,
               ),
               const Divider(height: 1),
@@ -3922,38 +3718,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       context: context,
                       builder: (ctx) => AlertDialog(
                             title: const Text("Choose Language"),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ListTile(
-                                  title: const Text("English"),
-                                  onTap: () =>
-                                      _updateLang(ctx, erp_l10n.AppLanguage.en),
-                                  trailing:
-                                      Provider.of<erp_l10n.LocalizationService>(
-                                                      context,
-                                                      listen: false)
-                                                  .currentLanguage ==
-                                              erp_l10n.AppLanguage.en
-                                          ? const Icon(Icons.check,
-                                              color: AppColors.success)
-                                          : null,
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              height: 400,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildLangItem(ctx, "English", "Global Business", erp_l10n.AppLanguage.en),
+                                    _buildLangItem(ctx, "Amharic (አማርኛ)", "Ethiopia", erp_l10n.AppLanguage.am),
+                                    _buildLangItem(ctx, "Arabic (العربية)", "Middle East / North Africa", erp_l10n.AppLanguage.ar),
+                                    _buildLangItem(ctx, "French (Français)", "West Africa / Europe", erp_l10n.AppLanguage.fr),
+                                    _buildLangItem(ctx, "Spanish (Español)", "Latin America / Spain", erp_l10n.AppLanguage.es),
+                                    _buildLangItem(ctx, "Hindi (हिन्दी)", "India", erp_l10n.AppLanguage.hi),
+                                    _buildLangItem(ctx, "Mandarin (中文)", "East Asia / Global Trade", erp_l10n.AppLanguage.zh),
+                                    _buildLangItem(ctx, "Swahili (Kiswahili)", "East Africa", erp_l10n.AppLanguage.sw),
+                                    _buildLangItem(ctx, "Portuguese (Português)", "Brazil, Angola & Mozambique", erp_l10n.AppLanguage.pt),
+                                  ],
                                 ),
-                                ListTile(
-                                  title: const Text("Amharic (አማርኛ)"),
-                                  onTap: () =>
-                                      _updateLang(ctx, erp_l10n.AppLanguage.am),
-                                  trailing:
-                                      Provider.of<erp_l10n.LocalizationService>(
-                                                      context,
-                                                      listen: false)
-                                                  .currentLanguage ==
-                                              erp_l10n.AppLanguage.am
-                                          ? const Icon(Icons.check,
-                                              color: AppColors.success)
-                                          : null,
-                                ),
-                              ],
+                              ),
                             ),
                           ));
                 },
@@ -4055,15 +3838,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Widget _buildLangItem(BuildContext ctx, String name, String sub, erp_l10n.AppLanguage lang) {
+    return ListTile(
+      title: Text(name),
+      subtitle: Text(sub),
+      onTap: () => _updateLang(ctx, lang),
+    );
+  }
+
   Future<void> _updateLang(BuildContext ctx, erp_l10n.AppLanguage lang) async {
-    final l10n =
-        Provider.of<erp_l10n.LocalizationService>(context, listen: false);
+    final l10n = Provider.of<erp_l10n.LocalizationService>(context, listen: false);
     await l10n.setLanguage(lang);
     if (mounted) {
       Navigator.pop(ctx);
+      String langName = "English";
+      switch(lang) {
+        case erp_l10n.AppLanguage.am: langName = "Amharic"; break;
+        case erp_l10n.AppLanguage.ar: langName = "Arabic"; break;
+        case erp_l10n.AppLanguage.fr: langName = "French"; break;
+        case erp_l10n.AppLanguage.es: langName = "Spanish"; break;
+        case erp_l10n.AppLanguage.hi: langName = "Hindi"; break;
+        case erp_l10n.AppLanguage.zh: langName = "Mandarin"; break;
+        case erp_l10n.AppLanguage.sw: langName = "Swahili"; break;
+        case erp_l10n.AppLanguage.pt: langName = "Portuguese"; break;
+        default: langName = "English";
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              'Language updated to ${lang == erp_l10n.AppLanguage.en ? "English" : "Amharic"}')));
+          content: Text('Language updated to $langName')));
       setState(() {});
     }
   }
@@ -4308,10 +4109,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 "inventory_alert");
                           }
                         } else {
-                          FirebaseFirestore.instance
+                          await FirebaseFirestore.instance
                               .collection('items')
                               .doc(id)
                               .update(productMap);
+                          await _repo.recordAuditLog(u.shopId, u.username, 'EDIT_PRODUCT', 'Updated product details for ${nameC.text}');
                         }
 
                         if (c.mounted) {
@@ -4336,57 +4138,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Future<void> _launchScanner(TextEditingController controller) async {
-    if (!kIsWeb && Platform.isWindows) {
-      showDialog(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text("Use Physical Scanner"),
-          content: const Text(
-              "Camera-based scanning is unsupported on Windows. Please click the text field and use a physical plug-and-play barcode scanner instead."),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(c), child: const Text("OK"))
-          ],
-        ),
-      );
-      return;
-    }
 
-    final localScannerController = MobileScannerController(
-      facing: CameraFacing.back,
-      torchEnabled: false,
-    );
-
-    try {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => Scaffold(
-            appBar: AppBar(title: const Text("Scan Barcode"), actions: [
-              IconButton(
-                icon: const Icon(Icons.flash_on),
-                onPressed: () => localScannerController.toggleTorch(),
-              )
-            ]),
-            body: MobileScanner(
-              controller: localScannerController,
-              onDetect: (capture) {
-                final barcodes = capture.barcodes;
-                if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                  controller.text = barcodes.first.rawValue!;
-                  localScannerController.dispose();
-                  Navigator.pop(ctx);
-                }
-              },
-            ),
-          ),
-        ),
-      );
-    } finally {
-      localScannerController.dispose();
-    }
-  }
 
   Widget _buildBadge(String label, Color color) {
     return Container(
@@ -4413,57 +4165,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-                "Upload an Excel file (.xlsx) with these columns in the first sheet:"),
+            Text("Upload an Excel file with these flexible headers:"),
             SizedBox(height: 12),
-            Text("• Name (Required)"),
-            Text("• Barcode"),
-            Text("• Quantity"),
-            Text("• Buying Price"),
-            Text("• Selling Price"),
-            Text("• Batch Number"),
-            Text("• Min Threshold"),
+            Text("• Name / Product (Required)"),
+            Text("• Barcode / Code / SKU"),
+            Text("• Quantity / Qty / Stock"),
+            Text("• Buying Price / Cost"),
+            Text("• Selling Price / Sale Price"),
+            Text("• Batch / Lot"),
           ],
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              FilePickerResult? result = await FilePicker.platform.pickFiles(
-                  type: FileType.custom,
-                  allowedExtensions: ['xlsx'],
-                  withData: true);
-              if (result != null) {
+              final bytes = await _importService.pickExcelFile();
+              if (bytes != null) {
                 LoadingOverlay.show(context);
                 try {
-                  final file = result.files.single;
-                  final bytes = file.bytes ??
-                      (file.path != null
-                          ? await File(file.path!).readAsBytes()
-                          : null);
-                  if (bytes == null) throw "Could not read file data.";
-
-                  final stats = await _importService.importFromExcel(bytes, user);
+                  final result = await _importService.importFromExcel(bytes, user);
                   if (mounted) {
-                    final imported = stats['imported'] ?? 0;
-                    final failed = stats['failed'] ?? 0;
-                    if (failed > 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text("Imported: $imported. Failed: $failed. Check file format."),
-                          backgroundColor: AppColors.warning));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text("Successfully imported $imported items."),
-                          backgroundColor: AppColors.success));
-                    }
+                    showDialog(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        title: const Text("Import Summary"),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("New Items: ${result.imported}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text("Updated Items: ${result.updated}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                            if (result.errors.isNotEmpty) ...[
+                              const Divider(height: 32),
+                              const Text("Errors / Skipped Rows:", style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: 200,
+                                width: double.maxFinite,
+                                child: ListView.builder(
+                                  itemCount: result.errors.length,
+                                  itemBuilder: (lsCtx, i) => Text("• ${result.errors[i]}", style: const TextStyle(fontSize: 11)),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("OK"))],
+                      ),
+                    );
                   }
                 } catch (e) {
-                  if (mounted)
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text("Import failed: $e"),
-                        backgroundColor: AppColors.danger));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Import Error: $e'), backgroundColor: AppColors.danger));
+                  }
                 } finally {
                   if (mounted) LoadingOverlay.hide(context);
                 }
@@ -4475,7 +4230,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-
   Widget _buildPieLegend(String label, Color color, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -5079,7 +4833,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               if (logs.isEmpty)
                 return const Center(child: Text("No audit records found."));
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
+                padding: const EdgeInsets.fromLTRB(32, 16, 32, 120), // Bottom padding for FAB/Navbar
                 itemCount: logs.length,
                 separatorBuilder: (c, i) => const Divider(height: 1),
                 itemBuilder: (c, i) {
@@ -5436,4 +5190,625 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
+
+  Future<void> _launchScanner(TextEditingController controller) async {
+    if (!kIsWeb && Platform.isWindows) {
+      await showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text("Use Physical Scanner"),
+          content: const Text("Camera-based scanning is unsupported on Windows. Please use a physical scanner or type manually."),
+          actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("OK"))],
+        ),
+      );
+      return;
+    }
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(ctx).size.height * 0.7,
+        child: MobileScanner(
+          controller: _scannerController,
+          onDetect: (capture) {
+            final List<Barcode> barcodes = capture.barcodes;
+            if (barcodes.isNotEmpty) {
+              final code = barcodes.first.rawValue;
+              if (code != null) {
+                controller.text = code;
+                Navigator.pop(ctx);
+                final user = Provider.of<AuthService>(context, listen: false).user;
+                if (user != null) _handlePOSSearch(code, user);
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _handlePOSSearch(String query, AppUser user) async {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+    });
+
+    if (query.isNotEmpty) {
+      final snapshot = await _db.getInventory(user.shopId).first;
+      final matches = snapshot.docs.where((d) {
+        final m = d.data() as Map;
+        return (m['barcode']?.toString() ?? '') == query.trim();
+      }).toList();
+
+      if (matches.length == 1) {
+        _showQuickSellDialog(matches.first, user);
+        _posBarcodeC.clear();
+        setState(() => _searchQuery = '');
+      }
+    }
+  }
+
+  void _showQuickSellDialog(DocumentSnapshot doc, AppUser user) {
+    final d = doc.data() as Map<String, dynamic>;
+    final qtyC = TextEditingController(text: '1');
+    final stock = (d['quantity'] ?? 0).toInt();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Quick Sell: ${d['name']}"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Price: ${currencyFormat.format(d['sellingPrice'] ?? 0)}"),
+            Text(
+              "Stock Available: $stock",
+              style: TextStyle(
+                  color: stock < 5 ? AppColors.danger : AppColors.success,
+                  fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: qtyC,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: "Quantity to Sell", border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          ElevatedButton(
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            onPressed: () async {
+              final val = int.tryParse(qtyC.text) ?? 0;
+              if (val <= 0 || val > stock) return;
+              Navigator.pop(ctx);
+              LoadingOverlay.show(context);
+              try {
+                await _repo.recordSale(user, {
+                  'shopId': user.shopId,
+                  'branchId': user.branchId ?? 'main',
+                  'userId': user.id,
+                  'username': user.username,
+                  'itemId': doc.id,
+                  'itemName': d['name'],
+                  'quantity': val,
+                  'totalPrice': (d['sellingPrice'] ?? 0) * val,
+                  'profit':
+                      ((d['sellingPrice'] ?? 0) - (d['buyingPrice'] ?? 0)) * val,
+                  'timestamp': DateTime.now().toIso8601String(),
+                });
+                if (mounted)
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Sale recorded successfully!'),
+                      backgroundColor: AppColors.success));
+              } catch (e) {
+                if (mounted)
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Sale Failed: $e'),
+                      backgroundColor: AppColors.danger));
+              } finally {
+                if (mounted) LoadingOverlay.hide(context);
+              }
+            },
+            child: const Text("Sell Now"),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+
+// ─────────────────────────────────────────────────────────────────
+// _InventoryTabView — fully self-contained inventory tab widget.
+// State mutation during build() is the root cause of the
+// `!semantics.parentDataDirty` assertion crash. By extracting this
+// into its own StatefulWidget we guarantee clean rebuild semantics.
+// ─────────────────────────────────────────────────────────────────
+class _InventoryTabView extends StatefulWidget {
+  final AppUser user;
+  final FirestoreService db;
+  final void Function(Map<String, dynamic>? data, String? id) onAddItem;
+  final VoidCallback onAddItemNew;
+  final void Function(Map<String, dynamic> prefill) onRestock;
+  final void Function(String id, String name) onDelete;
+  final VoidCallback onImport;
+  final VoidCallback onRestockSearch;
+  final VoidCallback onScanSearch;
+  final NumberFormat currencyFormat;
+
+  const _InventoryTabView({
+    required this.user,
+    required this.db,
+    required this.onAddItem,
+    required this.onAddItemNew,
+    required this.onRestock,
+    required this.onDelete,
+    required this.onImport,
+    required this.onRestockSearch,
+    required this.onScanSearch,
+    required this.currencyFormat,
+  });
+
+  @override
+  State<_InventoryTabView> createState() => _InventoryTabViewState();
+}
+
+class _InventoryTabViewState extends State<_InventoryTabView> {
+  String _filter = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchC = TextEditingController();
+  late Stream<QuerySnapshot> _inventoryStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cache the stream so it doesn't disconnect/recreate on every single build
+    _inventoryStream = widget.db.getInventory(widget.user.shopId).toMainThread();
+  }
+
+  @override
+  void dispose() {
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.sizeOf(context).width < 900;
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: _inventoryStream,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final allDocs = snapshot.data!.docs;
+        final now = DateTime.now();
+
+        // ── Compute available filters ─────────────────────────────────────
+        final Set<String> availableFilters = {'All'};
+        for (var doc in allDocs) {
+          final m = doc.data() as Map;
+          final qty = (m['quantity'] ?? 0) as num;
+          final lt = (m['lowStockThreshold'] ?? 5) as num;
+          final ed = m['expiryDate'];
+          DateTime? expiry;
+          if (ed != null) {
+            expiry = ed is Timestamp ? ed.toDate() : DateTime.tryParse(ed.toString());
+          }
+          if (expiry != null && expiry.isBefore(now)) availableFilters.add('Expired');
+          else if (expiry != null && expiry.difference(now).inDays <= 30) availableFilters.add('Expiring Soon');
+          if (qty <= 0) availableFilters.add('Out of Stock');
+          else if (qty <= lt) availableFilters.add('Low Stock');
+          else availableFilters.add('Healthy');
+        }
+        final filtersList = availableFilters.toList()..sort();
+        filtersList.remove('All');
+        filtersList.insert(0, 'All');
+
+        // ── Inventory Filter Logic ────────────────────────────────────────
+        final items = allDocs.where((doc) {
+          final m = doc.data() as Map;
+          final name = (m['name']?.toString().toLowerCase() ?? '');
+          final barcode = (m['barcode']?.toString().toLowerCase() ?? '');
+          final qty = (m['quantity'] ?? 0) as num;
+          final lt = (m['lowStockThreshold'] ?? 5) as num;
+          final ed = m['expiryDate'];
+          DateTime? exp;
+          if (ed != null) {
+            exp = ed is Timestamp ? ed.toDate() : DateTime.tryParse(ed.toString());
+          }
+
+          bool ok = true;
+          switch (_filter) {
+            case 'Healthy': ok = qty > lt; break;
+            case 'Low Stock': ok = qty > 0 && qty <= lt; break;
+            case 'Out of Stock': ok = qty <= 0; break;
+            case 'Expiring Soon':
+              ok = exp != null && exp.isAfter(now) && exp.difference(now).inDays <= 30;
+              break;
+            case 'Expired': ok = exp != null && exp.isBefore(now); break;
+            default: ok = true;
+          }
+          return ok && (name.contains(_searchQuery) || barcode.contains(_searchQuery));
+        }).toList();
+
+        return SizedBox(
+          width: isMobile ? MediaQuery.sizeOf(context).width : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header Actions ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
+                child: _buildSearchBar(context),
+              ),
+
+              // ── Filters Row ─────────────────────────────────────────────
+              Container(
+                height: 52,
+                margin: const EdgeInsets.only(top: 8),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 4),
+                  itemCount: filtersList.length,
+                  itemBuilder: (context, i) {
+                    final f = filtersList[i];
+                    final isSelected = _filter == f;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: InkWell(
+                        onTap: () => setState(() => _filter = f),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.secondary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: isSelected ? AppColors.secondary : AppColors.border),
+                          ),
+                          child: Center(
+                            child: Text(
+                              f,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // ── Main List Content ───────────────────────────────────────
+              Expanded(
+                child: items.isEmpty
+                    ? _buildEmptyState()
+                    : ExcludeSemantics(
+                        child: ListView.separated(
+                          key: const ValueKey('inventory_list_final_v3'),
+                          padding: EdgeInsets.only(
+                              left: 32, right: 32, top: 12, bottom: isMobile ? 120 : 32),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (context, i) => RepaintBoundary(
+                            child: _buildItemCard(items[i], isMobile),
+                          ),
+                        ),
+                      ),
+              ),
+
+              if (isMobile) _buildMobileBar() else _buildDesktopBottomBar(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDesktopBottomBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          _buildHeaderButton(
+            onPressed: widget.onAddItemNew,
+            icon: Icons.add_rounded,
+            label: "Product",
+          ),
+          const SizedBox(width: 12),
+          _buildHeaderButton(
+            onPressed: widget.onRestockSearch,
+            icon: Icons.add_to_photos_rounded,
+            label: "Restock",
+            color: AppColors.info,
+          ),
+          const SizedBox(width: 12),
+          _buildHeaderButton(
+            onPressed: widget.onImport,
+            icon: Icons.upload_file_rounded,
+            label: "Import",
+            isOutlined: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 64,
+              color: AppColors.textSecondary.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          Text('No products found',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    Color? color,
+    bool isOutlined = false,
+  }) {
+    final style = (isOutlined ? OutlinedButton.styleFrom : ElevatedButton.styleFrom)(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: isOutlined ? null : color,
+      foregroundColor: isOutlined ? null : (color != null ? Colors.white : null),
+      minimumSize: const Size(0, 0), 
+    );
+
+    if (isOutlined) {
+      return OutlinedButton.icon(onPressed: onPressed, icon: Icon(icon, size: 20), label: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), style: style);
+    }
+    return ElevatedButton.icon(onPressed: onPressed, icon: Icon(icon, size: 20), label: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), style: style);
+  }
+
+  Widget _buildItemCard(QueryDocumentSnapshot doc, bool isMobile) {
+    final d = doc.data() as Map<String, dynamic>;
+    final now = DateTime.now();
+    final qty = (d['quantity'] ?? 0) as num;
+    final isOut = qty <= 0;
+    final lt = (d['lowStockThreshold'] ?? 5) as num;
+    final isLow = !isOut && qty <= lt;
+
+    final ed = d['expiryDate'];
+    bool isExpired = false, isExpiringSoon = false;
+    if (ed != null) {
+      final exp = ed is Timestamp ? ed.toDate() : DateTime.tryParse(ed.toString());
+      if (exp != null) {
+        if (exp.isBefore(now)) isExpired = true;
+        else if (exp.difference(now).inDays <= 30) isExpiringSoon = true;
+      }
+    }
+
+    final stockBadge = _Badge(
+      label: isOut ? 'OUT OF STOCK' : (isLow ? 'LOW STOCK: $qty' : 'HEALTHY: $qty'),
+      color: isOut ? AppColors.danger : (isLow ? Colors.orange : Colors.green),
+    );
+    Widget? expiryBadge;
+    if (isExpired) expiryBadge = const _Badge(label: 'EXPIRED', color: AppColors.danger);
+    else if (isExpiringSoon) expiryBadge = const _Badge(label: 'EXPIRING SOON', color: Colors.red);
+
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.edit_rounded, size: 20),
+          tooltip: 'Edit',
+          onPressed: () => widget.onAddItem(d, doc.id),
+        ),
+        IconButton(
+          icon: const Icon(Icons.add_to_photos_rounded, color: AppColors.info, size: 20),
+          tooltip: 'Restock',
+          onPressed: () => widget.onRestock({
+            'id': doc.id, 'name': d['name'], 'barcode': d['barcode'],
+            'buyingPrice': d['buyingPrice'], 'sellingPrice': d['sellingPrice'],
+          }),
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger, size: 20),
+          tooltip: 'Delete',
+          onPressed: () => widget.onDelete(doc.id, d['name'] ?? ''),
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: AppColors.border, width: 0.5)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text(d['name'] ?? '',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                  Text(widget.currencyFormat.format(d['sellingPrice'] ?? 0),
+                      style: const TextStyle(fontWeight: FontWeight.bold,
+                          color: AppColors.secondary, fontSize: 16)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 4, children: [
+                stockBadge,
+                if (expiryBadge != null) expiryBadge,
+              ]),
+              const SizedBox(height: 8),
+              Text("Barcode: ${d['barcode'] ?? '-'}",
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              const Divider(height: 24),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [actions]),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border, width: 0.5)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        title: Text(d['name'] ?? '',
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              stockBadge,
+              if (expiryBadge != null) expiryBadge,
+            ]),
+            const SizedBox(height: 4),
+            Text("Barcode: ${d['barcode'] ?? '-'}",
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.currencyFormat.format(d['sellingPrice'] ?? 0),
+                style: const TextStyle(fontWeight: FontWeight.bold,
+                    color: AppColors.secondary, fontSize: 16)),
+            const SizedBox(width: 8),
+            actions,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context) {
+    return TextField(
+      controller: _searchC,
+      onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+      decoration: InputDecoration(
+        hintText: 'Search products by name or barcode...',
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_searchC.text.isNotEmpty)
+              IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  onPressed: () => setState(() {
+                    _searchC.clear();
+                    _searchQuery = '';
+                  })),
+            IconButton(
+                icon: const Icon(Icons.qr_code_scanner_rounded,
+                    size: 18, color: AppColors.secondary),
+                onPressed: widget.onScanSearch),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+        border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: widget.onAddItemNew,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text("Product", style: TextStyle(fontSize: 11)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: widget.onRestockSearch,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.info,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.add_to_photos_rounded, size: 18),
+              label: const Text("Restock", style: TextStyle(fontSize: 11)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: widget.onImport,
+              icon: const Icon(Icons.upload_file_rounded, size: 18),
+              label: const Text("Bulk Import", style: TextStyle(fontSize: 11)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lightweight status badge — avoids rebuilding Container on every frame.
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Badge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+      child: Text(label,
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+    );
+  }
+}
+

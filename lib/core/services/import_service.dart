@@ -3,148 +3,173 @@ import 'package:excel/excel.dart';
 import '../repositories/inventory_repository.dart';
 import '../models/models.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+class ImportResult {
+  final int imported;
+  final int updated;
+  final List<String> errors;
+
+  ImportResult({required this.imported, required this.updated, required this.errors});
+}
 
 class ImportService {
   final InventoryRepository _repo = InventoryRepository();
 
-  Future<Map<String, int>> importFromExcel(Uint8List bytes, AppUser user) async {
+  /// Picks an Excel file and returns its bytes. Handles platform differences.
+  Future<Uint8List?> pickExcelFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+      withData: true,
+    );
+
+    if (result != null) {
+      final file = result.files.first;
+      if (kIsWeb || file.bytes != null) {
+        return file.bytes;
+      } else if (file.path != null) {
+        return await File(file.path!).readAsBytes();
+      }
+    }
+    return null;
+  }
+
+  Future<ImportResult> importFromExcel(Uint8List bytes, AppUser user) async {
     int imported = 0;
     int updated = 0;
-    int skipped = 0;
+    final List<String> errors = [];
 
     try {
       var excel = Excel.decodeBytes(bytes);
-      final batch = FirebaseFirestore.instance.batch();
-      int batchCount = 0;
 
       for (var table in excel.tables.keys) {
         final sheet = excel.tables[table];
-        if (sheet == null || sheet.maxRows < 2) continue;
+        if (sheet == null || sheet.rows.isEmpty || sheet.maxRows < 2) continue;
 
-        // 1. Identify Headers
         final headerRow = sheet.rows.first;
-        Map<String, int> colMap = _mapHeaders(headerRow);
+        Map<String, List<int>> colMap = _mapHeadersFlexible(headerRow);
 
-        // Required Check: Minimum Name and Price
-        if (!colMap.containsKey('name')) {
-          throw 'Required column "Product Name" missing in Excel.';
+        if (!_hasRequiredHeaders(colMap)) {
+          throw 'Missing required columns. Please ensure "Product Name" exists in your Excel file.';
         }
 
         for (var i = 1; i < sheet.maxRows; i++) {
           if (i >= sheet.rows.length) break;
           final row = sheet.rows[i];
-          if (row == null || row.isEmpty) continue;
+          
+          if (row.every((cell) => cell == null || cell.value == null)) continue;
 
           try {
-            final name = _getColVal(row, colMap['name']).trim();
-            if (name.isEmpty) continue;
+            final name = _getValueFlexible(row, colMap['name']);
+            if (name == null || name.trim().isEmpty) {
+              errors.add("Row ${i + 1}: Missing Product Name");
+              continue;
+            }
 
-            final barcode = _getColVal(row, colMap['barcode']).trim();
-            final qtyStr = _getColVal(row, colMap['quantity']);
-            final qty = (double.tryParse(qtyStr) ?? 0).toInt();
+            final barcode = _getValueFlexible(row, colMap['barcode']) ?? "";
+            final qtyStr = _getValueFlexible(row, colMap['quantity']) ?? "0";
+            final qty = (double.tryParse(qtyStr) ?? 0).toDouble();
             
-            final buyStr = _getColVal(row, colMap['buyingPrice']);
+            final buyStr = _getValueFlexible(row, colMap['buyingPrice']) ?? "0";
             final buyPrice = double.tryParse(buyStr) ?? 0.0;
             
-            final sellStr = _getColVal(row, colMap['sellingPrice']);
-            final sellPrice = double.tryParse(sellStr) ?? 0.0;
+            final sellStr = _getValueFlexible(row, colMap['sellingPrice']);
+            if (sellStr == null) {
+               errors.add("Row ${i + 1}: Missing Selling Price for '$name'");
+               continue;
+            }
+            final sellPrice = double.tryParse(sellStr);
+            if (sellPrice == null) {
+               errors.add("Row ${i + 1}: Invalid Selling Price format for '$name'");
+               continue;
+            }
             
-            final batchNum = _getColVal(row, colMap['batch']);
-            final thresholdStr = _getColVal(row, colMap['threshold']);
+            final batchNum = _getValueFlexible(row, colMap['batch']) ?? "IMPORT-${DateTime.now().millisecondsSinceEpoch}";
+            final thresholdStr = _getValueFlexible(row, colMap['threshold']) ?? "5";
             final threshold = int.tryParse(thresholdStr) ?? 5;
-            final category = _getColVal(row, colMap['category']);
+            final category = _getValueFlexible(row, colMap['category']) ?? "General";
 
-            // 2. Matching Logic
-            String? existingId;
-            final query = await FirebaseFirestore.instance.collection('items')
-                .where('shopId', isEqualTo: user.shopId)
-                .where('name', isEqualTo: name)
-                .get();
-            if (query.docs.isNotEmpty) {
-              existingId = query.docs.first.id;
-            } else if (barcode.isNotEmpty) {
-              final barcodeQuery = await FirebaseFirestore.instance.collection('items')
-                  .where('shopId', isEqualTo: user.shopId)
-                  .where('barcode', isEqualTo: barcode)
-                  .get();
-              if (barcodeQuery.docs.isNotEmpty) {
-                existingId = barcodeQuery.docs.first.id;
-              }
-            }
-
-            final Map<String, dynamic> data = {
-              'shopId': user.shopId,
-              'branchId': user.branchId ?? 'main',
-              'name': name,
-              'barcode': barcode,
-              'quantity': qty,
-              'buyingPrice': buyPrice,
-              'sellingPrice': sellPrice,
-              'category': category.isEmpty ? 'General' : category,
-              'batchNumber': batchNum.isEmpty ? 'IMP-${DateTime.now().millisecondsSinceEpoch}' : batchNum,
-              'lowStockThreshold': threshold,
-              'lastUpdated': DateTime.now().toIso8601String(),
-            };
-
-            if (existingId != null) {
-              final docRef = FirebaseFirestore.instance.collection('items').doc(existingId);
-              batch.update(docRef, data);
-              updated++;
-            } else {
-              final docRef = FirebaseFirestore.instance.collection('items').doc();
-              batch.set(docRef, data);
-              imported++;
-            }
+            // ── AUTOMATIC LOGIC: Use Repository direct ────────────────────
+            // This handles matching, creating, restocking, and sync automatically.
             
-            batchCount++;
-            if (batchCount >= 450) { // Firestore limit is 500
-              await batch.commit();
-              batchCount = 0;
-            }
+            // First check if it exists to increment 'imported' vs 'updated'
+            final existingId = await _repo.findItemByNameOrBarcode(user.shopId, name.trim(), barcode.trim());
+            
+            await _repo.recordPurchase(user, {
+              'shopId': user.shopId,
+              'branchId': user.branchId,
+              'userId': user.id,
+              'username': user.username,
+              'supplierName': 'Bulk Import',
+              'itemName': name.trim(),
+              'barcode': barcode.trim(),
+              'quantity': qty,
+              'unitCost': buyPrice,
+              'sellingPrice': sellPrice,
+              'lowStockThreshold': threshold,
+              'batchNumber': batchNum.trim(),
+              'category': category.trim(),
+              'totalCost': qty * buyPrice,
+            });
+
+            if (existingId != null) updated++; else imported++;
+
           } catch (e) {
-            skipped++;
+            errors.add("Row ${i + 1}: Error - ${e.toString()}");
           }
         }
       }
-
-      if (batchCount > 0) await batch.commit();
-
     } catch (e) {
-      print("Bulk Import Error: $e");
+      print("Import Service Fatal Error: $e");
       rethrow;
     }
 
-    return {'imported': imported, 'updated': updated, 'skipped': skipped};
+    return ImportResult(imported: imported, updated: updated, errors: errors);
   }
 
-  Map<String, int> _mapHeaders(List<Data?> row) {
-    Map<String, int> map = {};
-    for (int i = 0; i < row.length; i++) {
-      final cell = row[i];
-      if (cell == null || cell.value == null) continue;
-      final val = cell.value.toString().toLowerCase().trim().replaceAll(' ', '_');
+  Map<String, List<int>> _mapHeadersFlexible(List<Data?> headerRow) {
+    Map<String, List<int>> map = {
+      'name': [], 'barcode': [], 'quantity': [], 'buyingPrice': [], 
+      'sellingPrice': [], 'batch': [], 'threshold': [], 'category': []
+    };
 
-      if (val.contains('name') || val.contains('product')) map['name'] = i;
-      else if (val.contains('barcode') || val.contains('sku')) map['barcode'] = i;
-      else if (val.contains('qty') || val.contains('quantity') || val.contains('stock')) map['quantity'] = i;
-      else if (val.contains('buying') || val.contains('cost')) map['buyingPrice'] = i;
-      else if (val.contains('selling') || val.contains('price') || val.contains('sell')) map['sellingPrice'] = i;
-      else if (val.contains('batch')) map['batch'] = i;
-      else if (val.contains('threshold') || val.contains('min')) map['threshold'] = i;
-      else if (val.contains('cat')) map['category'] = i;
+    for (int i = 0; i < headerRow.length; i++) {
+      final cell = headerRow[i];
+      if (cell == null || cell.value == null) continue;
+      final val = cell.value.toString().toLowerCase().trim();
+
+      if (_match(val, ['name', 'product', 'item'])) map['name']?.add(i);
+      else if (_match(val, ['barcode', 'code', 'sku'])) map['barcode']?.add(i);
+      else if (_match(val, ['qty', 'quantity', 'stock', 'amount'])) map['quantity']?.add(i);
+      else if (_match(val, ['buying', 'cost', 'buy', 'purchase'])) map['buyingPrice']?.add(i);
+      else if (_match(val, ['selling', 'price', 'sell', 'sale'])) map['sellingPrice']?.add(i);
+      else if (_match(val, ['batch', 'lot'])) map['batch']?.add(i);
+      else if (_match(val, ['threshold', 'min', 'low'])) map['threshold']?.add(i);
+      else if (_match(val, ['cat', 'category', 'type'])) map['category']?.add(i);
     }
     return map;
   }
 
-  String _getColVal(List<Data?> row, int? index) {
-    if (index == null || index >= row.length) return "";
-    final cell = row[index];
-    if (cell == null || cell.value == null) return "";
-    
-    final val = cell.value;
-    if (val is TextCellValue) return val.value.toString();
-    if (val is IntCellValue) return val.value.toString();
-    if (val is DoubleCellValue) return val.value.toString();
-    return val.toString();
+  bool _match(String val, List<String> targets) {
+    return targets.any((t) => val.contains(t));
+  }
+
+  bool _hasRequiredHeaders(Map<String, List<int>> colMap) {
+    return (colMap['name']?.isNotEmpty ?? false);
+  }
+
+  String? _getValueFlexible(List<Data?> row, List<int>? indices) {
+    if (indices == null || indices.isEmpty) return null;
+    for (var index in indices) {
+      if (index >= row.length) continue;
+      final cell = row[index];
+      if (cell == null || cell.value == null) continue;
+      final val = cell.value.toString().trim();
+      if (val.isNotEmpty) return val;
+    }
+    return null;
   }
 }
