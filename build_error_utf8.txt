@@ -1,0 +1,68 @@
+﻿Launching lib\main.dart on Windows in debug mode...
+Building Windows application...                                 
+flutter : CMake Deprecation 
+Warning at C:/projects/invent
+ory_management/build/windows/
+x64/extracted/firebase_cpp_sd
+k_windows/CMakeLists.txt:17 
+(cmake_minimum_required):
+At line:1 char:1
++ flutter run -d windows > 
+build_error.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (CMake D  
+  eprecati...imum_required   
+ )::String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+  Compatibility with CMake < 
+3.10 will be removed from a 
+future version of
+  CMake.
+
+  Update the VERSION 
+argument <min> value.  Or, 
+use the <min>...<max> syntax
+  to tell CMake that the 
+project requires at least 
+<min> but has been updated
+  to work with policies 
+introduced by <max> or 
+earlier.
+
+
+Nuget.exe not found, trying 
+to download or use cached 
+version.
+lib/core/services/auth_servic
+e.dart(343,17): error 
+GE5CFE876: The method 'Uuid' 
+isn't defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj]
+C:\Program Files\Microsoft 
+Visual Studio\18\Community\MS
+Build\Microsoft\VC\v180\Micro
+soft.CppCommon.targets(254,5)
+: error MSB8066: Custom 
+build for 'C:\projects\invent
+ory_management\build\windows\
+x64\CMakeFiles\0e51b98dcbf7ee
+4b11f7d1ddf417eddf\flutter_wi
+ndows.dll.rule;C:\projects\in
+ventory_management\build\wind
+ows\x64\CMakeFiles\2d65cd57c1
+2f79c33244ee1cf575d143\flutte
+r_assemble.rule' exited with 
+code 1. [C:\projects\inventor
+y_management\build\windows\x6
+4\flutter\flutter_assemble.vc
+xproj]
+Building Windows application...                                    20.5s
+Error: Build process failed.

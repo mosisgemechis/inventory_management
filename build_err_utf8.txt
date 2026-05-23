@@ -1,0 +1,603 @@
+﻿flutter : [31mCMake 
+Deprecation Warning at C:/pro
+jects/firebase_cpp_sdk/fireba
+se_cpp_sdk_windows/CMakeLists
+.txt:17 (cmake_minimum_requir
+ed):[39m
+At line:1 char:1
++ flutter build windows 
+--release 2> build_err.txt
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: ([31mCM  
+  ake Depr...required):[3   
+ 9m:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+[31m  Compatibility with 
+CMake < 3.10 will be removed 
+from a future version of[39m
+[31m  CMake.[39m
+
+[31m  Update the VERSION 
+argument <min> value.  Or, 
+use the <min>...<max> 
+syntax[39m
+[31m  to tell CMake that 
+the project requires at 
+least <min> but has been 
+updated[39m
+[31m  to work with policies 
+introduced by <max> or 
+earlier.[39m
+
+
+[31mNuget.exe not found, 
+trying to download or use 
+cached version.[39m
+[31mlib/core/services/auth_s
+ervice.dart(347,7): error 
+G6814800A: Expected a class 
+member, but got 'catch'. [C:\
+projects\inventory_management
+\build\windows\x64\flutter\fl
+utter_assemble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(347,13): error 
+G25387D61: Expected an 
+identifier, but got '('. [C:\
+projects\inventory_management
+\build\windows\x64\flutter\fl
+utter_assemble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(593,1): error 
+G85CCD27E: Expected a 
+declaration, but got '}'. [C:
+\projects\inventory_managemen
+t\build\windows\x64\flutter\f
+lutter_assemble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(322,5): error 
+G951CEA2F: A try block must 
+be followed by an 'on', 
+'catch', or 'finally' 
+clause. [C:\projects\inventor
+y_management\build\windows\x6
+4\flutter\flutter_assemble.vc
+xproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(365,9): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(365,26): error 
+GC9768DF9: Undefined name 
+'isOffline'. [C:\projects\inv
+entory_management\build\windo
+ws\x64\flutter\flutter_assemb
+le.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(367,26): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(367,77): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(398,5): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(412,25): error 
+GC9768DF9: Undefined name 
+'_auth'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(420,31): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(439,23): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(441,19): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(443,19): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(447,9): error 
+GC3CEBF4A: Setter not found: 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(448,20): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(448,9): error 
+G311314CC: Method not found: 
+'_cacheUser'. [C:\projects\in
+ventory_management\build\wind
+ows\x64\flutter\flutter_assem
+ble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(449,9): error 
+G311314CC: Method not found: 
+'_safeNotify'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(474,11): error 
+GC9768DF9: Undefined name 
+'isOffline'. [C:\projects\inv
+entory_management\build\windo
+ws\x64\flutter\flutter_assemb
+le.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(475,25): error 
+GC9768DF9: Undefined name 
+'_auth'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(490,23): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(491,19): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(492,19): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(532,25): error 
+GC9768DF9: Undefined name 
+'_auth'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(535,19): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(537,9): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(538,15): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(539,19): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(541,9): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(543,13): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(544,16): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(546,16): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(547,17): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(548,19): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(549,21): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(550,22): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(542,7): error 
+GC3CEBF4A: Setter not found: 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(553,5): error 
+G311314CC: Method not found: 
+'_safeNotify'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(557,25): error 
+GC9768DF9: Undefined name 
+'_auth'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(560,11): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(567,11): error 
+GC9768DF9: Undefined name 
+'_auth'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(568,11): error 
+G311314CC: Method not found: 
+'_clearCachedUser'. [C:\proje
+cts\inventory_management\buil
+d\windows\x64\flutter\flutter
+_assemble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(569,5): error 
+GC3CEBF4A: Setter not found: 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(570,5): error 
+G311314CC: Method not found: 
+'notifyListeners'. [C:\projec
+ts\inventory_management\build
+\windows\x64\flutter\flutter_
+assemble.vcxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(576,9): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(577,12): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(579,14): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(585,9): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(586,11): error 
+GC9768DF9: Undefined name 
+'_db'. [C:\projects\inventory
+_management\build\windows\x64
+\flutter\flutter_assemble.vcx
+proj][39m
+[31mlib/core/services/auth_s
+ervice.dart(586,39): error 
+GC9768DF9: Undefined name 
+'_user'. [C:\projects\invento
+ry_management\build\windows\x
+64\flutter\flutter_assemble.v
+cxproj][39m
+[31mlib/core/services/auth_s
+ervice.dart(591,5): error 
+G311314CC: Method not found: 
+'_safeNotify'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(140,10
+): error GE5CFE876: The 
+method 'syncStaffIdentities' 
+isn't defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(587,66
+): error GE5CFE876: The 
+method 'signOut' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(1821,3
+0): error GE5CFE876: The 
+method 'createStaffAccount' 
+isn't defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(1901,2
+5): error G4127D1E8: The 
+getter 'currencyFormat' 
+isn't defined for the type '_
+AdminDashboardScreenState'. [
+C:\projects\inventory_managem
+ent\build\windows\x64\flutter
+\flutter_assemble.vcxproj][3
+9m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4023,4
+1): error G4127D1E8: The 
+getter 'currencyFormat' 
+isn't defined for the type '_
+AdminDashboardScreenState'. [
+C:\projects\inventory_managem
+ent\build\windows\x64\flutter
+\flutter_assemble.vcxproj][3
+9m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4070,2
+3): error G4127D1E8: The 
+getter 'currencyFormat' 
+isn't defined for the type '_
+AdminDashboardScreenState'. [
+C:\projects\inventory_managem
+ent\build\windows\x64\flutter
+\flutter_assemble.vcxproj][3
+9m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4212,6
+9): error G4127D1E8: The 
+getter 'shopStream' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4239,4
+8): error GE5CFE876: The 
+method 'updateShop' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4358,8
+4): error GE5CFE876: The 
+method 'signOut' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4411,8
+7): error GE5CFE876: The 
+method 'signOut' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(4422,7
+9): error GE5CFE876: The 
+method 'signOut' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(5933,7
+2): error G7C168647: 
+Property 'currency' cannot 
+be accessed on 'AppUser?' 
+because it is potentially 
+null. [C:\projects\inventory_
+management\build\windows\x64\
+flutter\flutter_assemble.vcxp
+roj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(6249,7
+6): error G4127D1E8: The 
+getter 'user' isn't defined 
+for the type '_AdminDashboard
+ScreenState'. [C:\projects\in
+ventory_management\build\wind
+ows\x64\flutter\flutter_assem
+ble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(6517,3
+5): error GE5CFE876: The 
+method '_fmt' isn't defined 
+for the type 
+'_InventoryTabViewState'. [C:
+\projects\inventory_managemen
+t\build\windows\x64\flutter\f
+lutter_assemble.vcxproj][39m
+[31mlib/features/admin/admin
+_dashboard_screen.dart(6577,2
+5): error GE5CFE876: The 
+method '_fmt' isn't defined 
+for the type 
+'_InventoryTabViewState'. [C:
+\projects\inventory_managemen
+t\build\windows\x64\flutter\f
+lutter_assemble.vcxproj][39m
+[31mlib/features/staff/staff
+_dashboard_screen.dart(262,67
+): error GE5CFE876: The 
+method 'signOut' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/staff/staff
+_dashboard_screen.dart(843,72
+): error GE5CFE876: The 
+method 'signOut' isn't 
+defined for the type 
+'AuthService'. [C:\projects\i
+nventory_management\build\win
+dows\x64\flutter\flutter_asse
+mble.vcxproj][39m
+[31mlib/features/staff/staff
+_dashboard_screen.dart(1211,2
+3): error G4127D1E8: The 
+getter 'currencyFormat' 
+isn't defined for the type '_
+StaffDashboardScreenState'. [
+C:\projects\inventory_managem
+ent\build\windows\x64\flutter
+\flutter_assemble.vcxproj][3
+9m
+[31mlib/features/auth/signup
+_screen.dart(94,17): error 
+GE5CFE876: The method 
+'isValidEmail' isn't defined 
+for the type 'AuthService'. [
+C:\projects\inventory_managem
+ent\build\windows\x64\flutter
+\flutter_assemble.vcxproj][3
+9m
+[31mlib/features/auth/signup
+_screen.dart(109,18): error 
+GE5CFE876: The method 
+'signUp' isn't defined for 
+the type 'AuthService'. [C:\p
+rojects\inventory_management\
+build\windows\x64\flutter\flu
+tter_assemble.vcxproj][39m
+[31mC:\Program 
+Files\Microsoft Visual Studio
+\18\Community\MSBuild\Microso
+ft\VC\v180\Microsoft.CppCommo
+n.targets(254,5): error 
+MSB8066: Custom build for 'C:
+\projects\inventory_managemen
+t\build\windows\x64\CMakeFile
+s\0e51b98dcbf7ee4b11f7d1ddf41
+7eddf\flutter_windows.dll.rul
+e;C:\projects\inventory_manag
+ement\build\windows\x64\CMake
+Files\2d65cd57c12f79c33244ee1
+cf575d143\flutter_assemble.ru
+le' exited with code 1. [C:\p
+rojects\inventory_management\
+build\windows\x64\flutter\flu
+tter_assemble.vcxproj][39m
+[31mBuild process 
+failed.[39m

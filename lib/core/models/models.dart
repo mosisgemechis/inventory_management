@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:hive/hive.dart';
 
 part 'models.g.dart';
@@ -6,9 +6,10 @@ part 'models.g.dart';
 @HiveType(typeId: 4)
 enum UserRole { 
   @HiveField(0) admin, 
-  @HiveField(1) staff, 
-  @HiveField(2) manager, 
-  @HiveField(3) none 
+  @HiveField(1) coAdmin,
+  @HiveField(2) manager,
+  @HiveField(3) staff, 
+  @HiveField(4) none 
 }
 
 @HiveType(typeId: 0)
@@ -29,6 +30,18 @@ class AppUser {
   @HiveField(6)
   final String? branchName;
 
+  @HiveField(7)
+  final Map<String, bool>? permissions;
+
+  @HiveField(8)
+  final String? currency;
+  @HiveField(9)
+  final String? country;
+  @HiveField(10)
+  final bool isActive;
+  @HiveField(11)
+  final String fullName;
+
   AppUser({
     required this.id,
     required this.email,
@@ -37,9 +50,16 @@ class AppUser {
     required this.shopId,
     this.branchId = 'main',
     this.branchName,
+    this.permissions,
+    this.currency = 'USD',
+    this.country,
+    this.isActive = true,
+    this.fullName = '',
   }) : _roles = roles;
 
   UserRole get role => (roles.isNotEmpty) ? roles.first : UserRole.none;
+
+  bool hasRole(UserRole r) => roles.contains(r);
 
   factory AppUser.fromMap(Map<String, dynamic> map, String docId) {
     List<dynamic> rolesRaw = map['roles'] is List ? map['roles'] : [];
@@ -61,14 +81,30 @@ class AppUser {
       parsedRoles = [UserRole.staff];
     }
 
+    Map<String, bool>? perms;
+    if (map['permissions'] != null) {
+      if (map['permissions'] is String) {
+        try {
+          perms = Map<String, bool>.from(jsonDecode(map['permissions'] as String));
+        } catch(_) {}
+      } else if (map['permissions'] is Map) {
+        perms = Map<String, bool>.from(map['permissions'] as Map);
+      }
+    }
+
     return AppUser(
-      id: docId,
-      email: map['email'] ?? '',
-      username: map['username'] ?? '',
+      id: docId.toString(),
+      email: map['email']?.toString() ?? '',
+      username: map['username']?.toString() ?? '',
+      fullName: map['fullName']?.toString() ?? map['username']?.toString() ?? '',
       roles: parsedRoles,
-      shopId: map['shopId'] ?? 'default_shop',
-      branchId: map['branchId'] ?? 'main',
-      branchName: _sanitizeBranchName(map['branchName']),
+      shopId: map['shopId']?.toString() ?? 'default_shop',
+      branchId: map['branchId']?.toString() ?? 'main',
+      branchName: _sanitizeBranchName(map['branchName'] ?? 'Main Branch'),
+      permissions: perms,
+      currency: map['currency']?.toString() ?? 'USD',
+      country: map['country']?.toString(),
+      isActive: map['isActive'] == true || map['isActive'] == 1,
     );
   }
 
@@ -83,11 +119,91 @@ class AppUser {
     return {
       'email': email,
       'username': username,
+      'fullName': fullName,
       'roles': roles.map((r) => r.name).toList(),
       'shopId': shopId,
       'branchId': branchId,
       'branchName': branchName,
+      'permissions': permissions,
+      'currency': currency,
+      'country': country,
+      'isActive': isActive,
     };
+  }
+
+  /// Permission constants
+  static const String pViewInventory = 'canViewInventory';
+  static const String pAddProduct = 'canAddProduct';
+  static const String pEditProduct = 'canEditProduct';
+  static const String pDeleteProduct = 'canDeleteProduct';
+  static const String pAdjustStock = 'canAdjustStock';
+  static const String pViewBuyingPrice = 'canViewBuyingPrice';
+  static const String pSetSellingPrice = 'canSetSellingPrice';
+  static const String pEditSellingPrice = 'canEditSellingPrice';
+  static const String pAccessPOS = 'canAccessPOS';
+  static const String pAddPurchases = 'canAddPurchases';
+  static const String pEditPurchases = 'canEditPurchases';
+  static const String pViewReports = 'canViewReports';
+  static const String pViewProfitReports = 'canViewProfitReports';
+  static const String pExportReports = 'canExportReports';
+  static const String pAddUsers = 'canAddUsers';
+  static const String pEditUsers = 'canEditUsers';
+  static const String pDisableUsers = 'canDisableUsers';
+  static const String pManagePermissions = 'canManagePermissions';
+  static const String pAccessSettings = 'canAccessSettings';
+  static const String pBackupRestore = 'canBackupRestore';
+  static const String pViewAdminDashboard = 'canViewAdminDashboard';
+
+  static const allPermissions = [
+    pViewInventory, pAddProduct, pEditProduct, pDeleteProduct, pAdjustStock,
+    pViewBuyingPrice, pSetSellingPrice, pEditSellingPrice, pAccessPOS,
+    pAddPurchases, pEditPurchases, pViewReports, pViewProfitReports,
+    pExportReports, pAddUsers, pEditUsers, pDisableUsers, pManagePermissions,
+    pAccessSettings, pBackupRestore, pViewAdminDashboard
+  ];
+
+  /// Permission Check with Role Fallback
+  bool hasPermission(String permission) {
+    // 1. Admins have absolute power
+    if (roles.contains(UserRole.admin)) return true;
+
+    // 2. Explicit Permission Override check (from Drift string/JSON)
+    if (permissions != null && permissions!.containsKey(permission)) {
+      return permissions![permission] == true;
+    }
+    
+    // 3. Role-based Defaults (Fallbacks)
+    final r = role;
+    switch (permission) {
+      case pAccessPOS:
+      case pViewInventory:
+        return true; // Staff/Managers can do these by default
+      case pAddProduct:
+      case pEditProduct:
+      case pAdjustStock:
+      case pAddPurchases:
+        return r == UserRole.coAdmin || r == UserRole.manager;
+      case pDeleteProduct:
+      case pEditSellingPrice:
+      case pViewBuyingPrice:
+        return r == UserRole.coAdmin; // Restricted mostly to Co-Admin
+      case pSetSellingPrice:
+      case pViewReports:
+      case pViewProfitReports:
+      case pExportReports:
+        return r == UserRole.coAdmin || r == UserRole.manager;
+      case pAddUsers:
+      case pEditUsers:
+      case pDisableUsers:
+      case pManagePermissions:
+      case pAccessSettings:
+      case pBackupRestore:
+        return r == UserRole.coAdmin;
+      case pViewAdminDashboard:
+        return r == UserRole.coAdmin || r == UserRole.manager;
+      default:
+        return false;
+    }
   }
 }
 
@@ -121,6 +237,8 @@ class Product {
   final List<String>? bundleItems;
   @HiveField(13)
   final DateTime? lastUpdated;
+  @HiveField(14)
+  final String? imageUrl;
 
   Product({
     required this.id,
@@ -137,6 +255,7 @@ class Product {
     this.isBundle = false,
     this.bundleItems,
     this.lastUpdated,
+    this.imageUrl,
   });
 
   factory Product.fromMap(Map<String, dynamic> map, String docId) {
@@ -155,6 +274,7 @@ class Product {
       isBundle: map['isBundle'] ?? false,
       bundleItems: map['bundleItems'] != null ? List<String>.from(map['bundleItems']) : null,
       lastUpdated: parseDT(map['lastUpdated']),
+      imageUrl: map['imageUrl'],
     );
   }
 
@@ -168,11 +288,12 @@ class Product {
       'buyingPrice': buyingPrice,
       'sellingPrice': sellingPrice,
       'lowStockThreshold': lowStockThreshold,
-      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
+      'expiryDate': expiryDate?.toIso8601String(),
       'batchNumber': batchNumber,
       'isBundle': isBundle,
       'bundleItems': bundleItems,
-      'lastUpdated': lastUpdated != null ? Timestamp.fromDate(lastUpdated!) : FieldValue.serverTimestamp(),
+      'lastUpdated': (lastUpdated ?? DateTime.now()).toIso8601String(),
+      'imageUrl': imageUrl,
     };
   }
 }
@@ -259,7 +380,7 @@ class Sale {
       'profit': profit,
       'userId': userId,
       'username': username,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'timestamp': timestamp.toIso8601String(),
       'customerName': customerName,
       'isDebt': isDebt,
       'amountPaid': amountPaid,
@@ -371,7 +492,7 @@ class PurchaseRecord {
       'quantity': quantity,
       'unitCost': unitCost,
       'totalCost': totalCost,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'timestamp': timestamp.toIso8601String(),
     };
   }
 }
@@ -414,7 +535,7 @@ class AuditLog {
       'username': username,
       'action': action,
       'details': details,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'timestamp': timestamp.toIso8601String(),
     };
   }
 }
@@ -452,7 +573,7 @@ class AppNotification {
       'shopId': shopId,
       'message': message,
       'type': type,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'timestamp': timestamp.toIso8601String(),
       'isRead': isRead,
     };
   }
@@ -472,6 +593,8 @@ class CartItem {
   final String? batchNumber;
   @HiveField(5)
   final double? cost;
+  @HiveField(6)
+  final String? branchId;
 
   CartItem({
     required this.id,
@@ -480,6 +603,7 @@ class CartItem {
     required this.quantity,
     this.batchNumber,
     this.cost,
+    this.branchId,
   });
 
   double get total => price * quantity;
@@ -487,23 +611,9 @@ class CartItem {
 
 DateTime? parseDT(dynamic timestamp) {
   if (timestamp == null) return null;
-  if (timestamp is Timestamp) return timestamp.toDate();
   if (timestamp is String) return DateTime.tryParse(timestamp);
   if (timestamp is DateTime) return timestamp;
+  if (timestamp is int) return DateTime.fromMillisecondsSinceEpoch(timestamp);
   return null;
 }
 
-class TimestampAdapter extends TypeAdapter<Timestamp> {
-  @override
-  final int typeId = 20;
-
-  @override
-  Timestamp read(BinaryReader reader) {
-    return Timestamp.fromMillisecondsSinceEpoch(reader.readInt());
-  }
-
-  @override
-  void write(BinaryWriter writer, Timestamp obj) {
-    writer.writeInt(obj.millisecondsSinceEpoch);
-  }
-}

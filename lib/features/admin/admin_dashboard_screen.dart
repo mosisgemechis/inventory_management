@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:badges/badges.dart' as badges;
@@ -14,7 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:inventory_manager/core/services/auth_service.dart';
-import 'package:inventory_manager/core/services/firestore_service.dart';
+import 'package:inventory_manager/core/services/database_service.dart';
 import 'package:inventory_manager/core/services/validation_service.dart';
 import 'package:inventory_manager/core/services/import_service.dart';
 import 'package:inventory_manager/core/services/reporting_service.dart';
@@ -25,6 +23,10 @@ import 'package:inventory_manager/core/widgets/loading_overlay.dart';
 import 'package:inventory_manager/core/utils/thread_safe_stream.dart';
 import 'package:inventory_manager/core/models/models.dart';
 import 'package:inventory_manager/core/services/theme_service.dart';
+import 'package:inventory_manager/core/services/bulk_import/import_models.dart';
+import 'package:inventory_manager/core/widgets/import_error_report.dart';
+import 'package:inventory_manager/core/widgets/import_duplicate_resolver.dart';
+import 'package:inventory_manager/core/widgets/account_dropdown.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -34,7 +36,7 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final FirestoreService _db = FirestoreService();
+  final DatabaseService _db = DatabaseService();
   final ValidationService _validator = ValidationService();
   final ImportService _importService = ImportService();
   final ReportingService _reporting = ReportingService();
@@ -46,9 +48,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String _purchaseSupplierFilter = 'All Suppliers';
 
   // Streams cached to prevent infinite rebuild/semantics loops
-  Stream<QuerySnapshot>? _notificationStream;
-  Stream<QuerySnapshot>? _homeSalesStream;
-  Stream<QuerySnapshot>? _homeInventoryStream;
+  Stream<List<Map<String, dynamic>>>? _notificationStream;
+  Stream<List<Map<String, dynamic>>>? _homeSalesStream;
+  Stream<List<Map<String, dynamic>>>? _homeInventoryStream;
 
   @override
   void initState() {
@@ -60,15 +62,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final user = Provider.of<AuthService>(context, listen: false).user;
       if (user != null) {
         setState(() {
-          _notificationStream = FirebaseFirestore.instance
-              .collection('deletion_requests')
-              .where('shopId', isEqualTo: user.shopId)
-              .where('status', isEqualTo: 'pending')
-              .snapshots()
-              .toMainThread();
+          // If staff, default to their branch
+          if (user.roles.contains(UserRole.staff) && !user.roles.contains(UserRole.admin)) {
+            _selectedBranchId = user.branchId ?? 'main';
+          }
           
-          _homeSalesStream = _db.getSales(user.shopId).toMainThread();
-          _homeInventoryStream = _db.getInventory(user.shopId).toMainThread();
+          // Local-first notifications (no UI dependency on network).
+          _notificationStream = _db.watchNotifications(user.shopId).toMainThread();
+          
+          _homeSalesStream = _db.watchSales(user.shopId).toMainThread();
+          _homeInventoryStream = _db.watchProducts(user.shopId).toMainThread();
         });
       }
     });
@@ -96,7 +99,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
   String _searchQuery = "";
   final TextEditingController _posBarcodeC = TextEditingController(); // For POS Barcode scanning
-  final String _selectedBranchId = "all";
+  String _selectedBranchId = "all";
   List<CartItem> _posCart = [];
   double _cartTotal = 0;
 
@@ -123,8 +126,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.dispose();
   }
 
-  void _handleAddToCart(DocumentSnapshot doc, {bool isQuickSell = false}) {
-    final d = doc.data() as Map<String, dynamic>;
+  void _handleAddToCart(Map<String, dynamic> doc, {bool isQuickSell = false}) {
+    final d = doc;
     final stock = (d['quantity'] ?? 0).toDouble();
     final qtyC = TextEditingController(text: '1');
     final buyerC = TextEditingController();
@@ -134,15 +137,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (user == null) return;
     final expiryData = d['expiryDate'];
     if (expiryData != null) {
-      final expiry = (expiryData is Timestamp)
-          ? expiryData.toDate()
+      final expiry = (expiryData is DateTime)
+          ? expiryData
           : DateTime.tryParse(expiryData.toString());
       if (expiry != null) {
         final now = DateTime.now();
         if (expiry.isBefore(now)) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('Product has expired! cannot sell.'),
-              backgroundColor: AppColors.danger));
+              backgroundColor: Color(0xFFEF4444)));
           return;
         }
         final diff = expiry.difference(now).inDays;
@@ -224,17 +227,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     return;
                   }
                   setState(() {
-                    final exIdx = _posCart.indexWhere((i) => i.id == doc.id);
+                    final exIdx = _posCart.indexWhere((i) => i.id == (doc as Map<String, dynamic>)['id']);
                     if (exIdx != -1) {
                       _posCart[exIdx].quantity = val.toInt();
                     } else {
                       _posCart.add(CartItem(
-                        id: doc.id,
+                        id: doc['id'],
                         name: d['name'],
                         price: (d['sellingPrice'] ?? 0).toDouble(),
                         quantity: val.toInt(),
                         batchNumber: d['batchNumber'],
                         cost: (d['buyingPrice'] ?? 0).toDouble(),
+                        branchId: doc['branchId']?.toString(),
                       ));
                     }
                     _calculateTotal();
@@ -264,7 +268,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   try {
                     LoadingOverlay.show(context);
                     await _repo.recordSale(user, {
-                      'itemId': doc.id,
+                      'itemId': (doc as Map<String, dynamic>)['id'],
                       'itemName': d['name'],
                       'quantity': val.toInt(),
                       'totalPrice': total,
@@ -277,7 +281,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       'debtRemaining': isDebt ? (total - advanced) : 0.0,
                       'advancedPaid': isDebt ? advanced : total,
                       'shopId': user.shopId,
-                      'branchId': user.branchId,
+                      'branchId': (doc as Map<String, dynamic>)['branchId'] ?? user.branchId,
                       'timestamp': DateTime.now().toIso8601String(),
                     });
                     if (mounted) LoadingOverlay.hide(context);
@@ -312,7 +316,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
-  List<DocumentSnapshot>? _purchases;
+  List<Map<String, dynamic>>? _purchases;
   bool _isLoadingPurchases = true;
 
 
@@ -375,6 +379,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
       ),
+
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -449,8 +454,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   List<SidebarItem> _getSidebarItems(AppUser user) {
-    final isAdminOrManager = user.roles.contains(UserRole.admin) ||
-        user.roles.contains(UserRole.manager);
+    final isAdminOrManager = user.hasRole(UserRole.admin) ||
+        user.hasRole(UserRole.manager);
     return [
       SidebarItem(
           uid: 'overview', icon: Icons.grid_view_rounded, label: 'dashboard'.tr(context)),
@@ -460,7 +465,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           label: 'inventory'.tr(context)),
       SidebarItem(
           uid: 'sales',
-          icon: Icons.shopping_cart_outlined,
+          icon: Icons.point_of_sale_rounded,
           label: 'sales_pos'.tr(context)),
       SidebarItem(
           uid: 'purchases',
@@ -469,9 +474,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       SidebarItem(uid: 'debt', icon: Icons.payments_rounded, label: 'debt'.tr(context)),
       SidebarItem(
           uid: 'reports', icon: Icons.analytics_outlined, label: 'reports'.tr(context)),
-      if (isAdminOrManager)
+      if (isAdminOrManager) ...[
         SidebarItem(
-            uid: 'users', icon: Icons.people_outline_rounded, label: 'add_user'.tr(context)),
+            uid: 'users', icon: Icons.group_outlined, label: 'Manage Users'),
+        SidebarItem(
+            uid: 'branches', icon: Icons.lan_outlined, label: 'Manage Branches'),
+      ],
       SidebarItem(
           uid: 'audit', icon: Icons.history_rounded, label: 'audit_history'.tr(context)),
       SidebarItem(
@@ -479,21 +487,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ];
   }
 
+
+
   PreferredSizeWidget _buildMobileAppBar(AppUser user) {
     return AppBar(
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      title: Text(_getTabTitle(),
-          style: TextStyle(
-              color: AppColors.secondary,
-              fontWeight: FontWeight.bold,
-              fontSize: 18)),
-      actions: [_buildNotificationBadge(user), const SizedBox(width: 8)],
+      title: Text(_getTabTitle(), style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+      centerTitle: false,
+      actions: [
+        _buildBranchSelector(user),
+        const SizedBox(width: 4),
+        _buildNotificationBadge(user),
+        const SizedBox(width: 4),
+        const AccountDropdown(),
+        const SizedBox(width: 8),
+      ],
     );
   }
 
   Widget _buildDesktopHeader(AppUser user) {
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
       decoration: BoxDecoration(
@@ -555,12 +567,85 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
+                // ── Branch Selector ──
+                _buildBranchSelector(user),
+                const SizedBox(width: 16),
                 _buildNotificationBadge(user),
+                const SizedBox(width: 8),
+                const AccountDropdown(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBranchSelector(AppUser user) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _db.watchBranches(user.shopId).toMainThread(),
+      builder: (ctx, branchSnap) {
+        final branches = (branchSnap.data ?? []).where((b) => b['id'] != 'all').toList();
+        final options = [
+          {'id': 'all', 'name': 'All Branches'},
+          ...branches
+        ];
+
+        // Robust validation to prevent Dropdown crash
+        String validId = 'all';
+        if (options.any((b) => b['id'] == _selectedBranchId)) {
+          validId = _selectedBranchId;
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: validId,
+              isDense: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 18, color: AppColors.textSecondary),
+              items: options
+                  .map((b) => DropdownMenuItem<String>(
+                        value: b['id'] as String,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.store_rounded,
+                                size: 14, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(b['name'] as String,
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedBranchId = val;
+                    // Re-cache home streams for the new branch
+                    _homeSalesStream = _db
+                        .watchSales(user.shopId,
+                            branchId: val == 'all' ? null : val)
+                        .toMainThread();
+                    _homeInventoryStream = _db
+                        .watchProducts(user.shopId,
+                            branchId: val == 'all' ? null : val)
+                        .toMainThread();
+                  });
+                }
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -579,7 +664,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 5:
         return 'reports'.tr(context);
       case 6:
-        return 'add_user'.tr(context);
+        return 'manage_users'.tr(context);
       case 7:
         return 'audit_history'.tr(context);
       case 8:
@@ -591,18 +676,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildNotificationBadge(AppUser user) {
     if (_notificationStream == null) return const SizedBox();
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _notificationStream,
       builder: (context, snapshot) {
-        final delCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+        final all = snapshot.data ?? const <Map<String, dynamic>>[];
+        final unread = all.where((n) => (n['isRead'] ?? false) != true).toList();
+        final delCount = unread.length;
         return badges.Badge(
           showBadge: delCount > 0,
           badgeContent: Text('$delCount',
               style: const TextStyle(color: Colors.white, fontSize: 10)),
           child: IconButton(
             icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () =>
-                _showNotificationsPanel(user, snapshot.data?.docs ?? []),
+            onPressed: () => _showNotificationsPanel(user, all),
           ),
         );
       },
@@ -610,7 +696,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showNotificationsPanel(
-      AppUser user, List<DocumentSnapshot> deletionRequests) {
+      AppUser user, List<Map<String, dynamic>> notifications) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -633,7 +719,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             const Divider(height: 32),
             Expanded(
-              child: deletionRequests.isEmpty
+              child: notifications.isEmpty
                   ? Center(
                       child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -646,45 +732,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ],
                     ))
                   : ListView.builder(
-                      itemCount: deletionRequests.length,
+                      itemCount: notifications.length,
                       itemBuilder: (c, i) {
-                        final req =
-                            deletionRequests[i].data() as Map<String, dynamic>;
+                        final req = notifications[i];
+                        final id = req['id']?.toString() ?? '';
+                        final isRead = (req['isRead'] ?? false) == true;
                         return ListTile(
-                          leading: const CircleAvatar(
-                              backgroundColor: Color(0xFFFFEDD5),
-                              child: Icon(Icons.delete_sweep_rounded,
-                                  color: Color(0xFFF97316), size: 20)),
-                          title:
-                              Text("Deletion Request: ${req['productName']}"),
-                          subtitle: Text("Requested by ${req['requestedBy']}"),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                  icon: const Icon(Icons.check_circle_outline,
-                                      color: AppColors.success),
-                                  onPressed: () async {
-                                    await FirebaseFirestore.instance
-                                        .collection('deletion_requests')
-                                        .doc(deletionRequests[i].id)
-                                        .update({'status': 'approved'});
-                                    await _repo.deleteItem(
-                                        user, req['productId']);
-                                    if (ctx.mounted) Navigator.pop(ctx);
-                                  }),
-                              IconButton(
-                                  icon: const Icon(Icons.cancel_outlined,
-                                      color: AppColors.danger),
-                                  onPressed: () async {
-                                    await FirebaseFirestore.instance
-                                        .collection('deletion_requests')
-                                        .doc(deletionRequests[i].id)
-                                        .update({'status': 'declined'});
-                                    if (ctx.mounted) Navigator.pop(ctx);
-                                  }),
-                            ],
+                          leading: CircleAvatar(
+                            backgroundColor: isRead
+                                ? AppColors.border.withOpacity(0.4)
+                                : AppColors.secondary.withOpacity(0.15),
+                            child: Icon(
+                              Icons.notifications_rounded,
+                              color: isRead ? AppColors.textSecondary : AppColors.secondary,
+                              size: 18,
+                            ),
                           ),
+                          title: Text(req['title']?.toString() ?? 'Notification'),
+                          subtitle: Text(req['message']?.toString() ?? ''),
+                          trailing: (!isRead && id.isNotEmpty)
+                              ? IconButton(
+                                  tooltip: 'Mark as read',
+                                  icon: const Icon(Icons.done_rounded, color: AppColors.success),
+                                  onPressed: () async {
+                                    await _db.markNotificationAsRead(id);
+                                  },
+                                )
+                              : null,
                         );
                       }),
             ),
@@ -715,6 +789,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return _buildReportsTab(user, items);
       case 'users':
         return _buildManageUsersTab(user);
+      case 'branches':
+        return _buildManageBranchesTab(user);
       case 'audit':
         return _buildAuditLogTab(user);
       case 'settings':
@@ -728,33 +804,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_homeSalesStream == null || _homeInventoryStream == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _homeSalesStream,
       builder: (context, salesSnap) {
-        return StreamBuilder<QuerySnapshot>(
+        return StreamBuilder<List<Map<String, dynamic>>>(
           stream: _homeInventoryStream,
           builder: (context, invSnap) {
             double rev = 0;
             double prof = 0;
             int count = 0;
             int lowStock = 0;
-            List<DocumentSnapshot> sales = [];
+            List<Map<String, dynamic>> sales = [];
 
             if (salesSnap.hasData) {
-              final now = DateTime.now();
-              sales = salesSnap.data!.docs.where((d) {
-                final m = d.data() as Map;
-                if (_selectedBranchId != "all" &&
-                    m['branchId'] != _selectedBranchId) return false;
+              sales = (salesSnap.data ?? []).where((m) {
+                final bId = m['branchId']?.toString() ?? 'main';
+                if (_selectedBranchId != "all" && bId != _selectedBranchId) return false;
                 final ts = parseDT(m['timestamp']);
                 if (ts == null) return false;
-                return ts.year == now.year &&
-                    ts.month == now.month &&
-                    ts.day == now.day;
+                return ts.isAfter(_startDate.subtract(const Duration(seconds: 1))) &&
+                       ts.isBefore(_endDate.add(const Duration(days: 1)));
               }).toList();
 
               for (var doc in sales) {
-                final m = doc.data() as Map;
+                final m = doc;
                 rev += (m['totalPrice'] ?? 0).toDouble();
                 prof += (m['profit'] ?? 0).toDouble();
                 if (m['isDebt'] == true) {
@@ -766,10 +839,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             }
 
             if (invSnap.hasData) {
-              for (var doc in invSnap.data!.docs) {
-                final m = doc.data() as Map;
-                final qty = m['quantity'] ?? 0;
-                final threshold = m['lowStockThreshold'] ?? 5;
+              for (var m in (invSnap.data ?? [])) {
+                final bId = m['branchId']?.toString() ?? 'main';
+                if (_selectedBranchId != "all" && bId != _selectedBranchId) continue;
+                final qty = (m['quantity'] ?? 0).toDouble();
+                final threshold = (m['lowStockThreshold'] ?? 5).toDouble();
                 if (qty <= threshold) lowStock++;
               }
             }
@@ -818,7 +892,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         onTap: () => setState(() => _selectedIndex =
                             sidebarItems.indexWhere((it) => it.uid == 'reports')),
                       ),
-                      if (!user.roles.contains(UserRole.staff))
+                      if (!user.hasRole(UserRole.staff))
                         StatCard(
                           title: 'Net Profit',
                           value: prof < 0
@@ -860,7 +934,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(height: 32),
                   // Responsive Charts and Lists
                   if (isMobile) ...[
-                    if (!user.roles.contains(UserRole.staff)) ...[
+                    if (!user.hasRole(UserRole.staff)) ...[
                       _buildLineChartSection(context, cardDecoration),
                       const SizedBox(height: 24),
                     ],
@@ -868,15 +942,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         user, sales, cardDecoration, sidebarItems),
                     const SizedBox(height: 24),
                     _buildTopSellingTable(
-                        user, salesSnap.data?.docs ?? [], cardDecoration),
+                        user, salesSnap.data ?? [] ?? [], cardDecoration),
                     const SizedBox(height: 24),
                     _buildLowStockList(
-                        invSnap.data?.docs ?? [], cardDecoration),
+                        invSnap.data ?? [] ?? [], cardDecoration),
                   ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (!user.roles.contains(UserRole.staff))
+                        if (!user.hasRole(UserRole.staff))
                           Expanded(
                               flex: 3,
                               child: _buildLineChartSection(
@@ -896,23 +970,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         Expanded(
                             flex: 3,
-                            child: _buildTopSellingTable(user,
-                                salesSnap.data?.docs ?? [], cardDecoration)),
+                            child: _buildTopSellingTable(user, sales, cardDecoration)),
                         const SizedBox(width: 32),
                         Expanded(
-                            flex: 2,
-                            child: _buildLowStockList(
-                                invSnap.data?.docs ?? [], cardDecoration)),
+                                child: _buildLowStockList(invSnap.data ?? [], cardDecoration)),
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
-                ],
+                    ],
+                  );
+                },
               );
-            });
-          },
-        );
-      },
-    );
+            },
+          );
+        },
+      );
   }
 
   Widget _buildLineChartSection(
@@ -920,10 +992,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final user = Provider.of<AuthService>(context, listen: false).user;
     if (user == null) return const SizedBox();
 
-    return StreamBuilder<QuerySnapshot>(
-        stream: _db.getSales(user.shopId).toMainThread(),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _db.watchSales(user.shopId).toMainThread(),
         builder: (context, salesSnap) {
-          final allSales = salesSnap.data?.docs ?? [];
+          final allSales = salesSnap.data ?? [] ?? [];
           final now = DateTime.now();
           List<FlSpot> spots = [];
           double maxVal = 1000;
@@ -934,7 +1006,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             final date = now.subtract(Duration(days: 6 - i));
             double dailyProf = 0;
             for (var doc in allSales) {
-              final m = doc.data() as Map<String, dynamic>;
+              final m = doc;
               final ts = parseDT(m['timestamp']);
               if (ts != null &&
                   ts.year == date.year &&
@@ -1060,7 +1132,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
   }
 
-  Widget _buildRecentSalesList(AppUser user, List<DocumentSnapshot> sales,
+  Widget _buildRecentSalesList(AppUser user, List<Map<String, dynamic>> sales,
       BoxDecoration cardDecoration, List<SidebarItem> sidebarItems) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1083,7 +1155,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 16),
           ...sales.take(5).map((s) {
-            final d = s.data() as Map<String, dynamic>;
+            final d = s;
             final ts = parseDT(d['timestamp']) ?? DateTime.now();
             return ListTile(
               contentPadding: EdgeInsets.zero,
@@ -1120,8 +1192,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             spacing: 16,
             runSpacing: 12,
             children: [
-              const Text("User Management",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text("Manage Users",
+                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               OutlinedButton.icon(
                 onPressed: () => _showCreateUserDialog(adminUser),
                 icon: const Icon(Icons.person_add_outlined, size: 18),
@@ -1134,20 +1206,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _db.getUsers(adminUser.shopId).toMainThread(),
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchUsers(adminUser.shopId).toMainThread(),
             builder: (c, snap) {
               if (!snap.hasData)
                 return const Center(child: CircularProgressIndicator());
+              final users = snap.data ?? [];
+              if (users.isEmpty) return const Center(child: Text('No staff accounts found.'));
               return ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
-                itemCount: snap.data!.docs.length,
+                itemCount: users.length,
                 separatorBuilder: (c, i) => const SizedBox(height: 12),
                 itemBuilder: (c, i) {
-                  final doc = snap.data!.docs[i];
-                  final d = doc.data() as Map<String, dynamic>;
-                  final role =
-                      ((d['roles'] as List?)?.first ?? 'staff').toString();
+                  final d = users[i] as Map<String, dynamic>;
+                  final role = ((d['roles'] as List?)?.first ?? 'staff').toString();
                   final isAdmin = role == 'admin';
                   return Card(
                     child: ListTile(
@@ -1191,14 +1263,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             IconButton(
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               tooltip: 'Edit User',
-                              onPressed: () => _showEditUserDialog(doc.id, d),
+                              onPressed: () => _showEditUserDialog(d['uid'], d),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline_rounded,
                                   size: 18, color: AppColors.danger),
                               tooltip: 'Delete User',
                               onPressed: () => _confirmDeleteUser(
-                                  doc.id, d['username'] ?? ''),
+                                  d['uid'], d['username'] ?? ''),
                             ),
                           ],
                         ],
@@ -1255,10 +1327,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ElevatedButton(
                     onPressed: () async {
                       try {
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(uid)
-                            .update({
+                        await _db.updateUser(uid, {
                           'username': nameC.text.trim().toLowerCase(),
                           'roles': [selectedRole],
                         });
@@ -1304,10 +1373,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Navigator.pop(ctx);
               LoadingOverlay.show(context);
               try {
-                await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(uid)
-                    .delete();
+                await _db.delete('users', uid);
                 if (mounted)
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text("'$username' deleted."),
@@ -1327,6 +1393,120 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
+
+  Widget _buildManageBranchesTab(AppUser user) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 16,
+            runSpacing: 12,
+            children: [
+              const Text("Manage Branches",
+                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              OutlinedButton.icon(
+                onPressed: () => _showAddBranchDialog(user.shopId),
+                icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+                label: const Text("New Branch"),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchBranches(user.shopId).toMainThread(),
+            builder: (c, snap) {
+              if (!snap.hasData)
+                return const Center(child: CircularProgressIndicator());
+              final branches = snap.data!;
+              if (branches.isEmpty) return const Center(child: Text("No branches configured."));
+              
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                itemCount: branches.length,
+                separatorBuilder: (c, i) => const SizedBox(height: 12),
+                itemBuilder: (c, i) {
+                  final b = branches[i];
+                  return Card(
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: AppColors.secondary,
+                        child: Icon(Icons.store_rounded, color: Colors.white, size: 20),
+                      ),
+                      title: Text(b['name'] ?? 'Untitled Branch',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text("ID: ${b['id']}"),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                        onPressed: () => _confirmDeleteBranch(b['id'], b['name'] ?? ''),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddBranchDialog(String shopId) {
+     final nameC = TextEditingController();
+     showDialog(
+       context: context,
+       builder: (ctx) => AlertDialog(
+         title: const Text("Create New Branch"),
+         content: TextField(
+           controller: nameC,
+           decoration: const InputDecoration(labelText: "Branch Name"),
+         ),
+         actions: [
+           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+           ElevatedButton(
+             onPressed: () async {
+               if (nameC.text.isEmpty) return;
+               await _db.saveBranch({
+                 'id': nameC.text.toLowerCase().replaceAll(' ', '_'),
+                 'shopId': shopId,
+                 'name': nameC.text.trim(),
+               });
+               if (ctx.mounted) Navigator.pop(ctx);
+             },
+             child: const Text("Create"),
+           )
+         ],
+       ),
+     );
+  }
+
+  void _confirmDeleteBranch(String id, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete Branch?"),
+        content: Text("Proceed with deleting branch '$name'? Warning: Items assigned to this branch may become orphaned."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () async {
+              await _db.delete('branches', id);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text("Delete"),
+          )
+        ],
+      ),
+    );
+  }
+
 
   void _showCreateUserDialog(AppUser adminUser) {
     final nameC = TextEditingController();
@@ -1387,28 +1567,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       if (ctx.mounted) Navigator.pop(ctx);
                       LoadingOverlay.show(context);
                       try {
-                        final cred = await FirebaseAuth.instance
-                            .createUserWithEmailAndPassword(
+                        await Provider.of<AuthService>(context, listen: false).createStaffAccount(
                           email: emailC.text.trim(),
                           password: passC.text,
+                          username: nameC.text.trim(),
+                          fullName: nameC.text.trim(), // Use username as fullname for now if not provided
+                          shopId: adminUser.shopId,
+                          branchId: adminUser.branchId,
+                          branchName: adminUser.branchName ?? 'Main Branch',
+                          role: selectedRole,
+                          permissions: {for (var p in AppUser.allPermissions) p: true},
                         );
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(cred.user!.uid)
-                            .set({
-                          'username': nameC.text.trim().toLowerCase(),
-                          'email': emailC.text.trim(),
-                          'roles': [selectedRole],
-                          'shopId': adminUser.shopId,
-                          'branchId': adminUser.branchId,
-                          'branchName': adminUser.branchName ?? 'Main Branch',
-                        });
                         if (mounted)
                           ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                   content: Text('Staff account created!'),
                                   backgroundColor: AppColors.success));
                       } catch (e) {
+
                         if (mounted)
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                               content: Text('Error: $e'),
@@ -1429,6 +1605,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: _InventoryTabView(
         user: user,
         db: _db,
+        branchId: _selectedBranchId,
         onAddItem: (data, id) => _showAddItemDialog(user, data, id),
         onAddItemNew: () => _showAddItemDialog(user),
         onRestock: (prefill) => _showAdminPurchaseDialog(user, prefillProduct: prefill),
@@ -1544,13 +1721,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _db.getInventory(user.shopId).toMainThread(),
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchProducts(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).toMainThread(),
             builder: (context, snapshot) {
               if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              final items = snapshot.data!.docs.where((d) {
-                final m = d.data() as Map;
+              final items = snapshot.data!.where((d) {
+                final m = d;
                 final name = (m['name']?.toString().toLowerCase() ?? '');
                 final barcode = (m['barcode']?.toString().toLowerCase() ?? '');
                 final price = (m['sellingPrice'] ?? 0).toDouble();
@@ -1572,17 +1749,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
                 itemCount: items.length,
                 itemBuilder: (context, i) {
-                  final d = items[i].data() as Map<String, dynamic>;
+                  final d = items[i];
                   final qty = d['quantity'] ?? 0;
                   final isLow = qty <= (d['lowStockThreshold'] ?? 5);
+
 
                   bool isExpired = false;
                   bool isExpiringSoon = false;
                   final ed = d['expiryDate'];
                   if (ed != null) {
-                    final expiry = (ed is Timestamp)
-                        ? ed.toDate()
+                    final expiry = (ed is DateTime)
+                        ? ed
                         : DateTime.tryParse(ed.toString());
+
                     if (expiry != null) {
                       if (expiry.isBefore(DateTime.now()))
                         isExpired = true;
@@ -1922,7 +2101,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                       await _repo.recordSale(user, {
                         'shopId': user.shopId,
-                        'branchId': user.branchId,
+                        'branchId': item.branchId ?? user.branchId,
                         'userId': user.id,
                         'username': user.username,
                         'itemId': item.id,
@@ -1955,8 +2134,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  void _showAdminSellDialog(DocumentSnapshot doc, AppUser user) {
-    final d = doc.data() as Map<String, dynamic>;
+  void _showAdminSellDialog(Map<String, dynamic> doc, AppUser user) {
+    final d = doc;
     final qtyC = TextEditingController(text: '1');
     final buyerC = TextEditingController();
     String paymentType = 'Cash';
@@ -2019,10 +2198,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   // Optimistic/Instant local-first save via repo
                   _repo.recordSale(user, {
                     'shopId': user.shopId,
-                    'branchId': user.branchId,
+                    'branchId': d['branchId']?.toString() ?? user.branchId,
                     'userId': user.id,
                     'username': user.username,
-                    'itemId': doc.id,
+                    'itemId': doc['id'],
                     'itemName': d['name'],
                     'quantity': qty,
                     'sellingPrice': sell,
@@ -2108,24 +2287,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _db.getPurchases(user.shopId).toMainThread(),
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchPurchases(user.shopId, branchId: _selectedBranchId),
             builder: (context, snap) {
               if (!snap.hasData)
                 return const Center(child: CircularProgressIndicator());
-              final allPurchases = snap.data!.docs;
+              final allPurchases = snap.data!;
 
               // Extract Suppliers for Filter
               List<String> suppliers = ['All Suppliers'];
-              for (var doc in allPurchases) {
-                final sName = (doc.data() as Map)['supplierName']?.toString();
+              for (var m in allPurchases) {
+                final sName = m['supplierName']?.toString();
                 if (sName != null &&
                     sName.isNotEmpty &&
                     !suppliers.contains(sName)) suppliers.add(sName);
               }
 
-              var docs = allPurchases.where((d) {
-                final m = d.data() as Map;
+              var docs = allPurchases.where((m) {
                 if (_purchaseSupplierFilter != 'All Suppliers' &&
                     m['supplierName'] != _purchaseSupplierFilter) return false;
 
@@ -2175,7 +2353,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       itemCount: docs.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, i) {
-                        final d = docs[i].data() as Map<String, dynamic>;
+                        final d = docs[i];
                         final ts = parseDT(d['timestamp']);
                         return Card(
                           child: ListTile(
@@ -2372,13 +2550,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(height: 16),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 300),
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _db.getInventory(user.shopId).toMainThread(),
+                  child: StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _db.watchProducts(user.shopId).toMainThread(),
                     builder: (context, snap) {
                       if (!snap.hasData) return const LinearProgressIndicator();
                       final q = searchC.text.toLowerCase();
-                      final items = snap.data!.docs.where((doc) {
-                        final d = doc.data() as Map;
+                      final items = snap.data!.where((doc) {
+                        final d = doc;
                         final name = (d['name'] ?? '').toString().toLowerCase();
                         final bar = (d['barcode'] ?? '').toString().toLowerCase();
                         return (name.contains(q) || bar.contains(q)) && q.isNotEmpty;
@@ -2397,7 +2575,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         separatorBuilder: (_, __) => const Divider(),
                         itemBuilder: (ctx, i) {
                           final doc = items[i];
-                          final d = doc.data() as Map<String, dynamic>;
+                          final d = doc;
                           return ListTile(
                             title: Text(d['name'] ?? ''),
                             subtitle: Text("Stock: ${d['quantity']} | ${d['barcode'] ?? '-'}"),
@@ -2405,7 +2583,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             onTap: () {
                                 Navigator.pop(ctx);
                                 final prefill = Map<String, dynamic>.from(d);
-                                prefill['id'] = doc.id;
+                                prefill['id'] = doc['id'];
                                 _showAdminPurchaseDialog(user, prefillProduct: prefill, forceShowSupplier: forceShowSupplierInRestock);
                               },
                           );
@@ -2440,6 +2618,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final sellC = TextEditingController(text: sPrice > 0 ? sPrice.toString() : '');
     final thresholdC = TextEditingController(text: '5');
     DateTime? expiry;
+    String selectedBranchId = prefillProduct?['branchId']?.toString() ?? 
+        (_selectedBranchId != 'all' ? _selectedBranchId : user.branchId);
 
     showDialog(
       context: context,
@@ -2524,6 +2704,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               labelText: 'Low Stock Alert Threshold',
                               hintText: 'e.g. 5',
                               prefixIcon: Icon(Icons.notifications_active_outlined))),
+                      const SizedBox(height: 16),
+                      // ── Branch Selector ─────────────────────────────────
+                      StreamBuilder<List<Map<String, dynamic>>>(
+                        stream: _db.watchBranches(user.shopId).toMainThread(),
+                        builder: (c, snap) {
+                          final branches = snap.data ?? [];
+                          if (branches.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Assign to Branch*", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                              Container(
+                                margin: const EdgeInsets.only(top: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: branches.any((b) => b['id'] == selectedBranchId) ? selectedBranchId : branches.first['id'],
+                                    isExpanded: true,
+                                    items: branches.map((b) => DropdownMenuItem(
+                                      value: b['id'] as String,
+                                      child: Text(b['name'] as String),
+                                    )).toList(),
+                                    onChanged: (v) {
+                                      if (v != null) setS(() => selectedBranchId = v);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -2547,7 +2763,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         // Repository now handles the "Identity vs. Movement" logic internally.
                         await _repo.recordPurchase(user, {
                           'shopId': user.shopId,
-                          'branchId': user.branchId,
+                          'branchId': selectedBranchId,
                           'userId': user.id,
                           'username': user.username,
                           'supplierName': supplierC.text.trim(),
@@ -2559,7 +2775,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           'sellingPrice': double.tryParse(sellC.text) ?? 0,
                           'lowStockThreshold': int.tryParse(thresholdC.text) ?? 5,
                           'totalCost': (double.tryParse(qtyC.text) ?? 0) * (double.tryParse(costC.text) ?? 0),
-                          'expiryDate': expiry != null ? Timestamp.fromDate(expiry!) : null,
+                          'expiryDate': expiry?.toIso8601String(),
                         });
 
                         if (ctx.mounted) {
@@ -2600,16 +2816,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   offset: const Offset(0, 4))
             ],
     );
-    return StreamBuilder<QuerySnapshot>(
-      stream: _db.getSales(user.shopId).toMainThread(),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _db.watchSales(user.shopId).toMainThread(),
       builder: (context, snap) {
-        return StreamBuilder<QuerySnapshot>(
-          stream: _db.getInventory(user.shopId).toMainThread(),
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _db.watchProducts(user.shopId).toMainThread(),
           builder: (context, invSnap) {
             int lowStock = 0;
             if (invSnap.hasData) {
-              for (var doc in invSnap.data!.docs) {
-                final m = doc.data() as Map;
+              for (var doc in invSnap.data!) {
+                final m = doc;
                 final qty = m['quantity'] ?? 0;
                 final threshold = m['lowStockThreshold'] ?? 5;
                 if (qty <= threshold) lowStock++;
@@ -2670,9 +2886,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       onSelected: (val) async {
                         LoadingOverlay.show(context);
                         try {
-                          final allDocs = snap.data?.docs ?? [];
+                          final allDocs = (snap.data ?? []);
                           final filtered = allDocs.where((d) {
-                            final m = d.data() as Map;
+                            final m = d;
                             final ts = parseDT(m['timestamp']);
                             if (ts == null) return false;
                             return ts.isAfter(_startDate.subtract(const Duration(seconds: 1))) &&
@@ -2699,7 +2915,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Map<String, Map<String, dynamic>> dailyMap = {};
 
                             for (var d in filtered) {
-                              final m = d.data() as Map;
+                              final m = d;
+                              final bId = m['branchId']?.toString() ?? 'main';
+                              if (_selectedBranchId != 'all' && bId != _selectedBranchId) continue;
+                              
+                              final ts = parseDT(m['timestamp']);
                               final rev = (m['totalPrice'] ?? 0).toDouble();
                               final prof = (m['profit'] ?? 0).toDouble();
                               totalRev += rev;
@@ -2711,7 +2931,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               productRevMap[name] = (productRevMap[name] ?? 0) + rev;
                               productQtyMap[name] = (productQtyMap[name] ?? 0) + (m['quantity'] ?? 0).toDouble();
 
-                              final ts = parseDT(m['timestamp']);
                               if (ts != null) {
                                 final key = DateFormat('yyyy-MM-dd').format(ts);
                                 final label = DateFormat('dd MMM').format(ts);
@@ -2740,8 +2959,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             // Inventory alert counts
                             int lowCount = 0, outCount = 0, soonCount = 0, expiredCount = 0;
                             final now = DateTime.now();
-                            for (var d in invSnap.data?.docs ?? []) {
-                              final m = d.data() as Map;
+                            for (var d in invSnap.data ?? [] ?? []) {
+                              final m = d;
                               final qty = m['quantity'] ?? 0;
                               final thresh = m['lowStockThreshold'] ?? 5;
                               if (qty <= 0) outCount++;
@@ -2749,8 +2968,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                               final expiry = m['expiryDate'];
                               if (expiry != null) {
-                                final date = (expiry is Timestamp)
-                                    ? expiry.toDate()
+                                final date = (expiry is DateTime)
+                                    ? expiry
                                     : DateTime.tryParse(expiry.toString());
                                 if (date != null) {
                                   if (date.isBefore(now)) expiredCount++;
@@ -2763,9 +2982,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ? '${DateFormat('dd MMM yyyy').format(_startDate)} – ${DateFormat('dd MMM yyyy').format(_endDate)}'
                                 : _reportFilter;
                             // Fetch shop meta for reports
-                            final shopSnap = await FirebaseFirestore.instance.collection('shops').doc(user.shopId).get();
-                            final shopName = shopSnap.get('name') ?? 'SmartInventory ERP';
-                            final shopPhone = shopSnap.get('phone') ?? '+251...';
+                            final shopName = await _db.getSetting('shopName') ?? 'SmartInventory ERP';
+                            final shopPhone = await _db.getSetting('shopPhone') ?? '+251...';
 
                             pathStr = await _reporting.exportToPdf(
                                 'Report_${DateTime.now().millisecondsSinceEpoch}', {
@@ -2838,8 +3056,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   double totalProfit = 0;
                   int txCount = 0;
                   double totalUnpaid = 0;
-                  for (var doc in snap.data?.docs ?? []) {
-                    final m = doc.data() as Map;
+                  for (var doc in (snap.data ?? [])) {
+                    final m = doc;
+                    final bId = m['branchId']?.toString() ?? 'main';
+                    if (_selectedBranchId != "all" && bId != _selectedBranchId) continue;
+                    
                     final ts = parseDT(m['timestamp']);
                     if (ts != null &&
                         ts.isAfter(
@@ -2873,7 +3094,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             onTap: () => setState(() => _selectedIndex =
                                 _getSidebarItems(user)
                                     .indexWhere((it) => it.uid == 'reports'))),
-                        if (!user.roles.contains(UserRole.staff))
+                        if (!user.hasRole(UserRole.staff))
                           StatCard(
                               title: 'Total Profit',
                               value: currencyFormat.format(totalProfit),
@@ -2912,7 +3133,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   });
                 }),
                 // Charts row
-                if (!user.roles.contains(UserRole.staff)) ...[
+                if (!user.hasRole(UserRole.staff)) ...[
                   LayoutBuilder(builder: (context, constraints) {
                     final bool isMobile = constraints.maxWidth < 750;
                     if (isMobile) {
@@ -2936,8 +3157,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   height: 250,
                                   child: Builder(builder: (context) {
                                     Map<String, num> stats = {};
-                                    for (var d in snap.data?.docs ?? []) {
-                                      final m = d.data() as Map;
+                                    for (var d in (snap.data ?? [])) {
+                                      final m = d;
+                                      final bId = m['branchId']?.toString() ?? 'main';
+                                      if (_selectedBranchId != "all" && bId != _selectedBranchId) continue;
+                                      
+                                      final ts = parseDT(m['timestamp']);
+                                      if (ts == null || ts.isBefore(_startDate) || ts.isAfter(_endDate)) continue;
+                                      
                                       final name = m['itemName'] ?? 'Unknown';
                                       final qty = (m['quantity'] ?? 0);
                                       stats[name] = (stats[name] ?? 0) + qty;
@@ -2982,8 +3209,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 const SizedBox(height: 24),
                                 Builder(builder: (context) {
                                   Map<String, num> stats = {};
-                                  for (var d in snap.data?.docs ?? []) {
-                                    final m = d.data() as Map;
+                                  for (var d in (snap.data ?? [])) {
+                                    final m = d;
+                                    final bId = m['branchId']?.toString() ?? 'main';
+                                    if (_selectedBranchId != "all" && bId != _selectedBranchId) continue;
+                                    
+                                    final ts = parseDT(m['timestamp']);
+                                    if (ts == null || ts.isBefore(_startDate) || ts.isAfter(_endDate)) continue;
+
                                     final name = m['itemName'] ?? 'Unknown';
                                     final qty = (m['quantity'] ?? 0);
                                     stats[name] = (stats[name] ?? 0) + qty;
@@ -3037,8 +3270,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       height: 250,
                                       child: Builder(builder: (context) {
                                         Map<String, num> stats = {};
-                                        for (var d in snap.data?.docs ?? []) {
-                                          final m = d.data() as Map;
+                                        for (var d in (snap.data ?? [])) {
+                                          final m = d;
                                           final name = m['itemName'] ?? 'Unknown';
                                           final qty = (m['quantity'] ?? 0);
                                           stats[name] = (stats[name] ?? 0) + qty;
@@ -3083,8 +3316,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     const SizedBox(height: 24),
                                     Builder(builder: (context) {
                                       Map<String, num> stats = {};
-                                      for (var d in snap.data?.docs ?? []) {
-                                        final m = d.data() as Map;
+                                      for (var d in (snap.data ?? [])) {
+                                        final m = d;
                                         final name = m['itemName'] ?? 'Unknown';
                                         final qty = (m['quantity'] ?? 0);
                                         stats[name] = (stats[name] ?? 0) + qty;
@@ -3126,11 +3359,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Icons.download_rounded, () async {
                       LoadingOverlay.show(context);
                       try {
-                        final snapBatch = await FirebaseFirestore.instance
-                            .collection('sales')
-                            .where('shopId', isEqualTo: user.shopId)
-                            .get();
-                        if (snapBatch.docs.isEmpty) {
+                        final salesList = await _db.watchSales(user.shopId).first;
+                        if (salesList.isEmpty) {
                           if (mounted)
                             ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -3140,7 +3370,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           return;
                         }
                         final path =
-                            await _reporting.exportSalesExcel(snapBatch.docs);
+                            await _reporting.exportSalesExcel(salesList);
                         if (mounted && path != "Cancelled")
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                               content: Text("Export saved: $path"),
@@ -3161,25 +3391,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 // NEW ACTIONS SECTIONS
                 const SizedBox(height: 32),
                 Builder(builder: (ctx) {
-                  final products = invSnap.data?.docs ?? [];
+                  final products = invSnap.data ?? [] ?? [];
                   final outOfStock = products
-                      .where((d) => (d.data() as Map)['quantity'] <= 0)
+                      .where((d) => d['quantity'] <= 0)
                       .toList();
                   final expired = products.where((d) {
-                    final m = d.data() as Map;
+                    final m = d;
                     final expiry = m['expiryDate'];
-                    if (expiry == null) return false;
-                    final date = (expiry is Timestamp)
-                        ? expiry.toDate()
+                    final date = (expiry is DateTime)
+                        ? expiry
                         : DateTime.tryParse(expiry.toString());
                     return date != null && date.isBefore(DateTime.now());
                   }).toList();
                   final expiringSoon = products.where((d) {
-                    final m = d.data() as Map;
+                    final m = d;
                     final expiry = m['expiryDate'];
-                    if (expiry == null) return false;
-                    final date = (expiry is Timestamp)
-                        ? expiry.toDate()
+                    final date = (expiry is DateTime)
+                        ? expiry
                         : DateTime.tryParse(expiry.toString());
                     if (date == null) return false;
                     final diff = date.difference(DateTime.now()).inDays;
@@ -3214,12 +3442,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                       // NEW PERFORMANCE TIERS
                       Builder(builder: (c) {
-                        final salesInPeriod = snap.data?.docs ?? [];
-                        final inventory = invSnap.data?.docs ?? [];
+                        final salesInPeriod = (snap.data ?? []);
+                        final inventory = invSnap.data ?? [] ?? [];
 
                         Map<String, double> volumes = {};
                         for (var s in salesInPeriod) {
-                          final m = s.data() as Map;
+                          final m = s;
                           final name = m['itemName'] ?? 'Unknown';
                           volumes[name] = (volumes[name] ?? 0) +
                               (m['quantity'] ?? 0).toDouble();
@@ -3227,24 +3455,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                         final dead = inventory
                             .where((i) =>
-                                !volumes.containsKey((i.data() as Map)['name']))
+                                !volumes.containsKey((i)['name']))
                             .toList();
                         final moving = inventory
                             .where((i) =>
-                                volumes.containsKey((i.data() as Map)['name']))
+                                volumes.containsKey((i)['name']))
                             .toList()
-                          ..sort((a, b) => volumes[(b.data() as Map)['name']]!
-                              .compareTo(volumes[(a.data() as Map)['name']]!));
+                          ..sort((a, b) => volumes[(b)['name']]!
+                              .compareTo(volumes[(a)['name']]!));
 
                         final fast = moving.take(5).toList();
                         final slow = moving.reversed.take(5).toList();
 
-                        final valStock = List<QueryDocumentSnapshot>.from(
+                        final valStock = List<Map<String, dynamic>>.from(
                             inventory)
                           ..sort((a, b) =>
-                              ((b.data() as Map)['sellingPrice'] ?? 0)
+                              ((b)['sellingPrice'] ?? 0)
                                   .compareTo(
-                                      (a.data() as Map)['sellingPrice'] ?? 0));
+                                      (a)['sellingPrice'] ?? 0));
 
                         final highVal = valStock.take(5).toList();
                         final lowVal = valStock.reversed.take(5).toList();
@@ -3344,169 +3572,168 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           );
                         }
                         return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text("Sales History Log",
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 18)),
-                            SizedBox(width: 280, child: searchField),
+                            const Spacer(),
+                            SizedBox(width: 300, child: searchField),
                           ],
                         );
                       }),
-                      const SizedBox(height: 16),
-                      Builder(builder: (_) {
-                        var saleDocs = snap.data?.docs ?? [];
-                        saleDocs = saleDocs.where((d) {
-                          final m = d.data() as Map;
-                          final ts = parseDT(m['timestamp']);
-                          if (ts == null) return false;
-                          return ts.isAfter(_startDate
-                                  .subtract(const Duration(seconds: 1))) &&
-                              ts.isBefore(
-                                  _endDate.add(const Duration(days: 1)));
-                        }).toList();
-                        if (_searchSalesC.text.isNotEmpty) {
-                          final q = _searchSalesC.text.toLowerCase();
-                          saleDocs = saleDocs.where((d) {
-                            final m = d.data() as Map;
-                            return (m['itemName'] ?? '')
-                                    .toString()
-                                    .toLowerCase()
-                                    .contains(q) ||
-                                (m['customerName'] ?? '')
-                                    .toString()
-                                    .toLowerCase()
-                                    .contains(q) ||
-                                (m['barcode'] ?? '')
-                                    .toString()
-                                    .toLowerCase()
-                                    .contains(q) ||
-                                (m['username'] ?? '')
-                                    .toString()
-                                    .toLowerCase()
-                                    .contains(q);
-                          }).toList();
-                        }
-                        if (saleDocs.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                                child: Text("No sales found for this period.",
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary))),
-                          );
-                        }
-                        return Table(
-                          columnWidths: const {
-                            0: FlexColumnWidth(2),
-                            1: FlexColumnWidth(1.5),
-                            2: FlexColumnWidth(1),
-                            3: FlexColumnWidth(1.2),
-                            4: FlexColumnWidth(1.2)
-                          },
-                          children: [
-                            TableRow(
-                              decoration: const BoxDecoration(
-                                  border: Border(
-                                      bottom:
-                                          BorderSide(color: AppColors.border))),
-                              children: const [
-                                Padding(
-                                    padding: EdgeInsets.only(bottom: 8),
-                                    child: Text('Product',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary))),
-                                Padding(
-                                    padding: EdgeInsets.only(bottom: 8),
-                                    child: Text('Date & Time',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary))),
-                                Padding(
-                                    padding: EdgeInsets.only(bottom: 8),
-                                    child: Text('Qty',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary))),
-                                Padding(
-                                    padding: EdgeInsets.only(bottom: 8),
-                                    child: Text('Total',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary))),
-                                Padding(
-                                    padding: EdgeInsets.only(bottom: 8),
-                                    child: Text('By',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary))),
-                              ],
-                            ),
-                            ...saleDocs.take(50).map((doc) {
-                              final m = doc.data() as Map<String, dynamic>;
-                              final ts = parseDT(m['timestamp']);
-                              return TableRow(children: [
-                                Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    child: Text(m['itemName'] ?? '-',
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500),
-                                        overflow: TextOverflow.ellipsis)),
-                                Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    child: Text(
-                                        ts != null
-                                            ? DateFormat('dd MMM, hh:mm a')
-                                                .format(ts)
-                                            : '-',
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary))),
-                                Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    child: Text('${m['quantity'] ?? 0}',
-                                        style: const TextStyle(fontSize: 13))),
-                                Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    child: Text(
-                                        currencyFormat
-                                            .format(m['totalPrice'] ?? 0),
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.success))),
-                                Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    child: Text(m['username'] ?? '-',
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary),
-                                        overflow: TextOverflow.ellipsis)),
-                              ]);
-                            }),
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
+                      const SizedBox(height: 32),
+                      _buildSalesHistorySection(user),
+                      const SizedBox(height: 100),
+                    ],           // closes Column.children
+                  ),             // closes Column (child: arg of Container)
+                ),               // closes Container (item in ListView.children)
+              ],                 // closes ListView.children
+            );                   // closes ListView
+          },                     // closes invSnap StreamBuilder builder
+        );                       // closes invSnap StreamBuilder
+      },                         // closes snap StreamBuilder builder
+    );                           // closes snap StreamBuilder
+  }                              // closes _buildReportsTab
+
+  void _showSaleDetailDialog(Map<String, dynamic> s) {
+    final ts = parseDT(s['timestamp']) ?? DateTime.now();
+    final profit = (s['profit'] ?? 0).toDouble();
+    final total = (s['totalPrice'] ?? 0).toDouble();
+    final qty = s['quantity'] ?? 0;
+    
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.receipt_long, color: AppColors.secondary),
+            const SizedBox(width: 12),
+            const Text("Sale Details"),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow("Product", s['itemName'] ?? 'Unknown'),
+              _detailRow("Quantity", "$qty pieces"),
+              _detailRow("Total Paid", currencyFormat.format(total)),
+              _detailRow("Unit Price", currencyFormat.format(total / (qty > 0 ? qty : 1))),
+              const Divider(height: 32),
+              _detailRow("Sold By", s['username'] ?? 'Unknown'),
+              _detailRow("Branch", s['branchId']?.toString() ?? 'Main Branch'),
+              _detailRow("Customer", s['customerName']?.toString().isEmpty == false ? s['customerName'] : 'Walk-in Guest'),
+              _detailRow("Date", DateFormat('MMM dd, yyyy').format(ts)),
+              _detailRow("Time", DateFormat('hh:mm a').format(ts)),
+              const Divider(height: 32),
+              _detailRow("Net Profit", currencyFormat.format(profit), 
+                color: profit >= 0 ? Colors.green : Colors.red),
+              const SizedBox(height: 16),
+              Text("Transaction ID: ${s['id']}", style: const TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text("Close")),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSalesHistorySection(AppUser user) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("Transaction History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            TextButton.icon(
+              onPressed: () => _setFilter('Monthly'),
+              icon: const Icon(Icons.history, size: 16),
+              label: const Text("View Recent", style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _db.watchSales(user.shopId).toMainThread(),
+          builder: (context, snap) {
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            
+            final allSales = (snap.data ?? []);
+            final filtered = allSales.where((s) {
+              final bId = s['branchId']?.toString() ?? 'main';
+              if (_selectedBranchId != "all" && bId != _selectedBranchId) return false;
+              
+              final sq = _searchSalesC.text.trim().toLowerCase();
+              if (sq.isNotEmpty) {
+                final name = (s['itemName']?.toString() ?? '').toLowerCase();
+                final cName = (s['customerName']?.toString() ?? '').toLowerCase();
+                final sId = (s['id']?.toString() ?? '').toLowerCase();
+                if (!name.contains(sq) && !cName.contains(sq) && !sId.contains(sq)) return false;
+              }
+              
+              final ts = parseDT(s['timestamp']);
+              if (ts == null) return false;
+              return ts.isAfter(_startDate.subtract(const Duration(seconds: 1))) &&
+                     ts.isBefore(_endDate.add(const Duration(days: 1)));
+            }).toList();
+
+            // Sort by date (descending)
+            filtered.sort((a, b) => (parseDT(b['timestamp']) ?? DateTime(2000)).compareTo(parseDT(a['timestamp']) ?? DateTime(2000)));
+
+            if (filtered.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: AppColors.border.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ],
+                child: const Center(child: Text("No records for this period.", style: TextStyle(color: AppColors.textSecondary))),
+              );
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border.withOpacity(0.5)),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filtered.length > 20 ? 20 : filtered.length, // Show top 20 recent
+                separatorBuilder: (c, i) => const Divider(height: 1, indent: 64),
+                itemBuilder: (c, i) {
+                  final s = filtered[i];
+                  final ts = parseDT(s['timestamp']) ?? DateTime.now();
+                  final profit = (s['profit'] ?? 0).toDouble();
+                  return ListTile(
+                    onTap: () => _showSaleDetailDialog(s),
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.secondary.withOpacity(0.1),
+                      child: const Icon(Icons.shopping_bag_outlined, color: AppColors.secondary, size: 18),
+                    ),
+                    title: Text(s['itemName'] ?? 'Product', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text("${DateFormat('MMM dd • hh:mm a').format(ts)} • ${s['username']}", style: const TextStyle(fontSize: 11)),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(currencyFormat.format(s['totalPrice'] ?? 0), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text("${profit >= 0 ? '+' : ''}${currencyFormat.format(profit)}", 
+                          style: TextStyle(fontSize: 10, color: profit >= 0 ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  );
+                },
+              ),
             );
           },
-        );
-      },
+        ),
+      ],
     );
   }
 
@@ -3572,11 +3799,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   fontSize: 18,
                   color: AppColors.danger)),
           const SizedBox(height: 16),
-          StreamBuilder<QuerySnapshot>(
-            stream: _db.getInventory(user.shopId).toMainThread(),
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchProducts(user.shopId).toMainThread(),
             builder: (context, snap) {
-              final items = snap.data?.docs.where((d) {
-                    final m = d.data() as Map;
+              final items = snap.data!.where((d) {
+                    final m = d;
                     final qty = (m['quantity'] ?? 0);
                     final threshold = (m['lowStockThreshold'] ?? 5);
                     return qty > 0 && qty <= threshold;
@@ -3592,7 +3819,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: items.length,
                 itemBuilder: (c, i) {
-                  final d = items[i].data() as Map;
+                  final d = items[i];
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.warning_amber_rounded,
@@ -3648,8 +3875,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildSettingsTab(AppUser user) {
-    final isAdmin = user.roles.contains(UserRole.admin);
-    final isAdminOrManager = isAdmin || user.roles.contains(UserRole.manager);
+    final isAdmin = user.hasRole(UserRole.admin);
+    final isAdminOrManager = isAdmin || user.hasRole(UserRole.manager);
     return ListView(
       padding: const EdgeInsets.all(32),
       children: [
@@ -3668,10 +3895,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ? null
                     : () => showDialog(
                         context: context,
-                        builder: (ctx) => StreamBuilder<DocumentSnapshot>(
+                        builder: (ctx) => StreamBuilder<Map<String, dynamic>>(
                           stream: Provider.of<AuthService>(context).shopStream,
                           builder: (context, snap) {
-                            final shopData = snap.data?.data() as Map<String, dynamic>?;
+                            final shopData = snap.data;
                             final nameC = TextEditingController(text: shopData?['name'] ?? 'SmartInventory ERP');
                             final phoneC = TextEditingController(text: shopData?['phone'] ?? '+251...');
 
@@ -3757,6 +3984,103 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.cloud_sync_rounded),
+                title: const Text("Cloud Sync Configuration"),
+                subtitle: const Text("Connect to a backend to sync across devices"),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: !isAdmin
+                    ? null
+                    : () async {
+                        // Load current settings
+                        final currentUrl = await _db.getSetting('api_base_url') ?? '';
+                        final currentToken = await _db.getSetting('access_token') ?? '';
+                        final currentShopId = await _db.getSetting('active_shop_id') ?? user.shopId;
+                        final urlC = TextEditingController(text: currentUrl);
+                        final tokenC = TextEditingController(text: currentToken);
+                        final shopIdC = TextEditingController(text: currentShopId);
+                        if (!mounted) return;
+                        await showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Row(
+                              children: [
+                                Icon(Icons.cloud_sync_rounded, color: AppColors.secondary),
+                                SizedBox(width: 8),
+                                Text("Sync Settings"),
+                              ],
+                            ),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Enter your backend API details to enable cross-device sync. Leave blank for offline-only mode.",
+                                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextField(
+                                    controller: urlC,
+                                    decoration: const InputDecoration(
+                                      labelText: "API Base URL",
+                                      hintText: "e.g. https://api.yourserver.com",
+                                      prefixIcon: Icon(Icons.link_rounded),
+                                    ),
+                                    keyboardType: TextInputType.url,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: tokenC,
+                                    decoration: const InputDecoration(
+                                      labelText: "Access Token",
+                                      hintText: "Bearer token from your backend",
+                                      prefixIcon: Icon(Icons.vpn_key_rounded),
+                                    ),
+                                    obscureText: true,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: shopIdC,
+                                    decoration: const InputDecoration(
+                                      labelText: "Shop ID (override)",
+                                      hintText: "Leave as-is unless instructed",
+                                      prefixIcon: Icon(Icons.store_rounded),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text("Cancel"),
+                              ),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.save_rounded),
+                                label: const Text("Save & Sync"),
+                                onPressed: () async {
+                                  await _db.saveSetting('api_base_url', urlC.text.trim());
+                                  await _db.saveSetting('access_token', tokenC.text.trim());
+                                  await _db.saveSetting('active_shop_id', shopIdC.text.trim());
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Sync configuration saved. Syncing now...'),
+                                        backgroundColor: AppColors.success,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                enabled: isAdmin,
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.cloud_sync_rounded),
                 title: const Text("Database Backup"),
                 subtitle: const Text("Secure your data offshore"),
                 trailing: const Icon(Icons.chevron_right_rounded),
@@ -3777,6 +4101,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       },
                 enabled: isAdmin,
               ),
+
               if (isAdminOrManager) ...[
                 const Divider(height: 1),
                 ListTile(
@@ -3973,6 +4298,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final thresholdC = TextEditingController(
         text: item?['lowStockThreshold']?.toString() ?? '5');
     DateTime? expiryDate = parseDT(item?['expiryDate']);
+    String selectedBranchId = item?['branchId']?.toString() ?? 
+        (_selectedBranchId != 'all' ? _selectedBranchId : u.branchId);
 
     showDialog(
       context: context,
@@ -4062,6 +4389,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           if (picked != null) setS(() => expiryDate = picked);
                         },
                       ),
+                      const SizedBox(height: 16),
+                      // ── Branch Selector ─────────────────────────────────
+                      StreamBuilder<List<Map<String, dynamic>>>(
+                        stream: _db.watchBranches(u.shopId).toMainThread(),
+                        builder: (c, snap) {
+                          final branches = snap.data ?? [];
+                          if (branches.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Product Branch*", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                              Container(
+                                margin: const EdgeInsets.only(top: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: branches.any((b) => b['id'] == selectedBranchId) ? selectedBranchId : branches.first['id'],
+                                    isExpanded: true,
+                                    items: branches.map((b) => DropdownMenuItem(
+                                      value: b['id'] as String,
+                                      child: Text(b['name'] as String),
+                                    )).toList(),
+                                    onChanged: (v) {
+                                      if (v != null) setS(() => selectedBranchId = v);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -4092,29 +4455,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           'lowStockThreshold':
                               int.tryParse(thresholdC.text) ?? 5,
                           'expiryDate': expiryDate != null
-                              ? Timestamp.fromDate(expiryDate!)
+                              ? expiryDate!.toIso8601String()
                               : null,
                           'shopId': u.shopId,
-                          'branchId': u.branchId,
-                          'lastUpdated': DateTime.now()
-                              .toIso8601String(), // Avoid FieldValue locally
+                          'branchId': selectedBranchId,
+                          'lastUpdated': DateTime.now().toIso8601String(),
                         };
 
                         if (id == null) {
                           await _repo.registerItem(u, productMap);
                           if (u.roles.contains(UserRole.staff)) {
-                            await _db.addNotification(
-                                u.shopId,
-                                "New medicine '${nameC.text}' added by Staff. Please set buying/selling price.",
-                                "inventory_alert");
+                            await _db.addNotification({
+                              'shopId': u.shopId,
+                              'title': 'New Medicine Added',
+                              'message': "New medicine '${nameC.text}' added by Staff. Please set buying/selling price.",
+                              'type': 'inventory_alert'
+                            });
                           }
                         } else {
-                          await FirebaseFirestore.instance
-                              .collection('items')
-                              .doc(id)
-                              .update(productMap);
+                          await _db.update('products', id, productMap);
                           await _repo.recordAuditLog(u.shopId, u.username, 'EDIT_PRODUCT', 'Updated product details for ${nameC.text}');
                         }
+
 
                         if (c.mounted) {
                           LoadingOverlay.hide(context);
@@ -4156,76 +4518,152 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // _handleCSVExport removed in favor of integrated _reporting.exportSalesExcel calls
 
-  Future<void> _handleImport(AppUser user) async {
+    Future<void> _handleImport(AppUser user) async {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Bulk Excel Import"),
-        content: const Column(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Upload an Excel file with these flexible headers:"),
-            SizedBox(height: 12),
-            Text("• Name / Product (Required)"),
-            Text("• Barcode / Code / SKU"),
-            Text("• Quantity / Qty / Stock"),
-            Text("• Buying Price / Cost"),
-            Text("• Selling Price / Sale Price"),
-            Text("• Batch / Lot"),
+            const Text("Upload an Excel/CSV file with these requirements:"),
+            const SizedBox(height: 16),
+            _reqItem("Name", true),
+            _reqItem("Quantity / Stock", false, hint: "(Default: 0)"),
+            _reqItem("Buying Cost", false, hint: "(Default: 0)"),
+            _reqItem("Selling Price", false, hint: "(Default: 1.25x Cost)"),
+            _reqItem("Barcode / SKU", false),
+            _reqItem("Expiry Date", false, hint: "(e.g. 2025-12-31)"),
+            _reqItem("Low Stock Alert", false),
+            _reqItem("Supplier", false),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: AppColors.info),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text("Duplicates will be flagged for resolution (Restock, Replace, or Skip).",
+                      style: TextStyle(fontSize: 12, color: AppColors.info)),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
           ElevatedButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.pop(ctx);
-              final bytes = await _importService.pickExcelFile();
-              if (bytes != null) {
-                LoadingOverlay.show(context);
-                try {
-                  final result = await _importService.importFromExcel(bytes, user);
-                  if (mounted) {
-                    showDialog(
-                      context: context,
-                      builder: (c) => AlertDialog(
-                        title: const Text("Import Summary"),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("New Items: ${result.imported}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text("Updated Items: ${result.updated}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                            if (result.errors.isNotEmpty) ...[
-                              const Divider(height: 32),
-                              const Text("Errors / Skipped Rows:", style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                height: 200,
-                                width: double.maxFinite,
-                                child: ListView.builder(
-                                  itemCount: result.errors.length,
-                                  itemBuilder: (lsCtx, i) => Text("• ${result.errors[i]}", style: const TextStyle(fontSize: 11)),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text("OK"))],
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Import Error: $e'), backgroundColor: AppColors.danger));
-                  }
-                } finally {
-                  if (mounted) LoadingOverlay.hide(context);
-                }
-              }
+              _startImportFlow(user);
             },
-            child: const Text("Pick file & Import"),
+            child: const Text("Pick File & Import"),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reqItem(String label, bool required, {String? hint}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(required ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded, 
+            size: 14, color: required ? AppColors.success : AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: required ? FontWeight.bold : FontWeight.normal)),
+          if (hint != null)
+            Text(" $hint", style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          if (required)
+            const Text(" *", style: TextStyle(color: AppColors.danger)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startImportFlow(AppUser user) async {
+    try {
+      final parseResult = await _importService.pickAndParse(user);
+      
+      if (parseResult.errors.isNotEmpty && parseResult.validCompanions.isEmpty && parseResult.duplicates.isEmpty) {
+        if (mounted) _showImportErrorSummary(parseResult.errors);
+        return;
+      }
+
+      if (parseResult.duplicates.isNotEmpty) {
+        if (!mounted) return;
+        final resolutions = await showDialog<Map<String, ImportResolutionStrategy>>(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => ImportDuplicateResolver(duplicates: parseResult.duplicates),
+        );
+
+        if (resolutions == null) return; // Cancelled
+
+        LoadingOverlay.show(context);
+        final finalResult = await _importService.finalizeImport(user, parseResult, resolutions);
+        LoadingOverlay.hide(context);
+        
+        if (mounted) {
+          _showImportSuccess(finalResult.importedCount, parseResult.errors);
+          setState(() {}); // Refresh UI
+        }
+      } else if (parseResult.validCompanions.isNotEmpty) {
+        // No duplicates, just finalize
+        LoadingOverlay.show(context);
+        final finalResult = await _importService.finalizeImport(user, parseResult, {});
+        LoadingOverlay.hide(context);
+        
+        if (mounted) {
+          _showImportSuccess(finalResult.importedCount, parseResult.errors);
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint("Import Flow Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Import Failed: $e"),
+          backgroundColor: AppColors.danger,
+        ));
+      }
+    }
+  }
+
+  void _showImportErrorSummary(List<ImportErrorRow> errors, {int successCount = 0}) {
+     showDialog(
+      context: context,
+      builder: (c) => ImportErrorReport(errors: errors, successCount: successCount),
+    );
+  }
+
+  void _showImportSuccess(int count, List<ImportErrorRow> errors) {
+    if (errors.isNotEmpty) {
+      _showImportErrorSummary(errors, successCount: count);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text("Import Complete"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Successfully processed $count items."),
+          ],
+        ),
+        actions: [
+          ElevatedButton(onPressed: () => Navigator.pop(c), child: const Text("Close")),
         ],
       ),
     );
@@ -4260,10 +4698,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final user = Provider.of<AuthService>(context, listen: false).user;
     if (user == null) return const SizedBox();
 
-    return StreamBuilder<QuerySnapshot>(
-        stream: _db.getSales(user.shopId).toMainThread(),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _db.watchSales(user.shopId).toMainThread(),
         builder: (context, snap) {
-          final allSales = snap.data?.docs ?? [];
+          final allSales = (snap.data ?? []);
           final now = DateTime.now();
           List<BarChartGroupData> groups = [];
 
@@ -4271,7 +4709,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             final date = now.subtract(Duration(days: 6 - i));
             double dailyRev = 0;
             for (var doc in allSales) {
-              final m = doc.data() as Map<String, dynamic>;
+              final m = doc;
+              final bId = m['branchId']?.toString() ?? 'main';
+              if (_selectedBranchId != "all" && bId != _selectedBranchId) continue;
+              
               final ts = parseDT(m['timestamp']);
               if (ts != null &&
                   ts.year == date.year &&
@@ -4344,12 +4785,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
   }
 
-  Widget _buildTopSellingTable(AppUser user, List<DocumentSnapshot> allSales,
+  Widget _buildTopSellingTable(AppUser user, List<Map<String, dynamic>> allSales,
       BoxDecoration cardDecoration) {
     // Aggregate sales by product name
     final Map<String, Map<String, dynamic>> aggregated = {};
     for (var doc in allSales) {
-      final m = doc.data() as Map<String, dynamic>;
+      final m = doc;
       final name = m['itemName']?.toString() ?? 'Unknown';
       final qty = (m['quantity'] ?? 0).toInt();
       final profit = (m['profit'] ?? 0).toDouble();
@@ -4460,10 +4901,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildLowStockList(
-      List<DocumentSnapshot> inventory, BoxDecoration cardDecoration) {
+      List<Map<String, dynamic>> inventory, BoxDecoration cardDecoration) {
     final lowItems = inventory
         .where((doc) {
-          final m = doc.data() as Map;
+          final m = doc as Map<String, dynamic>;
           final qty = m['quantity'] ?? 0;
           return qty > 0 && qty <= (m['lowStockThreshold'] ?? 5);
         })
@@ -4492,7 +4933,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             )
           else
             ...lowItems.map((doc) {
-              final m = doc.data() as Map<String, dynamic>;
+              final m = doc as Map<String, dynamic>;
               final qty = m['quantity'] ?? 0;
               final isCritical = qty <= 3;
               return Padding(
@@ -4557,15 +4998,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _db.getSales(user.shopId).toMainThread(),
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchSales(user.shopId).toMainThread(),
             builder: (ctx, snap) {
               if (!snap.hasData)
                 return const Center(child: CircularProgressIndicator());
-              final allSales = snap.data!.docs;
-              Map<String, List<QueryDocumentSnapshot>> grouped = {};
+              final allSales = snap.data!;
+              Map<String, List<Map<String, dynamic>>> grouped = {};
               for (var doc in allSales) {
-                final m = doc.data() as Map;
+                final m = doc;
                 final remaining = (m['debtRemaining'] ?? 0.0);
                 if (m['isDebt'] == true && remaining > 0.1) {
                   // Fallback grouping: if groupId is missing, group by customer + day to avoid "divided" entries
@@ -4593,16 +5034,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 itemBuilder: (c, i) {
                   final key = groupKeys[i];
                   final items = grouped[key]!;
-                  final d = items.first.data() as Map<String, dynamic>;
+                  final d = items.first;
                   final totalRemaining = items.fold(
                       0.0,
                       (sum, doc) =>
-                          sum + ((doc.data() as Map)['debtRemaining'] ?? 0.0));
+                          sum + (doc['debtRemaining'] ?? 0.0));
                   final ts = parseDT(d['timestamp']) ?? DateTime.now();
 
                   return ListTile(
                     onTap: () => _showDebtDetailDialog(items
-                        .map((it) => it.data() as Map<String, dynamic>)
+                        .map((it) => it)
                         .toList()),
                     leading: const CircleAvatar(
                         backgroundColor: AppColors.danger,
@@ -4654,12 +5095,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           icon: const Icon(Icons.check_circle_rounded,
                               color: AppColors.success, size: 20),
                           onPressed: () async {
-                            final batch = FirebaseFirestore.instance.batch();
-                            for (var doc in items) {
-                              batch.update(doc.reference,
-                                  {'isDebt': false, 'debtRemaining': 0});
+                            LoadingOverlay.show(context);
+                            try {
+                              for (var item in items) {
+                                await _db.update('sales', item['id'], {'isDebt': false, 'debtRemaining': 0});
+                              }
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("All marked as paid!")));
+                            } catch(e) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                            } finally {
+                              if (mounted) LoadingOverlay.hide(context);
                             }
-                            await batch.commit();
+
                           },
                           tooltip: "Mark ALL as Paid",
                         ),
@@ -4674,6 +5121,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ],
     );
   }
+
+
 
   Widget _buildAuditLogTab(AppUser user) {
     return Column(
@@ -4710,13 +5159,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ),
                       ),
-                      StreamBuilder<QuerySnapshot>(
-                          stream: _db.getUsers(user.shopId),
+                      StreamBuilder<List<Map<String, dynamic>>>(
+                          stream: _db.watchBranches(user.shopId),
                           builder: (ctx, userSnap) {
                             List<String> usernames = ['All Users'];
                             if (userSnap.hasData) {
-                              for (var d in userSnap.data!.docs) {
-                                final m = d.data() as Map;
+                              for (var d in userSnap.data!) {
+                                final m = d;
                                 final un = m['username'] as String?;
                                 if (un != null && !usernames.contains(un))
                                   usernames.add(un);
@@ -4787,16 +5236,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _db.getAuditLogs(user.shopId).toMainThread(),
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _db.watchAuditLogs(user.shopId).toMainThread(),
+
             builder: (ctx, snap) {
               if (!snap.hasData)
                 return const Center(child: CircularProgressIndicator());
-              var logs = snap.data!.docs.where((d) {
-                final m = d.data() as Map;
+              var logs = snap.data!.where((d) {
+                final m = d;
                 
                 // Staff filter: Only see their own logs
-                if (user.roles.contains(UserRole.staff)) {
+                if (user.hasRole(UserRole.staff)) {
                    if ((m['username'] ?? '').toString() != user.username) return false;
                 }
 
@@ -4825,9 +5275,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               // Sort logs recent first
               logs.sort((a, b) {
                 final ta =
-                    parseDT((a.data() as Map)['timestamp']) ?? DateTime.now();
+                    parseDT((a)['timestamp']) ?? DateTime.now();
                 final tb =
-                    parseDT((b.data() as Map)['timestamp']) ?? DateTime.now();
+                    parseDT((b)['timestamp']) ?? DateTime.now();
                 return tb.compareTo(ta);
               });
               if (logs.isEmpty)
@@ -4837,7 +5287,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 itemCount: logs.length,
                 separatorBuilder: (c, i) => const Divider(height: 1),
                 itemBuilder: (c, i) {
-                  final d = logs[i].data() as Map<String, dynamic>;
+                  final d = logs[i];
                   final ts = parseDT(d['timestamp']) ?? DateTime.now();
                   String readableDetails = d['details'] ?? '';
                   if (readableDetails.startsWith('In-bound log for ')) {
@@ -4935,13 +5385,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
       if (confirm == true) {
         LoadingOverlay.show(context);
-        await FirebaseFirestore.instance.collection('deletion_requests').add({
+        await _db.addNotification({
           'shopId': u.shopId,
+          'title': 'Deletion Request',
+          'message': "Staff '${u.username}' requested deletion of '$name'",
+          'type': 'deletion_request',
+          'targetRole': 'admin',
           'itemId': id,
-          'itemName': name,
-          'requestedBy': u.username,
-          'status': 'pending',
-          'timestamp': FieldValue.serverTimestamp(),
         });
         await _db.recordAuditLog(u.shopId, u.username, 'DELETE_REQUEST',
             'Requested deletion for $name');
@@ -4992,10 +5442,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  void _showPartialPaymentDialog(List<QueryDocumentSnapshot> items) {
+  void _showPartialPaymentDialog(List<Map<String, dynamic>> items) {
     if (items.isEmpty) return;
     final remaining = items.fold(
-        0.0, (sum, i) => sum + ((i.data() as Map)['debtRemaining'] ?? 0.0));
+        0.0, (sum, i) => sum + ((i)['debtRemaining'] ?? 0.0));
 
     final payC = TextEditingController();
 
@@ -5023,35 +5473,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               final amt = double.tryParse(payC.text) ?? 0.0;
               if (amt <= 0) return;
 
-              double paymentLeft = amt;
-              final batch = FirebaseFirestore.instance.batch();
-
-              for (var doc in items) {
-                if (paymentLeft <= 0) break;
-                final m = doc.data() as Map<String, dynamic>;
-                final docRemaining = (m['debtRemaining'] ?? 0.0).toDouble();
-                if (docRemaining <= 0) continue;
-
-                final payToDoc =
-                    docRemaining > paymentLeft ? paymentLeft : docRemaining;
-                final newRem = docRemaining - payToDoc;
-
-                batch.update(doc.reference, {
-                  'debtRemaining': newRem < 0 ? 0 : newRem,
-                  'isDebt': newRem > 0.1,
-                  'advancedPaid': FieldValue.increment(payToDoc),
-                });
-                paymentLeft -= payToDoc;
+              try {
+                LoadingOverlay.show(context);
+                final user = Provider.of<AuthService>(context, listen: false).user!;
+                await _repo.updateDebtPayments(user, items, amt);
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text("Payment Successful!"),
+                      backgroundColor: AppColors.success));
+                }
+              } catch (e) {
+                if (mounted)
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text("Error: $e"),
+                      backgroundColor: AppColors.danger));
+              } finally {
+                if (mounted) LoadingOverlay.hide(context);
               }
 
-              await batch.commit();
-
-              if (mounted) {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text("Payment recorded and database updated"),
-                    backgroundColor: AppColors.success));
-              }
             },
             child: const Text("Apply Payment"),
           ),
@@ -5143,7 +5583,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       );
 
   Widget _buildHorizontalInventoryList(
-      List<QueryDocumentSnapshot> items, BoxDecoration decor,
+      List<Map<String, dynamic>> items, BoxDecoration decor,
       {required Color color}) {
     return SizedBox(
       height: 120,
@@ -5152,7 +5592,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: 16),
         itemBuilder: (ctx, i) {
-          final d = items[i].data() as Map<String, dynamic>;
+          final d = items[i];
           return Container(
             width: 250,
             padding: const EdgeInsets.all(16),
@@ -5233,9 +5673,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
 
     if (query.isNotEmpty) {
-      final snapshot = await _db.getInventory(user.shopId).first;
-      final matches = snapshot.docs.where((d) {
-        final m = d.data() as Map;
+      final snapshot = await _db.watchProducts(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).first;
+      final matches = snapshot.where((d) {
+        final m = d;
         return (m['barcode']?.toString() ?? '') == query.trim();
       }).toList();
 
@@ -5247,8 +5687,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  void _showQuickSellDialog(DocumentSnapshot doc, AppUser user) {
-    final d = doc.data() as Map<String, dynamic>;
+  void _showQuickSellDialog(Map<String, dynamic> doc, AppUser user) {
+    final d = doc;
     final qtyC = TextEditingController(text: '1');
     final stock = (d['quantity'] ?? 0).toInt();
 
@@ -5293,7 +5733,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   'branchId': user.branchId ?? 'main',
                   'userId': user.id,
                   'username': user.username,
-                  'itemId': doc.id,
+                  'itemId': doc['id'],
                   'itemName': d['name'],
                   'quantity': val,
                   'totalPrice': (d['sellingPrice'] ?? 0) * val,
@@ -5331,7 +5771,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 // ─────────────────────────────────────────────────────────────────
 class _InventoryTabView extends StatefulWidget {
   final AppUser user;
-  final FirestoreService db;
+  final DatabaseService db;
+  final String branchId;
   final void Function(Map<String, dynamic>? data, String? id) onAddItem;
   final VoidCallback onAddItemNew;
   final void Function(Map<String, dynamic> prefill) onRestock;
@@ -5344,6 +5785,7 @@ class _InventoryTabView extends StatefulWidget {
   const _InventoryTabView({
     required this.user,
     required this.db,
+    required this.branchId,
     required this.onAddItem,
     required this.onAddItemNew,
     required this.onRestock,
@@ -5362,13 +5804,28 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
   String _filter = 'All';
   String _searchQuery = '';
   final TextEditingController _searchC = TextEditingController();
-  late Stream<QuerySnapshot> _inventoryStream;
+  late Stream<List<Map<String, dynamic>>> _inventoryStream;
 
   @override
   void initState() {
     super.initState();
-    // Cache the stream so it doesn't disconnect/recreate on every single build
-    _inventoryStream = widget.db.getInventory(widget.user.shopId).toMainThread();
+    _inventoryStream = widget.db.watchProducts(
+      widget.user.shopId,
+      branchId: widget.branchId == 'all' ? null : widget.branchId,
+    ).toMainThread();
+  }
+
+  @override
+  void didUpdateWidget(_InventoryTabView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.branchId != widget.branchId) {
+      setState(() {
+        _inventoryStream = widget.db.watchProducts(
+          widget.user.shopId,
+          branchId: widget.branchId == 'all' ? null : widget.branchId,
+        ).toMainThread();
+      });
+    }
   }
 
   @override
@@ -5381,26 +5838,26 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.sizeOf(context).width < 900;
 
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _inventoryStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final allDocs = snapshot.data!.docs;
+        final allDocs = snapshot.data!;
         final now = DateTime.now();
 
         // ── Compute available filters ─────────────────────────────────────
         final Set<String> availableFilters = {'All'};
         for (var doc in allDocs) {
-          final m = doc.data() as Map;
+          final m = doc;
           final qty = (m['quantity'] ?? 0) as num;
           final lt = (m['lowStockThreshold'] ?? 5) as num;
           final ed = m['expiryDate'];
           DateTime? expiry;
           if (ed != null) {
-            expiry = ed is Timestamp ? ed.toDate() : DateTime.tryParse(ed.toString());
+            expiry = ed is DateTime ? ed : DateTime.tryParse(ed.toString());
           }
           if (expiry != null && expiry.isBefore(now)) availableFilters.add('Expired');
           else if (expiry != null && expiry.difference(now).inDays <= 30) availableFilters.add('Expiring Soon');
@@ -5414,7 +5871,7 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
 
         // ── Inventory Filter Logic ────────────────────────────────────────
         final items = allDocs.where((doc) {
-          final m = doc.data() as Map;
+          final m = doc;
           final name = (m['name']?.toString().toLowerCase() ?? '');
           final barcode = (m['barcode']?.toString().toLowerCase() ?? '');
           final qty = (m['quantity'] ?? 0) as num;
@@ -5422,7 +5879,7 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
           final ed = m['expiryDate'];
           DateTime? exp;
           if (ed != null) {
-            exp = ed is Timestamp ? ed.toDate() : DateTime.tryParse(ed.toString());
+            exp = ed is DateTime ? ed : DateTime.tryParse(ed.toString());
           }
 
           bool ok = true;
@@ -5504,7 +5961,10 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
                           itemCount: items.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (context, i) => RepaintBoundary(
-                            child: _buildItemCard(items[i], isMobile),
+                            child: InkWell(
+                              onTap: () => _showProductDetailDialog(items[i]),
+                              child: _buildItemCard(items[i], isMobile),
+                            ),
                           ),
                         ),
                       ),
@@ -5588,8 +6048,48 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
     return ElevatedButton.icon(onPressed: onPressed, icon: Icon(icon, size: 20), label: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), style: style);
   }
 
-  Widget _buildItemCard(QueryDocumentSnapshot doc, bool isMobile) {
-    final d = doc.data() as Map<String, dynamic>;
+  void _showProductDetailDialog(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(item['name'] ?? 'Product Details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _detailRow("Barcode", item['barcode'] ?? '-'),
+            _detailRow("Stock Qty", "${item['quantity'] ?? 0}"),
+            _detailRow("Buying Price", widget.currencyFormat.format(item['buyingPrice'] ?? 0)),
+            _detailRow("Selling Price", widget.currencyFormat.format(item['sellingPrice'] ?? 0)),
+            _detailRow("Profit Margin", widget.currencyFormat.format((item['sellingPrice'] ?? 0) - (item['buyingPrice'] ?? 0))),
+            _detailRow("Low Stock Alert", "${item['lowStockThreshold'] ?? 5}"),
+            if (item['expiryDate'] != null)
+              _detailRow("Expiry Date", DateFormat('dd MMM yyyy').format(DateTime.tryParse(item['expiryDate']) ?? DateTime.now())),
+            _detailRow("Branch ID", item['branchId']?.toString() ?? 'Main Branch'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text("Close")),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textSecondary)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemCard(Map<String, dynamic> doc, bool isMobile) {
+    final d = doc;
     final now = DateTime.now();
     final qty = (d['quantity'] ?? 0) as num;
     final isOut = qty <= 0;
@@ -5599,12 +6099,13 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
     final ed = d['expiryDate'];
     bool isExpired = false, isExpiringSoon = false;
     if (ed != null) {
-      final exp = ed is Timestamp ? ed.toDate() : DateTime.tryParse(ed.toString());
+      final exp = ed is DateTime ? ed : DateTime.tryParse(ed.toString());
       if (exp != null) {
         if (exp.isBefore(now)) isExpired = true;
         else if (exp.difference(now).inDays <= 30) isExpiringSoon = true;
       }
     }
+
 
     final stockBadge = _Badge(
       label: isOut ? 'OUT OF STOCK' : (isLow ? 'LOW STOCK: $qty' : 'HEALTHY: $qty'),
@@ -5620,20 +6121,20 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
         IconButton(
           icon: const Icon(Icons.edit_rounded, size: 20),
           tooltip: 'Edit',
-          onPressed: () => widget.onAddItem(d, doc.id),
+          onPressed: () => widget.onAddItem(d, doc['id']),
         ),
         IconButton(
           icon: const Icon(Icons.add_to_photos_rounded, color: AppColors.info, size: 20),
           tooltip: 'Restock',
           onPressed: () => widget.onRestock({
-            'id': doc.id, 'name': d['name'], 'barcode': d['barcode'],
+            'id': doc['id'], 'name': d['name'], 'barcode': d['barcode'],
             'buyingPrice': d['buyingPrice'], 'sellingPrice': d['sellingPrice'],
           }),
         ),
         IconButton(
           icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger, size: 20),
           tooltip: 'Delete',
-          onPressed: () => widget.onDelete(doc.id, d['name'] ?? ''),
+          onPressed: () => widget.onDelete(doc['id'], d['name'] ?? ''),
         ),
       ],
     );

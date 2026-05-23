@@ -1,31 +1,23 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'firestore_service.dart';
 
 class SyncService {
-  static Timer? _syncTimer;
-  static bool _isSyncing = false;
+  // OFFLINE MODE OVERRIDE: 
+  // All connectivity and sync services are disabled to support 100% standalone operation.
   
-  static void start(FirestoreService dbService, String shopId) {
-    if (_syncTimer != null) return;
-
-    _syncTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      Future.delayed(Duration.zero, () async {
-        if (_isSyncing) return;
-        _isSyncing = true;
-        try {
-          await dbService.syncAll(shopId);
-        } catch (e) {
-          debugPrint("Background Sync Failed ($shopId): $e");
-        } finally {
-          _isSyncing = false;
-        }
-      });
-    });
+  static void start(dynamic remote, String shopId) {
+    debugPrint("OFFLINE MODE: SyncService.start bypassed.");
   }
 
   static void stop() {
-    _syncTimer?.cancel();
-    _syncTimer = null;
+    debugPrint("OFFLINE MODE: SyncService.stop bypassed.");
   }
+
+  static Future<void> triggerSilentSync(String shopId) async {
+    return; // Immediate local-only return
+  }
+
+  // Stub for any background push routines
+  static void runBackgroundSync() {}
 }
+

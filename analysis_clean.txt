@@ -1,0 +1,468 @@
+﻿Analyzing inventory_management...                               
+
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\constants\colors.dart:30:25 - deprecated_member_use
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:192:3 - use_super_parameters
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:203:3 - use_super_parameters
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:211:3 - use_super_parameters
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:216:3 - use_super_parameters
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:227:3 - use_super_parameters
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:232:3 - use_super_parameters
+   info - Parameter 'db' could be a super parameter - lib\core\db\app_database.dart:242:3 - use_super_parameters
+warning - The '!' will have no effect because the receiver can't be null - lib\core\repositories\inventory_repository.dart:436:45 - unnecessary_non_null_assertion
+   info - The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/widgets.dart' - lib\core\services\auth_service.dart:8:8 - unnecessary_import
+warning - The value of the field '_loginAttempts' isn't used - lib\core\services\auth_service.dart:24:7 - unused_field
+warning - The value of the field '_lockoutUntil' isn't used - lib\core\services\auth_service.dart:25:13 - unused_field
+warning - Unused import: 'package:drift/drift.dart' - lib\core\services\bulk_import\import_models.dart:1:8 - unused_import
+   info - Statements in an if should be enclosed in a block - lib\core\services\bulk_import\import_worker.dart:153:66 - curly_braces_in_flow_control_structures
+   info - Unnecessary cascade expression - lib\core\services\database_service.dart:48:9 - avoid_single_cascade_in_expression_statements
+warning - The left operand can't be null, so the right operand is never executed - lib\core\services\database_service.dart:565:37 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\core\services\database_service.dart:800:31 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\core\services\database_service.dart:801:34 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\core\services\database_service.dart:843:31 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\core\services\database_service.dart:844:34 - curly_braces_in_flow_control_structures
+   info - The argument type 'String' isn't related to 'SubscriptionAddOn' - lib\core\services\feature_gating_service.dart:25:32 - collection_methods_unrelated_type
+warning - Unused import: 'package:flutter/material.dart' - lib\core\services\firestore_service.dart:1:8 - unused_import
+warning - The value of the field '_uuid' isn't used - lib\core\services\firestore_service.dart:12:9 - unused_field
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:drift/drift.dart' - lib\core\services\import_service.dart:1:8 - unnecessary_import
+warning - The name debugPrint is shown, but isn't used - lib\core\services\import_service.dart:2:56 - unused_shown_name
+warning - The left operand can't be null, so the right operand is never executed - lib\core\services\import_service.dart:82:39 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\core\services\import_service.dart:127:46 - dead_null_aware_expression
+   info - Use a function declaration rather than a variable assignment to bind a function to a name - lib\core\services\reporting_native.dart:136:11 - prefer_function_declarations_over_variables
+   info - The local variable '_statCard' starts with an underscore - lib\core\services\reporting_native.dart:184:15 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_sectionHeader' starts with an underscore - lib\core\services\reporting_native.dart:217:15 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_tableSection' starts with an underscore - lib\core\services\reporting_native.dart:236:15 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_fRow' starts with an underscore - lib\core\services\reporting_native.dart:262:15 - no_leading_underscores_for_local_identifiers
+warning - The operand can't be 'null', so the condition is always 'true' - lib\core\services\reporting_native.dart:314:36 - unnecessary_null_comparison
+   info - Use interpolation to compose strings and values - lib\core\services\reporting_native.dart:339:24 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values - lib\core\services\reporting_native.dart:366:26 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values - lib\core\services\reporting_native.dart:414:15 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values - lib\core\services\reporting_native.dart:430:15 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values - lib\core\services\reporting_native.dart:446:24 - prefer_interpolation_to_compose_strings
+   info - Statements in an if should be enclosed in a block - lib\core\services\reporting_native.dart:491:7 - curly_braces_in_flow_control_structures
+warning - The declaration '_fRow' isn't referenced - lib\core\services\reporting_native.dart:519:13 - unused_element
+   info - Use a function declaration rather than a variable assignment to bind a function to a name - lib\core\services\reporting_service.dart:74:9 - prefer_function_declarations_over_variables
+   info - Statements in an if should be enclosed in a block - lib\core\services\reporting_service.dart:88:29 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\core\services\reporting_service.dart:89:31 - curly_braces_in_flow_control_structures
+   info - 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead - lib\core\services\reporting_web.dart:1:1 - deprecated_member_use
+   info - Don't use web-only libraries outside Flutter web plugins - lib\core\services\reporting_web.dart:1:1 - avoid_web_libraries_in_flutter
+warning - The value of the local variable 'anchor' isn't used - lib\core\services\reporting_web.dart:15:11 - unused_local_variable
+warning - The value of the local variable 'anchor' isn't used - lib\core\services\reporting_web.dart:40:13 - unused_local_variable
+warning - Unused import: '../db/app_database.dart' - lib\core\services\subscription_service.dart:4:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\theme\app_theme.dart:43:44 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\theme\app_theme.dart:50:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\theme\app_theme.dart:60:38 - deprecated_member_use
+   info - The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' - lib\core\widgets\account_dropdown.dart:11:8 - unnecessary_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\account_dropdown.dart:31:48 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\account_dropdown.dart:91:41 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\account_dropdown.dart:93:52 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\account_dropdown.dart:132:52 - deprecated_member_use
+   info - 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor or activeTrackColor instead. This feature was deprecated after v3.31.0-2.0.pre - lib\core\widgets\account_dropdown.dart:173:15 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\account_dropdown.dart:221:65 - deprecated_member_use
+   info - The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' - lib\core\widgets\erp_components.dart:4:8 - unnecessary_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:48:56 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:90:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:95:60 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:132:32 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:187:41 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:196:62 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:203:42 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:258:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:280:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:296:26 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:332:14 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:367:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\erp_components.dart:376:60 - deprecated_member_use
+   info - 'dataRowHeight' is deprecated and shouldn't be used. Migrate to use dataRowMinHeight and dataRowMaxHeight instead. This feature was deprecated after v3.7.0-5.0.pre - lib\core\widgets\erp_components.dart:377:11 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\import_duplicate_resolver.dart:189:24 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\import_duplicate_resolver.dart:191:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\import_error_report.dart:97:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\jumping_calendar.dart:64:50 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\jumping_calendar.dart:67:35 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\jumping_calendar.dart:157:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\jumping_calendar.dart:242:38 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\jumping_calendar.dart:275:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\jumping_calendar.dart:385:28 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\loading_overlay.dart:18:46 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\privacy_dialog.dart:20:35 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\privacy_dialog.dart:36:41 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\privacy_dialog.dart:48:50 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\privacy_dialog.dart:127:62 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:32:36 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:33:45 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:33:84 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:37:40 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:38:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:38:88 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\subscription_banner.dart:70:137 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\upgrade_modal.dart:28:35 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\upgrade_modal.dart:40:44 - deprecated_member_use
+warning - The value of the field '_validator' isn't used - lib\features\admin\admin_dashboard_screen.dart:40:27 - unused_field
+   info - The private field _searchQuery could be 'final' - lib\features\admin\admin_dashboard_screen.dart:95:10 - prefer_final_fields
+   info - The private field _posCart could be 'final' - lib\features\admin\admin_dashboard_screen.dart:98:18 - prefer_final_fields
+   info - The private field _selectedAuditAction could be 'final' - lib\features\admin\admin_dashboard_screen.dart:110:10 - prefer_final_fields
+   info - The private field _selectedAuditUserFilter could be 'final' - lib\features\admin\admin_dashboard_screen.dart:111:10 - prefer_final_fields
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:225:71 - unnecessary_cast
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:266:34 - unnecessary_cast
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:279:36 - unnecessary_cast
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:283:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:285:23 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:290:42 - use_build_context_synchronously
+warning - The value of the field '_purchases' isn't used - lib\features\admin\admin_dashboard_screen.dart:314:31 - unused_field
+   info - The private field _isLoadingPurchases could be 'final' - lib\features\admin\admin_dashboard_screen.dart:315:8 - prefer_final_fields
+warning - The value of the field '_isLoadingPurchases' isn't used - lib\features\admin\admin_dashboard_screen.dart:315:8 - unused_field
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:695:60 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:710:52 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:711:55 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:829:47 - deprecated_member_use
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:912:55 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:915:47 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:965:52 - dead_null_aware_expression
+warning - The value of the local variable 'currencyFormat' isn't used - lib\features\admin\admin_dashboard_screen.dart:998:17 - unused_local_variable
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1019:55 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1032:37 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1084:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1085:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1132:48 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1180:17 - curly_braces_in_flow_control_structures
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:1188:29 - unnecessary_cast
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1196:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1218:38 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:1303:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1310:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:1310:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1345:19 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1350:19 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1393:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1533:47 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1549:27 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1556:27 - curly_braces_in_flow_control_structures
+warning - The declaration '_buildInventoryFloatingButtons' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:1594:10 - unused_element
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1598:58 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1695:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1708:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1734:25 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1736:25 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1749:54 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1779:40 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1794:61 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1807:55 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1878:46 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:2088:42 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:2092:42 - use_build_context_synchronously
+warning - The declaration '_showAdminSellDialog' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:2104:8 - unused_element
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2194:21 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2261:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2270:49 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2275:67 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:2331:57 - deprecated_member_use
+warning - The declaration '_showEditPurchaseDialog' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:2441:8 - unused_element
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2481:38 - use_build_context_synchronously
+warning - The value of the local variable 'batchC' isn't used - lib\features\admin\admin_dashboard_screen.dart:2583:11 - unused_local_variable
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2750:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2757:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2757:48 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:2780:39 - deprecated_member_use
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:2928:65 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2932:45 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2933:55 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2941:59 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2942:79 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2978:50 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2988:50 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2993:60 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3143:39 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3250:43 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3331:29 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3331:50 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3341:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3341:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3346:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3346:48 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3350:58 - use_build_context_synchronously
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3360:58 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3412:65 - dead_null_aware_expression
+warning - The value of the local variable 'slow' isn't used - lib\features\admin\admin_dashboard_screen.dart:3434:31 - unused_local_variable
+warning - The value of the local variable 'lowVal' isn't used - lib\features\admin\admin_dashboard_screen.dart:3444:31 - unused_local_variable
+  error - Expected to find ')' - lib\features\admin\admin_dashboard_screen.dart:3554:20 - expected_token
+  error - Expected to find ']' - lib\features\admin\admin_dashboard_screen.dart:3554:20 - expected_token
+  error - Expected to find ';' - lib\features\admin\admin_dashboard_screen.dart:3555:18 - expected_token
+  error - Expected to find ')' - lib\features\admin\admin_dashboard_screen.dart:3556:13 - expected_token
+  error - Expected a class member - lib\features\admin\admin_dashboard_screen.dart:3558:10 - expected_class_member
+  error - Expected a class member - lib\features\admin\admin_dashboard_screen.dart:3559:7 - expected_class_member
+  error - Expected a class member - lib\features\admin\admin_dashboard_screen.dart:3559:8 - expected_class_member
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3569:16 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3585:40 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3586:40 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3594:40 - undefined_identifier
+  error - The named parameter 'bold' isn't defined - lib\features\admin\admin_dashboard_screen.dart:3596:17 - undefined_named_parameter
+  error - The function '_setFilter' isn't defined - lib\features\admin\admin_dashboard_screen.dart:3618:32 - undefined_function
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:3626:19 - undefined_identifier
+  error - Undefined name '_selectedBranchId' - lib\features\admin\admin_dashboard_screen.dart:3633:19 - undefined_identifier
+  error - Undefined name '_selectedBranchId' - lib\features\admin\admin_dashboard_screen.dart:3633:56 - undefined_identifier
+  error - Undefined name '_startDate' - lib\features\admin\admin_dashboard_screen.dart:3637:33 - undefined_identifier
+  error - Undefined name '_endDate' - lib\features\admin\admin_dashboard_screen.dart:3638:34 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:3648:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:3659:60 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:3673:60 - deprecated_member_use
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3682:30 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3683:58 - undefined_identifier
+  error - Expected to find ']' - lib\features\admin\admin_dashboard_screen.dart:3692:10 - expected_token
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3700:18 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3711:36 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3714:23 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:3760:21 - undefined_identifier
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3768:19 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3771:17 - curly_braces_in_flow_control_structures
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:3787:35 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:3817:46 - deprecated_member_use
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3854:34 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3856:60 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3902:32 - undefined_identifier
+   info - 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre - lib\features\admin\admin_dashboard_screen.dart:3937:21 - deprecated_member_use
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3950:45 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:3953:29 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3954:47 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3955:48 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3978:38 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:3997:49 - undefined_identifier
+  error - Undefined name '_repo' - lib\features\admin\admin_dashboard_screen.dart:3998:35 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:3999:33 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4000:51 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4001:52 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4016:55 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4034:60 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4036:9 - undefined_identifier
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:4037:21 - use_build_context_synchronously
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4050:28 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4052:7 - undefined_function
+warning - The declaration '_buildActiveTab' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:4056:10 - unused_element
+  error - The function '_buildBody' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4056:59 - undefined_function
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4059:43 - undefined_identifier
+  error - The function '_getSidebarItems' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4061:19 - undefined_function
+  error - Undefined name '_selectedIndex' - lib\features\admin\admin_dashboard_screen.dart:4066:31 - undefined_identifier
+  error - Undefined name '_selectedIndex' - lib\features\admin\admin_dashboard_screen.dart:4069:22 - undefined_identifier
+  error - Undefined name '_selectedIndex' - lib\features\admin\admin_dashboard_screen.dart:4069:43 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4072:32 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4074:11 - undefined_function
+  error - Undefined name '_selectedIndex' - lib\features\admin\admin_dashboard_screen.dart:4074:26 - undefined_identifier
+  error - The function '_getSidebarItems' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4114:34 - undefined_function
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4115:44 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4126:23 - undefined_function
+  error - Undefined name '_selectedIndex' - lib\features\admin\admin_dashboard_screen.dart:4126:38 - undefined_identifier
+warning - The value of the local variable 'isAdmin' isn't used - lib\features\admin\admin_dashboard_screen.dart:4140:11 - unused_local_variable
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4163:16 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4166:43 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4243:40 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:4253:33 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4298:46 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4305:45 - undefined_identifier
+   info - Use the null-aware operator '?.' rather than an explicit 'null' comparison - lib\features\admin\admin_dashboard_screen.dart:4315:41 - prefer_null_aware_operators
+  error - Undefined name '_repo' - lib\features\admin\admin_dashboard_screen.dart:4324:33 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:4326:35 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:4334:33 - undefined_identifier
+  error - Undefined name '_repo' - lib\features\admin\admin_dashboard_screen.dart:4335:33 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4340:47 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4341:48 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4348:60 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4349:46 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4367:24 - deprecated_member_use
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4381:16 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4384:35 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4403:39 - deprecated_member_use
+  error - Undefined name '_importService' - lib\features\admin\admin_dashboard_screen.dart:4453:33 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4456:13 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4461:14 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4463:20 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4470:29 - undefined_identifier
+  error - Undefined name '_importService' - lib\features\admin\admin_dashboard_screen.dart:4471:35 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4472:29 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4474:13 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4476:11 - undefined_function
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4480:29 - undefined_identifier
+  error - Undefined name '_importService' - lib\features\admin\admin_dashboard_screen.dart:4481:35 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4482:29 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4484:13 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:4486:11 - undefined_function
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4491:11 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4492:30 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4502:16 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4513:16 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:4560:17 - undefined_identifier
+  error - Undefined name '_selectedBranchId' - lib\features\admin\admin_dashboard_screen.dart:4572:19 - undefined_identifier
+  error - Undefined name '_selectedBranchId' - lib\features\admin\admin_dashboard_screen.dart:4572:56 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4667:29 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4685:43 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4688:32 - deprecated_member_use
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:4747:43 - undefined_identifier
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:4765:21 - unnecessary_cast
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:4794:25 - unnecessary_cast
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4822:32 - deprecated_member_use
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:4860:21 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4863:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4884:17 - curly_braces_in_flow_control_structures
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4917:43 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:4921:42 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4930:43 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:4935:38 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4956:49 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:4959:39 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4961:35 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4961:65 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4963:35 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4963:65 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:4965:35 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:4965:64 - undefined_identifier
+  error - Undefined name '_searchAuditC' - lib\features\admin\admin_dashboard_screen.dart:5007:39 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:5008:45 - undefined_function
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:5021:35 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5029:35 - curly_braces_in_flow_control_structures
+  error - Undefined name '_selectedAuditUserFilter' - lib\features\admin\admin_dashboard_screen.dart:5041:42 - undefined_identifier
+  error - Undefined name '_selectedAuditUserFilter' - lib\features\admin\admin_dashboard_screen.dart:5043:41 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:5052:53 - undefined_function
+  error - Undefined name '_selectedAuditUserFilter' - lib\features\admin\admin_dashboard_screen.dart:5053:39 - undefined_identifier
+  error - Undefined name '_selectedAuditAction' - lib\features\admin\admin_dashboard_screen.dart:5068:34 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:5085:44 - undefined_function
+  error - Undefined name '_selectedAuditAction' - lib\features\admin\admin_dashboard_screen.dart:5085:59 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:5098:21 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5102:17 - curly_braces_in_flow_control_structures
+  error - Undefined name '_selectedAuditAction' - lib\features\admin\admin_dashboard_screen.dart:5111:21 - undefined_identifier
+  error - Undefined name '_selectedAuditAction' - lib\features\admin\admin_dashboard_screen.dart:5112:36 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5112:58 - curly_braces_in_flow_control_structures
+  error - Undefined name '_selectedAuditUserFilter' - lib\features\admin\admin_dashboard_screen.dart:5114:36 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5117:37 - curly_braces_in_flow_control_structures
+  error - Undefined name '_searchAuditC' - lib\features\admin\admin_dashboard_screen.dart:5119:27 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5142:17 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5160:62 - deprecated_member_use
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5172:43 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5179:45 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5185:68 - deprecated_member_use
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5229:18 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5245:29 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:5246:15 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:5254:15 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5256:13 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5257:31 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5258:32 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5265:18 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5283:29 - undefined_identifier
+  error - Undefined name '_repo' - lib\features\admin\admin_dashboard_screen.dart:5285:17 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5286:15 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5287:34 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5292:15 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5293:13 - curly_braces_in_flow_control_structures
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5293:34 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5297:15 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5297:44 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5311:16 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:5317:37 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5335:37 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5336:55 - undefined_identifier
+  error - Undefined name '_repo' - lib\features\admin\admin_dashboard_screen.dart:5337:23 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5338:21 - undefined_identifier
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:5339:33 - use_build_context_synchronously
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5340:40 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5345:21 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5346:19 - curly_braces_in_flow_control_structures
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5346:40 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5350:21 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5350:50 - undefined_identifier
+warning - The declaration '_buildAddItemFAB' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:5361:10 - unused_element
+warning - The declaration '_buildAddPurchaseFAB' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:5367:10 - unused_element
+  error - The function '_showAdminPurchaseDialog' isn't defined - lib\features\admin\admin_dashboard_screen.dart:5370:26 - undefined_function
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5380:16 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:5402:30 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:5411:19 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:5413:45 - undefined_identifier
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5458:49 - deprecated_member_use
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:5479:26 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5495:18 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5505:16 - undefined_identifier
+  error - Undefined name '_scannerController' - lib\features\admin\admin_dashboard_screen.dart:5510:23 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5518:55 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:5529:5 - undefined_function
+  error - Undefined name '_searchQuery' - lib\features\admin\admin_dashboard_screen.dart:5530:7 - undefined_identifier
+  error - Undefined name '_db' - lib\features\admin\admin_dashboard_screen.dart:5534:30 - undefined_identifier
+  error - Undefined name '_posBarcodeC' - lib\features\admin\admin_dashboard_screen.dart:5542:9 - undefined_identifier
+  error - The function 'setState' isn't defined - lib\features\admin\admin_dashboard_screen.dart:5543:9 - undefined_function
+  error - Undefined name '_searchQuery' - lib\features\admin\admin_dashboard_screen.dart:5543:24 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5554:16 - undefined_identifier
+  error - Undefined name 'currencyFormat' - lib\features\admin\admin_dashboard_screen.dart:5560:28 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5587:35 - undefined_identifier
+  error - Undefined name '_repo' - lib\features\admin\admin_dashboard_screen.dart:5589:23 - undefined_identifier
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:5591:48 - dead_null_aware_expression
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5602:21 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5603:19 - curly_braces_in_flow_control_structures
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5603:40 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5607:21 - undefined_identifier
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5608:19 - curly_braces_in_flow_control_structures
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5608:40 - undefined_identifier
+  error - Undefined name 'mounted' - lib\features\admin\admin_dashboard_screen.dart:5612:21 - undefined_identifier
+  error - Undefined name 'context' - lib\features\admin\admin_dashboard_screen.dart:5612:50 - undefined_identifier
+  error - Expected a method, getter, setter or operator declaration - lib\features\admin\admin_dashboard_screen.dart:5621:1 - expected_executable
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5720:55 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5721:75 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5722:25 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5723:31 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5724:16 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5879:46 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5962:32 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5963:52 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5973:20 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5974:30 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:6081:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:6108:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:6167:24 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen_local.dart:100:53 - deprecated_member_use
+warning - Unused import: 'package:font_awesome_flutter/font_awesome_flutter.dart' - lib\features\auth\login_screen.dart:4:8 - unused_import
+   info - Invalid use of a private type in a public API - lib\features\auth\login_screen.dart:15:3 - library_private_types_in_public_api
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:71:63 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:86:52 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:89:65 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:108:99 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:108:132 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:109:118 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:109:150 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:156:70 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\auth\login_screen.dart:216:23 - deprecated_member_use
+warning - Unused import: '../../core/services/firestore_service.dart' - lib\features\auth\signup_screen.dart:5:8 - unused_import
+   info - Invalid use of a private type in a public API - lib\features\auth\signup_screen.dart:13:3 - library_private_types_in_public_api
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\auth\signup_screen.dart:166:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\auth\signup_screen.dart:173:23 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:206:74 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:281:80 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:287:55 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:287:87 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:374:61 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:471:44 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\subscription\subscription_screen.dart:480:49 - deprecated_member_use
+   info - The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/foundation.dart' - lib\main.dart:2:8 - unnecessary_import
+warning - Unused import: 'dart:io' - lib\main.dart:5:8 - unused_import
+warning - Unused import: 'core/models/models.dart' - lib\main.dart:9:8 - unused_import
+warning - Unused import: 'core/constants/colors.dart' - lib\main.dart:11:8 - unused_import
+warning - Unused import: 'core/services/notification_service.dart' - lib\main.dart:15:8 - unused_import
+warning - Unused import: 'dart:io' - test\test_db.dart:1:8 - unused_import
+   info - Don't invoke 'print' in production code - test\test_db.dart:13:9 - avoid_print
+   info - Don't invoke 'print' in production code - test\test_db.dart:16:7 - avoid_print
+warning - Unused import: 'dart:io' - test\test_flow.dart:1:8 - unused_import
+  error - The named parameter 'email' is required, but there's no corresponding argument - test\test_flow.dart:14:24 - missing_required_argument
+   info - Don't invoke 'print' in production code - test\test_flow.dart:31:7 - avoid_print
+   info - Don't invoke 'print' in production code - test\test_flow.dart:37:7 - avoid_print
+   info - Don't invoke 'print' in production code - test\test_flow.dart:40:10 - avoid_print
+   info - Don't invoke 'print' in production code - test\test_flow.dart:53:7 - avoid_print
+   info - Don't invoke 'print' in production code - test\test_flow.dart:55:7 - avoid_print
+   info - Don't invoke 'print' in production code - test\test_flow.dart:56:7 - avoid_print
+
+flutter : 451 issues found. 
+(ran in 16.3s)
+At line:1 char:1
++ flutter analyze --no-pub 2>&1 
+| Out-File -Encoding utf8 
+-FilePath ana ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: (451 issues fo  
+  und. (ran in 16.3s):String)   
+  [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 

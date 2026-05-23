@@ -8,6 +8,19 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 # Firebase's prebuilt Windows libraries are built with a modern MSVC toolset.
 # Force using the v143 toolset so linking succeeds on newer MSVC runtimes.
 set(CMAKE_VS_PLATFORM_TOOLSET "v143" CACHE STRING "" FORCE)
+
+# Use the local Firebase C++ SDK to avoid repeated downloads
+set(FIREBASE_CPP_SDK_DIR "C:/projects/firebase_cpp_sdk/firebase_cpp_sdk_windows" CACHE PATH "Path to the Firebase C++ SDK" FORCE)
+set(ENV{FIREBASE_CPP_SDK_DIR} "${FIREBASE_CPP_SDK_DIR}")
+
+# Inject local nuget.exe into path for plugins
+set(ENV{PATH} "${CMAKE_CURRENT_SOURCE_DIR};$ENV{PATH}")
+
+# Modern extraction policy
+if(POLICY CMP0135)
+  cmake_policy(SET CMP0135 NEW)
+endif()
+
 project(inventory_manager LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
@@ -47,7 +60,7 @@ add_definitions(-DUNICODE -D_UNICODE)
 # of modifying this function.
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
-  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100" /wd"4996")
+  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100" /wd"4996" /FS)
   target_compile_options(${TARGET} PRIVATE /EHsc)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")

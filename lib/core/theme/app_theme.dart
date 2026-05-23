@@ -1,6 +1,16 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
+
+class SafeScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+      };
+}
 
 class AppTheme {
   static ThemeData get darkTheme {
@@ -8,7 +18,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.background,
-      fontFamily: GoogleFonts.inter().fontFamily,
+      fontFamily: GoogleFonts.outfit().fontFamily,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.secondary,
         secondary: AppColors.secondary,
@@ -16,7 +26,7 @@ class AppTheme {
         error: AppColors.danger,
         onSurface: AppColors.textPrimary,
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
+      textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
         displayLarge: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -1),
         displayMedium: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5),
         titleLarge: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
@@ -70,7 +80,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-      fontFamily: GoogleFonts.inter().fontFamily,
+      fontFamily: GoogleFonts.outfit().fontFamily,
       colorScheme: const ColorScheme.light(
         primary: AppColors.secondary,
         secondary: AppColors.secondary,
@@ -78,7 +88,7 @@ class AppTheme {
         error: AppColors.danger,
         onSurface: Color(0xFF0F172A),
       ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme).copyWith(
+      textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).copyWith(
         displayLarge: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: -1),
         displayMedium: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: -0.5),
         titleLarge: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),

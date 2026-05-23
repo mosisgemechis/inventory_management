@@ -1,0 +1,179 @@
+{
+  "firestore": {
+    "indexes": [
+      {
+        "collectionGroup": "sales",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "sales",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "isDebt",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "medicines",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "stock",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "medicines",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "lastUpdated",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "notifications",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "items",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "lastUpdated",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "items",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "items",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "name",
+            "order": "ASCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "purchases",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "purchases",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "lastUpdated",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "suppliers",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "payments",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "shopId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "timestamp",
+            "order": "DESCENDING"
+          }
+        ]
+      }
+    ],
+    "fieldOverrides": []
+  }
+}

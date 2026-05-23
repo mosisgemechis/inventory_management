@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "948412189680-mgtf5k5ru52vvm01g7ogtvq9v46cd6t8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.pharmacy_inventory_management",
+            "certificate_hash": "d97597566c2bfaabcb28bca05ed29127124ab6a9"
+          }
+        },
+        {
           "client_id": "948412189680-9lpcpfsd6itrecrihuu1er19h6ag4fk6.apps.googleusercontent.com",
           "client_type": 3
         }

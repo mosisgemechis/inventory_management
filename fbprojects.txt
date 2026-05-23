@@ -1,0 +1,22 @@
+﻿#
+
+     Welcome to...
+   ######## #### ########  ######## ########     ###     ######  ########  ##
+   ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##        ##
+   ######    ##  ########  ######   ########  #########  ######  ######    ##
+   ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##       
+   ##       #### ##     ## ######## ########  ##     ##  ######  ########  ##
+ 
+
+#
+
+~ Let's make sure your Firebase CLI is ready...
++ Looks like your CLI is set up!
+
+[2K[1G~ Checking your Firebase credentials[/][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[\][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[|][2K[1G~ Checking your Firebase credentials[/][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[\][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[|][2K[1G~ Checking your Firebase credentials[/][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[\][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[|][2K[1G~ Checking your Firebase credentials[/][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[\][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[|][2K[1G~ Checking your Firebase credentials[/][2K[1G~ Checking your Firebase credentials[-][2K[1G~ Checking your Firebase credentials[\][2K[1GAlready logged in as [1mgemechisbedassa531@gmail.com[22m
+
++ You can now use the 'firebase' or 'npm' commands!
+~ For more help see https://firebase.google.com/docs/cli/
+
+-
+

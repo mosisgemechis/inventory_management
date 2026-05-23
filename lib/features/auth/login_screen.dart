@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:ui';
 import '../../core/services/auth_service.dart';
 import '../../core/constants/colors.dart';
 import 'signup_screen.dart';
+import '../../core/l10n/l10n.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -66,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
           // Subtle Mesh/Wave Pattern Overlay
           Positioned.fill(
             child: CustomPaint(
-              painter: WavePainter(color: AppColors.secondary.withOpacity(0.05)),
+              painter: GridPainter(color: AppColors.secondary.withOpacity(0.08)),
             ),
           ),
           
@@ -87,12 +89,12 @@ class _LoginScreenState extends State<LoginScreen> {
                            BoxShadow(color: AppColors.secondary.withOpacity(0.2), blurRadius: 40, spreadRadius: 0)
                         ]
                       ),
-                      child: const Icon(Icons.inventory_2_rounded, size: 64, color: AppColors.secondary),
+                      child: Image.asset('assets/logo.png', width: 80, height: 80, errorBuilder: (c, e, s) => const Icon(Icons.inventory_2_rounded, size: 64, color: AppColors.secondary)),
                     ).animate().fadeIn(duration: 1.seconds).scale(),
                     
                     const SizedBox(height: 24),
-                    const Text('SmartInventory', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: -1.5)),
-                    const Text('Control your shop from anywhere.', style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                    const Text('Core Inventory', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: -1.5)),
+                    Text('control_anywhere'.tr(context), style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
                     const SizedBox(height: 48),
                     
                     // Glassmorphic Login Card
@@ -110,15 +112,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Welcome Back', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                              const Text('Sign in to continue', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                              Text('welcome_back'.tr(context), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                              Text('signin_continue'.tr(context), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                               const SizedBox(height: 40),
                               
                               TextField(
                                 controller: _identifierController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Username / Email',
-                                  prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                                decoration: InputDecoration(
+                                  labelText: 'username'.tr(context),
+                                  prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                                 ),
                               ),
                               const SizedBox(height: 20),
@@ -126,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 controller: _passwordController,
                                 obscureText: _obscure,
                                 decoration: InputDecoration(
-                                  labelText: 'Password',
+                                  labelText: 'password'.tr(context),
                                   prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
                                   suffixIcon: IconButton(
                                     icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 18),
@@ -135,13 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 onSubmitted: (_) => _handleLogin(),
                               ),
-                              const SizedBox(height: 12),
-                              
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(onPressed: () {}, child: const Text('Forgot password?', style: TextStyle(fontSize: 12))),
-                              ),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 24),
                               
                               if (_error != null)
                                 Padding(
@@ -162,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   child: _loading 
                                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                                    : const Text('Login'),
+                                    : Text('login'.tr(context)),
                                 ),
                               ),
                             ],
@@ -175,15 +171,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text("New user?", style: TextStyle(color: AppColors.textSecondary)),
+                        Text('new_user'.tr(context), style: const TextStyle(color: AppColors.textSecondary)),
                         TextButton(
                           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupScreen())), 
-                          child: const Text('Create an account', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold)),
+                          child: Text('create_account'.tr(context), style: const TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
                     const SizedBox(height: 48),
-                    Text('© 2026 SmartInventory. All rights reserved.', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                    Text('© 2026 Core Inventory. All rights reserved.', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
                   ],
                 ),
               ),
@@ -195,44 +191,36 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class WavePainter extends CustomPainter {
+class GridPainter extends CustomPainter {
   final Color color;
-  WavePainter({required this.color});
+  GridPainter({required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     var paint = Paint()
       ..color = color
-      ..strokeWidth = 1.0
+      ..strokeWidth = 0.5
       ..style = PaintingStyle.stroke;
 
-    var path = Path();
-    for (var i = 0; i < size.height; i += 40) {
-      path.moveTo(0, i.toDouble());
-      path.quadraticBezierTo(
-        size.width / 4, i - 20,
-        size.width / 2, i.toDouble(),
-      );
-      path.quadraticBezierTo(
-        3 * size.width / 4, i + 20,
-        size.width, i.toDouble(),
-      );
-    }
-    canvas.drawPath(path, paint);
+    const double step = 40.0;
 
-    var path2 = Path();
-    for (var i = 0; i < size.width; i += 40) {
-      path2.moveTo(i.toDouble(), 0);
-      path2.quadraticBezierTo(
-        i - 20, size.height / 4,
-        i.toDouble(), size.height / 2,
-      );
-      path2.quadraticBezierTo(
-        i + 20, 3 * size.height / 4,
-        i.toDouble(), size.height,
-      );
+    for (double i = 0; i <= size.width; i += step) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
     }
-    canvas.drawPath(path2, paint);
+    for (double i = 0; i <= size.height; i += step) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+
+    // Add some "dots" at intersections for a more techy feel
+    var dotPaint = Paint()
+      ..color = color.withOpacity(0.2)
+      ..style = PaintingStyle.fill;
+    
+    for (double i = 0; i <= size.width; i += step * 2) {
+      for (double j = 0; j <= size.height; j += step * 2) {
+         canvas.drawCircle(Offset(i, j), 1.5, dotPaint);
+      }
+    }
   }
 
   @override

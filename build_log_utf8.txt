@@ -1,0 +1,41 @@
+﻿[        ]   All outputs are up-to-date.
+[  +25 ms] Link:
+[        ]   C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.50.35717\bin\HostX64\x64\link.exe /OUT:"C:\projects\inventory_management\build\windows\x64\runner\Release\inventory_manager.exe" /INCREMENTAL:NO /NOLOGO ..\flutter\Release\flutter_wrapper_app.lib dwmapi.lib ..\plugins\cloud_firestore\Release\cloud_firestore_plugin.lib ..\plugins\dynamic_color\Release\dynamic_color_plugin.lib ..\plugins\firebase_auth\Release\firebase_auth_plugin.lib ..\plugins\firebase_core\Release\firebase_core_plugin.lib ..\plugins\permission_handler_windows\Release\permission_handler_windows_plugin.lib ..\plugins\printing\Release\printing_plugin.lib ..\plugins\share_plus\Release\share_plus_plugin.lib ..\plugins\url_launcher_windows\Release\url_launcher_windows_plugin.lib ..\extracted\firebase_cpp_sdk_windows\libs\windows\VS2019\MD\x64\Release\firebase_firestore.lib shell32.lib Bcrypt.lib DbgHelp.lib advapi32.lib ws2_32.lib crypt32.lib rpcrt4.lib ole32.lib ..\extracted\firebase_cpp_sdk_windows\libs\windows\VS2019\MD\x64\Release\firebase_app.lib icu.lib ..\extracted\firebase_cpp_sdk_windows\libs\windows\VS2019\MD\x64\Release\firebase_auth.lib ..\flutter\Release\flutter_wrapper_plugin.lib C:\projects\inventory_management\windows\flutter\ephemeral\flutter_windows.dll.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /manifestinput:C:\projects\inventory_management\windows\runner\runner.exe.manifest /PDB:"C:/projects/inventory_management/build/windows/x64/runner/Release/inventory_manager.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /IMPLIB:"C:/projects/inventory_management/build/windows/x64/runner/Release/inventory_manager.lib" /MACHINE:X64  /machine:x64 inventory_manager.dir\Release\Runner.res
+[        ]   inventory_manager.dir\Release\flutter_window.obj
+[        ]   inventory_manager.dir\Release\main.obj
+[        ]   inventory_manager.dir\Release\utils.obj
+[        ]   inventory_manager.dir\Release\win32_window.obj
+[        ]   inventory_manager.dir\Release\generated_plugin_registrant.obj
+[  +85 ms] LINK : fatal error 
+LNK1181: cannot open input 
+file '..\extracted\firebase_cpp
+_sdk_windows\libs\windows\VS201
+9\MD\x64\Release\firebase_fires
+tore.lib' [C:\projects\inventor
+y_management\build\windows\x64\
+runner\inventory_manager.vcxpro
+j]
+[  +30 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\runner\inventory_manager.vcxproj" (default targets) -- FAILED.
+[   +2 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (default targets) -- FAILED.
+[   +1 ms] Done Building Project "C:\projects\inventory_management\build\windows\x64\INSTALL.vcxproj" (default targets) -- FAILED.
+[   +2 ms] Build FAILED.
+[   +2 ms] "C:\projects\inventory_management\build\windows\x64\INSTALL.vcxproj" (default target) (1) ->
+[        ] "C:\projects\inventory_management\build\windows\x64\ALL_BUILD.vcxproj" (default target) (3) ->
+[        ] "C:\projects\inventory_management\build\windows\x64\runner\inventory_manager.vcxproj" (default target) (11) ->
+[        ] (Link target) -> 
+[        ]   LINK : fatal 
+error LNK1181: cannot open 
+input file '..\extracted\fireba
+se_cpp_sdk_windows\libs\windows
+\VS2019\MD\x64\Release\firebase
+_firestore.lib' [C:\projects\in
+ventory_management\build\window
+s\x64\runner\inventory_manager.
+vcxproj]
+[        ]     0 Warning(s)
+[        ]     1 Error(s)
+[        ] Time Elapsed 00:00:15.41
+[  +41 ms] Building Windows application... (completed in 22.7s)
+[   +2 ms] "flutter windows" took 24,758ms.
+[ +142 ms] Build process 
+failed.

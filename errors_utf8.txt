@@ -1,0 +1,193 @@
+﻿Analyzing 2 items...                                            
+
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:drift/drift.dart' - lib\core\services\import_service.dart:1:8 - unnecessary_import
+warning - The name debugPrint is shown, but isn't used - lib\core\services\import_service.dart:2:56 - unused_shown_name
+warning - The left operand can't be null, so the right operand is never executed - lib\core\services\import_service.dart:82:39 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\core\services\import_service.dart:127:46 - dead_null_aware_expression
+warning - The value of the field '_validator' isn't used - lib\features\admin\admin_dashboard_screen.dart:41:27 - unused_field
+   info - The private field _posCart could be 'final' - lib\features\admin\admin_dashboard_screen.dart:103:18 - prefer_final_fields
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:287:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:289:23 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:294:42 - use_build_context_synchronously
+   info - The parameter name 'sum' matches a visible type name - lib\features\admin\admin_dashboard_screen.dart:308:36 - avoid_types_as_parameter_names
+warning - The value of the field '_purchases' isn't used - lib\features\admin\admin_dashboard_screen.dart:318:27 - unused_field
+   info - The private field _isLoadingPurchases could be 'final' - lib\features\admin\admin_dashboard_screen.dart:319:8 - prefer_final_fields
+warning - The value of the field '_isLoadingPurchases' isn't used - lib\features\admin\admin_dashboard_screen.dart:319:8 - unused_field
+  error - The argument type 'Stream<QuerySnapshot<Object?>>?' can't be assigned to the parameter type 'Stream<List<Map<String, dynamic>>>?'.  - lib\features\admin\admin_dashboard_screen.dart:598:15 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:608:70 - dead_null_aware_expression
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:645:60 - deprecated_member_use
+  error - The method 'data' isn't defined for the type 'Map' - lib\features\admin\admin_dashboard_screen.dart:655:49 - undefined_method
+  error - The getter 'id' isn't defined for the type 'Map<String, dynamic>' - lib\features\admin\admin_dashboard_screen.dart:673:66 - undefined_getter
+  error - The getter 'id' isn't defined for the type 'Map<String, dynamic>' - lib\features\admin\admin_dashboard_screen.dart:685:66 - undefined_getter
+  error - A value of type 'List<Map<String, dynamic>>' can't be assigned to a variable of type 'List<DocumentSnapshot<Object?>>' - lib\features\admin\admin_dashboard_screen.dart:748:23 - invalid_assignment
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:751:57 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:791:47 - deprecated_member_use
+  error - The argument type 'List<DocumentSnapshot<Object?>>' can't be assigned to the parameter type 'List<Map<String, dynamic>>'.  - lib\features\admin\admin_dashboard_screen.dart:871:31 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:874:55 - dead_null_aware_expression
+  error - The argument type 'List<Object>' can't be assigned to the parameter type 'List<DocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:877:25 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:877:47 - dead_null_aware_expression
+  error - The argument type 'List<DocumentSnapshot<Object?>>' can't be assigned to the parameter type 'List<Map<String, dynamic>>'.  - lib\features\admin\admin_dashboard_screen.dart:893:39 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:903:57 - dead_null_aware_expression
+  error - The argument type 'List<Object>' can't be assigned to the parameter type 'List<DocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:908:33 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:908:55 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:929:52 - dead_null_aware_expression
+warning - The value of the local variable 'currencyFormat' isn't used - lib\features\admin\admin_dashboard_screen.dart:962:17 - unused_local_variable
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:983:55 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:996:37 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1048:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1049:49 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1096:48 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1144:17 - curly_braces_in_flow_control_structures
+warning - Unnecessary cast - lib\features\admin\admin_dashboard_screen.dart:1150:31 - unnecessary_cast
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1160:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1182:38 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:1270:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1277:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:1277:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1315:19 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1320:19 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1389:47 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1410:27 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1416:27 - curly_braces_in_flow_control_structures
+warning - The declaration '_buildInventoryFloatingButtons' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:1453:10 - unused_element
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1457:58 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1554:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1567:17 - curly_braces_in_flow_control_structures
+  error - The method 'data' isn't defined for the type 'Map' - lib\features\admin\admin_dashboard_screen.dart:1578:38 - undefined_method
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1591:25 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:1593:25 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1606:54 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1636:40 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1651:61 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1664:55 - deprecated_member_use
+  error - The argument type 'Map<String, dynamic>' can't be assigned to the parameter type 'DocumentSnapshot<Object?>'.  - lib\features\admin\admin_dashboard_screen.dart:1680:60 - argument_type_not_assignable
+  error - The argument type 'Map<String, dynamic>' can't be assigned to the parameter type 'DocumentSnapshot<Object?>'.  - lib\features\admin\admin_dashboard_screen.dart:1694:60 - argument_type_not_assignable
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:1735:46 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:1945:42 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:1949:42 - use_build_context_synchronously
+warning - The declaration '_showAdminSellDialog' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:1961:8 - unused_element
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2051:21 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2118:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2127:49 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2132:67 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:2188:57 - deprecated_member_use
+warning - The declaration '_showEditPurchaseDialog' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:2298:8 - unused_element
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2338:38 - use_build_context_synchronously
+warning - The value of the local variable 'batchC' isn't used - lib\features\admin\admin_dashboard_screen.dart:2440:11 - unused_local_variable
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2570:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2577:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2577:48 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:2600:39 - deprecated_member_use
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:2675:57 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:2745:65 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2749:45 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2750:55 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2758:59 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2759:79 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2796:50 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2806:50 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:2811:60 - use_build_context_synchronously
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:2843:49 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:2941:65 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:2952:39 - curly_braces_in_flow_control_structures
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:2987:63 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3042:69 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3053:43 - curly_braces_in_flow_control_structures
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3088:67 - dead_null_aware_expression
+  error - The getter 'isEmpty' isn't defined for the type 'QuerySnapshot<Map<String, dynamic>>' - lib\features\admin\admin_dashboard_screen.dart:3135:39 - undefined_getter
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3137:29 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3137:50 - use_build_context_synchronously
+  error - The method 'map' isn't defined for the type 'QuerySnapshot' - lib\features\admin\admin_dashboard_screen.dart:3145:73 - undefined_method
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3147:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3147:48 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3152:27 - curly_braces_in_flow_control_structures
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3152:48 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3156:58 - use_build_context_synchronously
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3166:58 - dead_null_aware_expression
+  error - The argument type 'List<Map<String, dynamic>>' can't be assigned to the parameter type 'List<QueryDocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:3198:55 - argument_type_not_assignable
+  error - The argument type 'List<Map<String, dynamic>>' can't be assigned to the parameter type 'List<QueryDocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:3205:55 - argument_type_not_assignable
+  error - The argument type 'List<Map<String, dynamic>>' can't be assigned to the parameter type 'List<QueryDocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:3212:55 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3219:61 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3220:65 - dead_null_aware_expression
+warning - The value of the local variable 'slow' isn't used - lib\features\admin\admin_dashboard_screen.dart:3242:31 - unused_local_variable
+warning - The value of the local variable 'lowVal' isn't used - lib\features\admin\admin_dashboard_screen.dart:3252:31 - unused_local_variable
+  error - The argument type 'List<Map<String, dynamic>>' can't be assigned to the parameter type 'List<QueryDocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:3261:61 - argument_type_not_assignable
+  error - The argument type 'List<Map<String, dynamic>>' can't be assigned to the parameter type 'List<QueryDocumentSnapshot<Object?>>'.  - lib\features\admin\admin_dashboard_screen.dart:3269:61 - argument_type_not_assignable
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3360:54 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:3586:19 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:3589:17 - curly_braces_in_flow_control_structures
+  error - The method 'data' isn't defined for the type 'Map' - lib\features\admin\admin_dashboard_screen.dart:3597:38 - undefined_method
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:3635:46 - deprecated_member_use
+  error - The argument type 'Stream<Map<String, dynamic>>' can't be assigned to the parameter type 'Stream<DocumentSnapshot<Object?>>?'.  - lib\features\admin\admin_dashboard_screen.dart:3674:35 - argument_type_not_assignable
+   info - 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead. This feature was deprecated after v3.31.0-2.0.pre - lib\features\admin\admin_dashboard_screen.dart:3755:21 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:3815:49 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:3855:21 - use_build_context_synchronously
+warning - The declaration '_buildActiveTab' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:3874:10 - unused_element
+warning - The value of the local variable 'isAdmin' isn't used - lib\features\admin\admin_dashboard_screen.dart:3958:11 - unused_local_variable
+  error - The argument type 'String' can't be assigned to the parameter type 'Map<String, dynamic>'.  - lib\features\admin\admin_dashboard_screen.dart:4109:33 - argument_type_not_assignable
+  error - Too many positional arguments: 1 expected, but 3 found - lib\features\admin\admin_dashboard_screen.dart:4110:33 - extra_positional_arguments
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:4122:47 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:4123:48 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:4130:60 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:4131:46 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4149:24 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4185:39 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:4252:29 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:4254:29 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:4262:29 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:4264:29 - use_build_context_synchronously
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:4344:42 - dead_null_aware_expression
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4467:32 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4601:32 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4642:17 - curly_braces_in_flow_control_structures
+  error - The argument type 'Map<String, dynamic>' can't be assigned to the parameter type 'QueryDocumentSnapshot<Object?>'.  - lib\features\admin\admin_dashboard_screen.dart:4657:37 - argument_type_not_assignable
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4663:17 - curly_braces_in_flow_control_structures
+   info - The parameter name 'sum' matches a visible type name - lib\features\admin\admin_dashboard_screen.dart:4677:24 - avoid_types_as_parameter_names
+  error - The argument type 'List<QueryDocumentSnapshot<Object?>>' can't be assigned to the parameter type 'List<Map<String, dynamic>>'.  - lib\features\admin\admin_dashboard_screen.dart:4682:56 - argument_type_not_assignable
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4800:35 - curly_braces_in_flow_control_structures
+  error - The method 'getAuditLogs' isn't defined for the type 'DatabaseService' - lib\features\admin\admin_dashboard_screen.dart:4869:25 - undefined_method
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4872:17 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4882:58 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4887:37 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:4912:17 - curly_braces_in_flow_control_structures
+  error - The method 'data' isn't defined for the type 'Map' - lib\features\admin\admin_dashboard_screen.dart:4918:37 - undefined_method
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4930:62 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:4955:68 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:5015:29 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\admin\admin_dashboard_screen.dart:5053:29 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5063:13 - curly_braces_in_flow_control_structures
+   info - The parameter name 'sum' matches a visible type name - lib\features\admin\admin_dashboard_screen.dart:5076:15 - avoid_types_as_parameter_names
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\admin\admin_dashboard_screen.dart:5128:31 - use_build_context_synchronously
+warning - The declaration '_buildAddItemFAB' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:5141:10 - unused_element
+warning - The declaration '_buildAddPurchaseFAB' isn't referenced - lib\features\admin\admin_dashboard_screen.dart:5147:10 - unused_element
+   info - The parameter name 'sum' matches a visible type name - lib\features\admin\admin_dashboard_screen.dart:5156:26 - avoid_types_as_parameter_names
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5238:49 - deprecated_member_use
+warning - The left operand can't be null, so the right operand is never executed - lib\features\admin\admin_dashboard_screen.dart:5371:48 - dead_null_aware_expression
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5383:19 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5388:19 - curly_braces_in_flow_control_structures
+  error - Undefined class 'FirestoreService' - lib\features\admin\admin_dashboard_screen.dart:5412:9 - undefined_class
+  error - The argument type 'Stream<QuerySnapshot<Object?>>' can't be assigned to the parameter type 'Stream<List<Map<String, dynamic>>>?'.  - lib\features\admin\admin_dashboard_screen.dart:5463:15 - argument_type_not_assignable
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5483:55 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5484:75 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5485:25 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5486:31 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5487:16 - curly_braces_in_flow_control_structures
+  error - The argument type 'Map<String, dynamic>' can't be assigned to the parameter type 'QueryDocumentSnapshot<Object?>'.  - lib\features\admin\admin_dashboard_screen.dart:5585:51 - argument_type_not_assignable
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5639:46 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5682:32 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5683:52 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5692:20 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\features\admin\admin_dashboard_screen.dart:5693:30 - curly_braces_in_flow_control_structures
+  error - The argument type 'QueryDocumentSnapshot<Object?>' can't be assigned to the parameter type 'Map<String, dynamic>?'.  - lib\features\admin\admin_dashboard_screen.dart:5701:45 - argument_type_not_assignable
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5800:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5827:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\admin\admin_dashboard_screen.dart:5886:24 - deprecated_member_use
+
+flutter : 182 issues found. (ran in 6.1s)
+At line:1 char:1
++ flutter analyze lib/features/admin/admin_dashboard_screen.dart lib/co ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : N    otSpecified: (182 issues fo    und. (ran in 6.1s):String)     [], RemoteException
+    + FullyQualifiedErrorId : N    ativeCommandError
+ 
+

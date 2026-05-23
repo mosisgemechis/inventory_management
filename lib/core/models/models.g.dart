@@ -24,13 +24,18 @@ class AppUserAdapter extends TypeAdapter<AppUser> {
       shopId: fields[4] as String,
       branchId: fields[5] as String,
       branchName: fields[6] as String?,
+      permissions: (fields[7] as Map?)?.cast<String, bool>(),
+      currency: fields[8] as String?,
+      country: fields[9] as String?,
+      isActive: fields[10] as bool,
+      fullName: fields[11] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppUser obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -43,6 +48,16 @@ class AppUserAdapter extends TypeAdapter<AppUser> {
       ..write(obj.branchId)
       ..writeByte(6)
       ..write(obj.branchName)
+      ..writeByte(7)
+      ..write(obj.permissions)
+      ..writeByte(8)
+      ..write(obj.currency)
+      ..writeByte(9)
+      ..write(obj.country)
+      ..writeByte(10)
+      ..write(obj.isActive)
+      ..writeByte(11)
+      ..write(obj.fullName)
       ..writeByte(3)
       ..write(obj.roles);
   }
@@ -83,13 +98,14 @@ class ProductAdapter extends TypeAdapter<Product> {
       isBundle: fields[11] as bool,
       bundleItems: (fields[12] as List?)?.cast<String>(),
       lastUpdated: fields[13] as DateTime?,
+      imageUrl: fields[14] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Product obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -117,7 +133,9 @@ class ProductAdapter extends TypeAdapter<Product> {
       ..writeByte(12)
       ..write(obj.bundleItems)
       ..writeByte(13)
-      ..write(obj.lastUpdated);
+      ..write(obj.lastUpdated)
+      ..writeByte(14)
+      ..write(obj.imageUrl);
   }
 
   @override
@@ -281,13 +299,14 @@ class CartItemAdapter extends TypeAdapter<CartItem> {
       price: fields[2] as double,
       quantity: fields[3] as int,
       batchNumber: fields[4] as String?,
+      cost: fields[5] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CartItem obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -297,7 +316,9 @@ class CartItemAdapter extends TypeAdapter<CartItem> {
       ..writeByte(3)
       ..write(obj.quantity)
       ..writeByte(4)
-      ..write(obj.batchNumber);
+      ..write(obj.batchNumber)
+      ..writeByte(5)
+      ..write(obj.cost);
   }
 
   @override
@@ -321,10 +342,12 @@ class UserRoleAdapter extends TypeAdapter<UserRole> {
       case 0:
         return UserRole.admin;
       case 1:
-        return UserRole.staff;
+        return UserRole.coAdmin;
       case 2:
         return UserRole.manager;
       case 3:
+        return UserRole.staff;
+      case 4:
         return UserRole.none;
       default:
         return UserRole.admin;
@@ -337,14 +360,17 @@ class UserRoleAdapter extends TypeAdapter<UserRole> {
       case UserRole.admin:
         writer.writeByte(0);
         break;
-      case UserRole.staff:
+      case UserRole.coAdmin:
         writer.writeByte(1);
         break;
       case UserRole.manager:
         writer.writeByte(2);
         break;
-      case UserRole.none:
+      case UserRole.staff:
         writer.writeByte(3);
+        break;
+      case UserRole.none:
+        writer.writeByte(4);
         break;
     }
   }

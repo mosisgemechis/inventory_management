@@ -49,15 +49,15 @@ class ERPSidebar extends StatelessWidget {
                             blurRadius: 15,
                             spreadRadius: -2)
                       ]),
-                  child: const Icon(Icons.inventory_2_rounded,
-                      color: Colors.white, size: 24),
+                  child: Image.asset('assets/logo.png', width: 24, height: 24, errorBuilder: (c, e, s) => const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 24)),
                 ),
                 const SizedBox(width: 12),
                 const Text(
-                  'SmartInventory',
+                  'Core Inventory',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
+                      color: Colors.white,
                       letterSpacing: -0.5),
                 ),
               ],
@@ -352,11 +352,11 @@ class _BuildStatChange extends StatelessWidget {
   }
 }
 
-class SmartInventoryDataTable extends StatelessWidget {
+class CoreInventoryDataTable extends StatelessWidget {
   final List<String> columns;
   final List<DataRow> rows;
 
-  const SmartInventoryDataTable(
+  const CoreInventoryDataTable(
       {super.key, required this.columns, required this.rows});
 
   @override

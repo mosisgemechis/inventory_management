@@ -18,14 +18,14 @@ bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
 /// Returns the best writable directory for user-visible exports.
 ///
-/// Android: Tries `/storage/emulated/0/Download/SmartInventory/` first (visible
+/// Android: Tries `/storage/emulated/0/Download/CoreInventory/` first (visible
 ///          in Files app under "Downloads"), falls back to app-external dir.
 /// iOS:     Returns `getApplicationDocumentsDirectory()` (visible in Files app
 ///          under the app name).
 Future<Directory> _getExportDir() async {
   if (Platform.isAndroid) {
     // Option 1 — public Downloads (works on most devices including API 29+)
-    final downloads = Directory('/storage/emulated/0/Download/SmartInventory');
+    final downloads = Directory('/storage/emulated/0/Download/CoreInventory');
     try {
       if (!await downloads.exists()) await downloads.create(recursive: true);
       // Quick write test
@@ -36,7 +36,7 @@ Future<Directory> _getExportDir() async {
     } catch (_) {
       // Option 2 — app-specific external dir (always works, always visible in Files)
       final extDir = await getExternalStorageDirectory();
-      final dir = Directory('${extDir!.path}/SmartInventory');
+      final dir = Directory('${extDir!.path}/CoreInventory');
       if (!await dir.exists()) await dir.create(recursive: true);
       return dir;
     }
@@ -53,7 +53,7 @@ Future<String> _saveAndShare(Directory dir, String baseName, Uint8List bytes) as
   final file = File('${dir.path}/$baseName');
   await file.writeAsBytes(bytes, flush: true);
   // Offer share sheet so user can also open/send the file
-  await Share.shareXFiles([XFile(file.path)], text: 'SmartInventory Export');
+  await Share.shareXFiles([XFile(file.path)], text: 'Core Inventory Export');
   return file.path;
 }
 
@@ -99,6 +99,11 @@ class ReportingServiceImpl implements ReportingInterface {
       sheet.appendRow(row.map((v) => TextCellValue(v.toString())).toList());
     }
 
+    // Set reasonable column widths for readability
+    for (var i = 0; i < headers.length; i++) {
+       sheet.setColumnWidth(i, 20.0);
+    }
+
     final savedBytes = excel.save();
     if (savedBytes == null || savedBytes.isEmpty) {
       throw Exception('Excel generation failed: no bytes produced.');
@@ -125,42 +130,54 @@ class ReportingServiceImpl implements ReportingInterface {
 
   // ── PDF ───────────────────────────────────────────────────────────────────
   @override
-  Future<String> exportToPdf(
-      String fileName, Map<String, dynamic> data) async {
+  Future<String> exportToPdf(String fileName, Map<String, dynamic> data) async {
     // ── Fonts (graceful offline fallback) ──
-    pw.Font baseFont, boldFont, italicFont;
+    final labels = data['labels'] as Map<String, dynamic>? ?? {};
+    final getL = (String key, String def) => labels[key]?.toString() ?? def;
+
+    pw.Font baseFont;
+    pw.Font boldFont;
+    pw.Font italicFont;
     pw.Font? ethiopicFont;
+    pw.Font? arabicFont;
+
     try {
-      baseFont    = await PdfGoogleFonts.notoSansRegular();
-      boldFont    = await PdfGoogleFonts.notoSansBold();
-      italicFont  = await PdfGoogleFonts.notoSansItalic();
+      baseFont = await PdfGoogleFonts.notoSansRegular();
+      boldFont = await PdfGoogleFonts.notoSansBold();
+      italicFont = await PdfGoogleFonts.notoSansItalic();
       ethiopicFont = await PdfGoogleFonts.notoSansEthiopicRegular();
+      arabicFont = await PdfGoogleFonts.notoSansArabicRegular();
     } catch (_) {
-      baseFont   = pw.Font.helvetica();
-      boldFont   = pw.Font.helveticaBold();
+      baseFont = pw.Font.helvetica();
+      boldFont = pw.Font.helveticaBold();
       italicFont = pw.Font.helveticaOblique();
       ethiopicFont = null;
+      arabicFont = null;
     }
 
     final theme = pw.ThemeData.withFont(
       base: baseFont,
       bold: boldFont,
       italic: italicFont,
-      fontFallback: [if (ethiopicFont != null) ethiopicFont],
+      fontFallback: [
+        if (ethiopicFont != null) ethiopicFont,
+        if (arabicFont != null) arabicFont,
+      ],
     );
 
     final pdf = pw.Document(theme: theme);
     final now = DateTime.now();
     final fmt = DateFormat('MMMM d, yyyy  hh:mm a');
-    final currency = NumberFormat.currency(symbol: 'ETB ', decimalDigits: 2);
+    final currencySymbol = data['currency']?.toString() ?? 'USD';
+    final currency = NumberFormat.currency(symbol: '$currencySymbol ', decimalDigits: 2);
 
     // ── Colours ──
-    const primaryColor  = PdfColor.fromInt(0xFF1B8A5A);
-    const accentColor   = PdfColor.fromInt(0xFF5B50F9);
-    const dangerColor   = PdfColor.fromInt(0xFFDC3545);
-    const warningColor  = PdfColor.fromInt(0xFFFFA500);
-    const lightBg       = PdfColor.fromInt(0xFFF7F9FC);
-    const borderColor   = PdfColor.fromInt(0xFFE2E8F0);
+    const primaryColor = PdfColor.fromInt(0xFF1B8A5A);
+    const accentColor = PdfColor.fromInt(0xFF5B50F9);
+    const dangerColor = PdfColor.fromInt(0xFFDC3545);
+    const warningColor = PdfColor.fromInt(0xFFFFA500);
+    const lightBg = PdfColor.fromInt(0xFFF7F9FC);
+    const borderColor = PdfColor.fromInt(0xFFE2E8F0);
     const textSecondary = PdfColor.fromInt(0xFF6B7280);
 
     // ── Helpers ──
@@ -178,13 +195,16 @@ class ReportingServiceImpl implements ReportingInterface {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Container(
-                  width: 20, height: 3,
+                  width: 20,
+                  height: 3,
                   decoration: pw.BoxDecoration(
                       color: accent,
-                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)))),
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(2)))),
               pw.SizedBox(height: 6),
               pw.Text(value,
-                  style: pw.TextStyle(font: boldFont, fontSize: 14, color: accent)),
+                  style: pw.TextStyle(
+                      font: boldFont, fontSize: 14, color: accent)),
               pw.SizedBox(height: 3),
               pw.Text(label,
                   style: const pw.TextStyle(fontSize: 8, color: textSecondary)),
@@ -198,28 +218,38 @@ class ReportingServiceImpl implements ReportingInterface {
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 10, top: 18),
         child: pw.Row(children: [
-          pw.Container(width: 4, height: 16,
-              decoration: pw.BoxDecoration(color: color,
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)))),
+          pw.Container(
+              width: 4,
+              height: 16,
+              decoration: pw.BoxDecoration(
+                  color: color,
+                  borderRadius:
+                      const pw.BorderRadius.all(pw.Radius.circular(2)))),
           pw.SizedBox(width: 8),
           pw.Text(title,
-              style: pw.TextStyle(font: boldFont, fontSize: 13, color: PdfColors.grey800)),
+              style: pw.TextStyle(
+                  font: boldFont, fontSize: 13, color: PdfColors.grey800)),
         ]),
       );
     }
 
-    pw.Widget _tableSection(String title, List<String> headers, List<List<String>> rows,
+    pw.Widget _tableSection(String title, List<String> headers,
+        List<List<String>> rows,
         {PdfColor headerColor = primaryColor}) {
       return pw.Column(children: [
         _sectionHeader(title, color: headerColor),
         pw.TableHelper.fromTextArray(
-          headers: headers, data: rows,
-          headerStyle: pw.TextStyle(font: boldFont, fontSize: 9, color: PdfColors.white),
+          headers: headers,
+          data: rows,
+          headerStyle:
+              pw.TextStyle(font: boldFont, fontSize: 9, color: PdfColors.white),
           headerDecoration: pw.BoxDecoration(color: headerColor),
           cellStyle: const pw.TextStyle(fontSize: 9),
           rowDecoration: const pw.BoxDecoration(
-              border: pw.Border(bottom: pw.BorderSide(color: borderColor, width: 0.5))),
-          cellHeight: 22, headerHeight: 24,
+              border: pw.Border(
+                  bottom: pw.BorderSide(color: borderColor, width: 0.5))),
+          cellHeight: 22,
+          headerHeight: 24,
           cellAlignments: {
             0: pw.Alignment.centerLeft,
             1: pw.Alignment.center,
@@ -229,22 +259,39 @@ class ReportingServiceImpl implements ReportingInterface {
       ]);
     }
 
+    pw.Widget _fRow(
+        String label, String value, pw.Font bold, PdfColor valueColor) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 5),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(label, style: const pw.TextStyle(fontSize: 10)),
+            pw.Text(value,
+                style:
+                    pw.TextStyle(font: bold, fontSize: 10, color: valueColor)),
+          ],
+        ),
+      );
+    }
+
     // ── Extract data ──
-    final dailySales     = (data['dailySales'] as List?)?.cast<Map<String,dynamic>>() ?? [];
-    final topProducts    = data['topProducts']    as List? ?? [];
-    final leastProducts  = data['leastProducts']  as List? ?? [];
-    final totalRev       = (data['revenue']       ?? 0).toDouble();
-    final totalProfit    = (data['profit']        ?? 0).toDouble();
-    final totalDebt      = (data['debt']          ?? 0).toDouble();
-    final totalPurchases = (data['purchases']     ?? 0).toDouble();
-    final totalOrders    = data['orders']         ?? 0;
-    final lowCount       = data['lowStockCount']  ?? 0;
-    final outCount       = data['outStockCount']  ?? 0;
-    final soonCount      = data['soonCount']      ?? 0;
-    final expiredCount   = data['expiredCount']   ?? 0;
-    final companyName    = data['companyName']?.toString() ?? 'SmartInventory ERP';
-    final companyPhone   = data['companyPhone']?.toString() ?? '+251 ...';
-    final period         = data['period']?.toString()      ?? 'Selected Period';
+    final dailySales =
+        (data['dailySales'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final topProducts = data['topProducts'] as List? ?? [];
+    final leastProducts = data['leastProducts'] as List? ?? [];
+    final totalRev = (data['revenue'] ?? 0).toDouble();
+    final totalProfit = (data['profit'] ?? 0).toDouble();
+    final totalDebt = (data['debt'] ?? 0).toDouble();
+    final totalPurchases = (data['purchases'] ?? 0).toDouble();
+    final totalOrders = data['orders'] ?? 0;
+    final lowCount = data['lowStockCount'] ?? 0;
+    final outCount = data['outStockCount'] ?? 0;
+    final soonCount = data['soonCount'] ?? 0;
+    final expiredCount = data['expiredCount'] ?? 0;
+    final companyName = data['companyName']?.toString() ?? 'Core Inventory';
+    final companyPhone = data['companyPhone']?.toString() ?? '+251 ...';
+    final period = data['period']?.toString() ?? 'Selected Period';
 
     pdf.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -255,18 +302,22 @@ class ReportingServiceImpl implements ReportingInterface {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text(companyName,
-                  style: pw.TextStyle(font: boldFont, fontSize: 20, color: primaryColor)),
-              pw.SizedBox(height: 2),
-              pw.Text('Business Performance Report',
-                  style: const pw.TextStyle(fontSize: 11, color: textSecondary)),
-              if (companyPhone != null) ...[
-                pw.SizedBox(height: 1),
-                pw.Text('Contact: $companyPhone',
-                    style: const pw.TextStyle(fontSize: 8, color: textSecondary)),
-              ],
-            ]),
+            pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(companyName,
+                      style: pw.TextStyle(
+                          font: boldFont, fontSize: 20, color: primaryColor)),
+                  pw.SizedBox(height: 2),
+                  pw.Text(getL('business_report', 'Business Performance Report'),
+                      style: const pw.TextStyle(fontSize: 11, color: textSecondary)),
+                  if (companyPhone != null) ...[
+                    pw.SizedBox(height: 1),
+                    pw.Text('Contact: $companyPhone',
+                        style: const pw.TextStyle(
+                            fontSize: 8, color: textSecondary)),
+                  ],
+                ]),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Text('Generated: ${fmt.format(now)}',
                   style: const pw.TextStyle(fontSize: 8, color: textSecondary)),
@@ -285,40 +336,56 @@ class ReportingServiceImpl implements ReportingInterface {
       ]),
       build: (ctx) => [
         // 1 — Summary cards
-        _sectionHeader('1. Executive Summary'),
+        _sectionHeader('1. ' + getL('executive_summary', 'Executive Summary')),
         pw.Row(children: [
-          _statCard('Total Revenue',  currency.format(totalRev)),
+          _statCard(getL('total_revenue', 'Total Revenue'),
+              currency.format(totalRev)),
           pw.SizedBox(width: 8),
-          _statCard('Net Profit',     currency.format(totalProfit), accent: accentColor),
+          _statCard(getL('net_profit', 'Net Profit'),
+              currency.format(totalProfit),
+              accent: accentColor),
           pw.SizedBox(width: 8),
-          _statCard('Total Orders',   '$totalOrders', accent: PdfColor.fromInt(0xFF0EA5E9)),
+          _statCard(getL('total_orders', 'Total Orders'), '$totalOrders',
+              accent: PdfColor.fromInt(0xFF0EA5E9)),
         ]),
         pw.SizedBox(height: 8),
         pw.Row(children: [
-          _statCard('Outstanding Debt',  currency.format(totalDebt),      accent: dangerColor),
+          _statCard(getL('outstanding_debt', 'Outstanding Debt'),
+              currency.format(totalDebt),
+              accent: dangerColor),
           pw.SizedBox(width: 8),
-          _statCard('Total Purchases',   currency.format(totalPurchases), accent: warningColor),
+          _statCard(getL('total_purchases', 'Total Purchases'),
+              currency.format(totalPurchases),
+              accent: warningColor),
           pw.SizedBox(width: 8),
           pw.Expanded(child: pw.SizedBox()),
         ]),
 
         // 2 — Daily trend
         if (dailySales.isNotEmpty) ...[
-          _sectionHeader('2. Sales Trend'),
+          _sectionHeader('2. ' + getL('sales_trend', 'Sales Trend')),
           pw.TableHelper.fromTextArray(
-            headers: ['Date', 'Revenue (ETB)', 'Profit (ETB)', 'Orders'],
+            headers: [
+              getL('date', 'Date'),
+              getL('revenue', 'Revenue'),
+              getL('profit', 'Profit'),
+              getL('orders', 'Orders')
+            ],
             data: dailySales.map((d) => [
-              d['date']?.toString() ?? '',
-              currency.format((d['revenue'] ?? 0).toDouble()),
-              currency.format((d['profit']  ?? 0).toDouble()),
-              '${d['orders'] ?? 0}',
-            ]).toList(),
-            headerStyle: pw.TextStyle(font: boldFont, fontSize: 9, color: PdfColors.white),
+                  d['date']?.toString() ?? '',
+                  currency.format((d['revenue'] ?? 0).toDouble()),
+                  currency.format((d['profit'] ?? 0).toDouble()),
+                  '${d['orders'] ?? 0}',
+                ]).toList(),
+            headerStyle: pw.TextStyle(
+                font: boldFont, fontSize: 9, color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: primaryColor),
             cellStyle: const pw.TextStyle(fontSize: 9),
             rowDecoration: const pw.BoxDecoration(
-                border: pw.Border(bottom: pw.BorderSide(color: borderColor, width: 0.5))),
-            cellHeight: 22, headerHeight: 24,
+                border: pw.Border(
+                    bottom: pw.BorderSide(color: borderColor, width: 0.5))),
+            cellHeight: 22,
+            headerHeight: 24,
             cellAlignments: {
               0: pw.Alignment.centerLeft,
               1: pw.Alignment.centerRight,
@@ -331,35 +398,53 @@ class ReportingServiceImpl implements ReportingInterface {
         // 3 — Inventory alerts
         _sectionHeader('3. Inventory Alerts', color: dangerColor),
         pw.Row(children: [
-          _statCard('Low Stock',     '$lowCount',     accent: warningColor),
+          _statCard('Low Stock', '$lowCount', accent: warningColor),
           pw.SizedBox(width: 8),
-          _statCard('Out of Stock',  '$outCount',     accent: dangerColor),
+          _statCard('Out of Stock', '$outCount', accent: dangerColor),
           pw.SizedBox(width: 8),
-          _statCard('Expiring Soon', '$soonCount',    accent: PdfColor.fromInt(0xFFFF6B35)),
+          _statCard('Expiring Soon', '$soonCount',
+              accent: PdfColor.fromInt(0xFFFF6B35)),
           pw.SizedBox(width: 8),
-          _statCard('Expired',       '$expiredCount', accent: dangerColor),
+          _statCard('Expired', '$expiredCount', accent: dangerColor),
         ]),
 
         // 4 & 5 — Product tables
         if (topProducts.isNotEmpty)
-          _tableSection('4. Top Selling Products', ['Product Name', 'Units Sold', 'Revenue'],
-            topProducts.map<List<String>>((p) => [
-              p['name']?.toString() ?? '',
-              '${p['qty'] ?? 0}',
-              currency.format((p['rev'] ?? 0).toDouble()),
-            ]).toList()),
+          _tableSection(
+              '4. ' + getL('top_selling', 'Top Selling Products'),
+              [
+                getL('product_name', 'Product Name'),
+                getL('units_sold', 'Units Sold'),
+                getL('revenue', 'Revenue')
+              ],
+              topProducts
+                  .map<List<String>>((p) => [
+                        p['name']?.toString() ?? '',
+                        '${p['qty'] ?? 0}',
+                        currency.format((p['rev'] ?? 0).toDouble()),
+                      ])
+                  .toList()),
 
         if (leastProducts.isNotEmpty)
-          _tableSection('5. Least Selling Products', ['Product Name', 'Units Sold', 'Revenue'],
-            leastProducts.map<List<String>>((p) => [
-              p['name']?.toString() ?? '',
-              '${p['qty'] ?? 0}',
-              currency.format((p['rev'] ?? 0).toDouble()),
-            ]).toList(),
-            headerColor: warningColor),
+          _tableSection(
+              '5. ' + getL('least_selling', 'Least Selling Products'),
+              [
+                getL('product_name', 'Product Name'),
+                getL('units_sold', 'Units Sold'),
+                getL('revenue', 'Revenue')
+              ],
+              leastProducts
+                  .map<List<String>>((p) => [
+                        p['name']?.toString() ?? '',
+                        '${p['qty'] ?? 0}',
+                        currency.format((p['rev'] ?? 0).toDouble()),
+                      ])
+                  .toList(),
+              headerColor: warningColor),
 
         // 6 — Financial summary
-        _sectionHeader('6. Financial Summary', color: accentColor),
+        _sectionHeader('6. ' + getL('financial_summary', 'Financial Summary'),
+            color: accentColor),
         pw.Container(
           padding: const pw.EdgeInsets.all(14),
           decoration: pw.BoxDecoration(
@@ -368,23 +453,31 @@ class ReportingServiceImpl implements ReportingInterface {
             borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
           ),
           child: pw.Column(children: [
-            _fRow('Total Revenue',   currency.format(totalRev),       boldFont, primaryColor),
+            _fRow(getL('total_revenue', 'Total Revenue'),
+                currency.format(totalRev), boldFont, primaryColor),
             pw.Divider(color: borderColor, thickness: 0.5),
-            _fRow('Total Profit',    currency.format(totalProfit),     boldFont, accentColor),
+            _fRow(getL('total_profit', 'Total Profit'),
+                currency.format(totalProfit), boldFont, accentColor),
             pw.Divider(color: borderColor, thickness: 0.5),
-            _fRow('Profit Margin',
-                totalRev > 0 ? '${(totalProfit / totalRev * 100).toStringAsFixed(1)}%' : '0%',
-                boldFont, primaryColor),
+            _fRow(
+                getL('profit_margin', 'Profit Margin'),
+                totalRev > 0
+                    ? '${(totalProfit / totalRev * 100).toStringAsFixed(1)}%'
+                    : '0%',
+                boldFont,
+                primaryColor),
             pw.Divider(color: borderColor, thickness: 0.5),
-            _fRow('Outstanding Debt',   currency.format(totalDebt),       boldFont, dangerColor),
+            _fRow(getL('outstanding_debt', 'Outstanding Debt'),
+                currency.format(totalDebt), boldFont, dangerColor),
             pw.Divider(color: borderColor, thickness: 0.5),
-            _fRow('Total Purchases',    currency.format(totalPurchases),   boldFont, warningColor),
+            _fRow(getL('total_purchases', 'Total Purchases'),
+                currency.format(totalPurchases), boldFont, warningColor),
           ]),
         ),
 
         pw.SizedBox(height: 20),
         pw.Text(
-          'This report was automatically generated by SmartInventory ERP. '
+          'This report was automatically generated by Core Inventory. '
           'All figures reflect the selected reporting period only.',
           style: const pw.TextStyle(fontSize: 7, color: textSecondary),
           textAlign: pw.TextAlign.center,
@@ -394,7 +487,8 @@ class ReportingServiceImpl implements ReportingInterface {
 
     // ── Generate bytes ──
     final bytes = await pdf.save();
-    if (bytes.isEmpty) throw Exception('PDF generation failed: no bytes produced.');
+    if (bytes.isEmpty)
+      throw Exception('PDF generation failed: no bytes produced.');
     final baseName = '$fileName.pdf';
 
     if (_isMobile) {

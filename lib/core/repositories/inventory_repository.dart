@@ -1,75 +1,120 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../services/database_service.dart';
-import '../services/firestore_service.dart';
 import '../services/validation_service.dart';
 import '../models/models.dart';
 
 class InventoryRepository {
   final DatabaseService _local = DatabaseService();
-  final FirestoreService _remote = FirestoreService();
   final ValidationService _validator = ValidationService();
-  final _uuid = const Uuid();
+  final _uuid = Uuid();
 
-  Future<void> registerItem(AppUser user, Map<String, dynamic> data) async {
-    // 1. Validation (Quick local check)
+  DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is int) {
+       // DRIFT / SQLite stores as integer (Unix timestamp)
+       // Robust check for seconds vs milliseconds:
+       // Anything before year 2000 in milliseconds (946684800000) is likely seconds.
+       if (val < 10000000000) {
+         return DateTime.fromMillisecondsSinceEpoch(val * 1000); 
+       }
+       return DateTime.fromMillisecondsSinceEpoch(val); 
+    }
+    return DateTime.tryParse(val.toString());
+  }
+
+  Future<String> registerItem(AppUser user, Map<String, dynamic> data) async {
+    // 1. Validation
+    final branchId = data['branchId'] ?? user.branchId;
     await _validator.validateProduct(
       user.shopId, 
       data['name'] ?? '', 
       data['barcode'] ?? '',
-      data['batchNumber']
+      batchNumber: data['batchNumber'],
+      branchId: branchId
     );
 
-    // 1b. Duplicate Check (Name-based)
-    final existing = await _local.searchItems(user.shopId, data['name'] ?? '', '');
+    // 2. Duplicate Check (Branch Specific)
+    final existing = await _local.query('products', 
+      where: 'shop_id = ? AND (name = ? OR barcode = ?) AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))', 
+      whereArgs: [user.shopId, data['name'] ?? '', data['barcode'] ?? '', branchId, branchId]
+    );
     if (existing.isNotEmpty && data['id'] == null) {
-       throw Exception('A product with this name already exists in your inventory.');
+       final existingItem = existing.first;
+       final existingId = existingItem['id'];
+       final incomingQty = (data['quantity'] ?? 0).toDouble();
+       
+       if (incomingQty > 0) {
+         await recordRestock(user, {
+           'shopId': user.shopId,
+           'itemId': existingId,
+           'itemName': existingItem['name'],
+           'addedQuantity': incomingQty,
+           'buyingPrice': data['buyingPrice'] ?? existingItem['buyingPrice'],
+           'expiryDate': data['expiryDate'],
+           'supplierName': data['supplierName'] ?? 'Unknown',
+           'branchId': branchId,
+         });
+       }
+       return existingId;
     }
 
-    // 2. Prep data
-    final id = data['id'] ?? data['uniqueId'] ?? _uuid.v4(); 
+    // 3. Prepare data
+    final id = data['uniqueId'] ?? data['id'] ?? _uuid.v4(); 
+    final initialQty = (data['quantity'] ?? 0.0).toDouble();
+    final sellingPrice = (data['sellingPrice'] ?? 0.0).toDouble();
+    
     final finalData = {
       ...data,
       'id': id,
       'shopId': user.shopId,
-      'isSynced': 0,
+      'quantity': initialQty, // FIX BUG #1: Direct initialization
+      'syncStatus': 0,
       'lastUpdated': DateTime.now().toIso8601String(),
     };
 
-    // 3. Instant Local Save (Set quantity to 0 initially, batches will populate it)
-    final initialQty = (finalData['quantity'] ?? 0).toDouble();
-    finalData['quantity'] = 0.0;
+    // 4. Save Product Definition
     await _local.saveProduct(finalData);
 
-    // 4. Fire-and-forget Background Sync for Item Identity
-    _remote.addItem(finalData, addedBy: user.username).then((_) {
-      _local.markSynced('products', id);
-    }).catchError((e) {
-      debugPrint("Background Sync Delay (Products): $e");
-    });
+    // 5. Check if Admin Pricing Alert is needed
+    if (sellingPrice <= 0.01) {
+       await _local.addNotification({
+         'id': _uuid.v4(),
+         'shopId': user.shopId,
+         'title': 'Pricing Required',
+         'message': 'New product "${data['name']}" added. Please set a selling price to enable sales.',
+         'type': 'pricing_alert',
+         'targetRole': 'admin',
+         'itemId': id,
+       });
+    }
 
-    // 5. If initial stock exists, trigger batch engine immediately
+    // 6. Register initial stock batch if exists
     if (initialQty > 0) {
       await recordRestock(user, {
         'shopId': user.shopId,
         'itemId': id,
-        'itemName': finalData['name'],
+        'itemName': data['name'],
         'addedQuantity': initialQty,
-        'buyingPrice': finalData['buyingPrice'],
-        'expiryDate': finalData['expiryDate'] is Timestamp 
-            ? (finalData['expiryDate'] as Timestamp).toDate().toIso8601String()
-            : finalData['expiryDate']?.toString(),
-        'supplierName': finalData['supplierName'],
-      });
+        'buyingPrice': data['buyingPrice'],
+        'sellingPrice': sellingPrice,
+        'expiryDate': _parseDate(data['expiryDate'])?.toIso8601String(),
+        'supplierName': data['supplierName'],
+        'branchId': branchId,
+      }, silent: true);
+    } else {
+       // Force a recal because saveProduct might have set slightly different data
+       await _recalculateItemStock(user.shopId, id);
     }
 
-    await recordAuditLog(user.shopId, user.username, 'ADD_PRODUCT', 'Added new product: ${finalData['name']} (Initial: $initialQty)');
+    await recordAuditLog(user.shopId, user.username, 'ADD_PRODUCT', 'Added: ${data['name']} (Stock: $initialQty)', branchId: branchId);
+    return id;
   }
 
   /// THE BATCH ENGINE: Direct/Global Restock Logic 
   /// Implements "Traceable Batch Inventory" Smart-Merge
-  Future<void> recordRestock(AppUser user, Map<String, dynamic> restockData) async {
+  Future<void> recordRestock(AppUser user, Map<String, dynamic> restockData, {bool isPurchase = false, bool silent = false}) async {
     // Requires: itemId, itemName, addedQuantity, buyingPrice, expiryDate
     // NO duplicate detector constraint here because it operates on existing items.
     
@@ -79,19 +124,23 @@ class InventoryRepository {
     if (incomingQty <= 0) throw Exception("Restock quantity must be greater than zero.");
 
     // ISO 8601 Formatting strictly enforced
-    String? incomingExpiryStr = restockData['expiryDate'];
-    if (incomingExpiryStr != null && incomingExpiryStr.isNotEmpty) {
-      // Ensure ISO formatting 
-      final dt = DateTime.tryParse(incomingExpiryStr);
+    // Handle all possible input types: Timestamp, DateTime, int, String, null
+    String? incomingExpiryStr;
+    final rawExpiry = restockData['expiryDate'];
+    if (rawExpiry is DateTime) {
+      incomingExpiryStr = rawExpiry.toIso8601String();
+    } else if (rawExpiry is int) {
+      incomingExpiryStr = _parseDate(rawExpiry)?.toIso8601String();
+    } else if (rawExpiry is String && rawExpiry.isNotEmpty) {
+      final dt = DateTime.tryParse(rawExpiry);
       if (dt != null) incomingExpiryStr = dt.toIso8601String();
-    } else {
-      incomingExpiryStr = null; // Correctly handle non-expiring stock
     }
 
-    // 1. Fetch existing batches for smart-merge (local first)
+    // 1. Fetch existing batches for smart-merge (limited to THIS branch)
+    final branchId = restockData['branchId'] ?? user.branchId;
     final existingBatches = await _local.query('batches', 
-      where: 'shopId = ? AND itemId = ?', 
-      whereArgs: [user.shopId, itemId]);
+      where: 'shop_id = ? AND item_id = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))', 
+      whereArgs: [user.shopId, itemId, branchId, branchId]);
 
     String activeBatchId = _uuid.v4();
     bool merged = false;
@@ -99,8 +148,9 @@ class InventoryRepository {
 
     // 2. The Smart-Merge (using null-safe comparison)
     for (var b in existingBatches) {
-      final oldExp = b['expiryDate']?.toString();
-      if (oldExp == incomingExpiryStr) {
+      final oldExp = _parseDate(b['expiryDate']);
+      final oldExpStr = oldExp?.toIso8601String();
+      if (oldExpStr == incomingExpiryStr) {
         // MATCH: Same expiry. Add to existing batch.
         activeBatchId = b['id'];
         newBatchTotal = (b['quantity'] ?? 0.0) + incomingQty;
@@ -119,46 +169,78 @@ class InventoryRepository {
       'expiryDate': incomingExpiryStr,
       'batchNumber': restockData['batchNumber'] ?? '', // optional
       'timestamp': DateTime.now().toIso8601String(),
-      'isSynced': 0,
+      'syncStatus': 0,
+      'branchId': restockData['branchId'] ?? user.branchId, // Use provided branch or user's branch
     };
 
     if (merged) {
-      await _local.update('batches', batchData, where: 'id = ?', whereArgs: [activeBatchId]);
+      await _local.update('batches', activeBatchId, batchData);
     } else {
-      await _local.insert('batches', batchData);
+      await _local.saveBatchRecord(batchData); // Standardized name
     }
 
     // 4. Update the Product's flat quantity cache temporarily to ensure UI compatibility
-    final summary = await _recalculateItemStock(user.shopId, itemId);
+    await _recalculateItemStock(user.shopId, itemId, 
+      branchId: branchId,
+      overrideBuyingPrice: (restockData['buyingPrice'] as num?)?.toDouble(),
+      overrideSellingPrice: (restockData['sellingPrice'] as num?)?.toDouble());
 
-    _remote.recordBatch(batchData, itemSummaryUpdate: summary).then((_) {
-      _local.markSynced('batches', activeBatchId);
-    }).catchError((e) {
-      debugPrint("Batch Sync Error: $e");
-    });
+    // 4. Background Sync Removed
 
-    await recordAuditLog(user.shopId, user.username, 'RESTOCK', 'Restocked ${restockData['itemName']}: +$incomingQty units');
+    if (!silent) {
+      await recordAuditLog(user.shopId, user.username, isPurchase ? 'PURCHASE' : 'RESTOCK', 'Restocked ${restockData['itemName']}: +$incomingQty units', branchId: branchId);
+    }
+
+    // 5. If this is a formal Purchase, create the purchase record
+    if (isPurchase) {
+      final purchaseId = "PURCHASE-${DateTime.now().millisecondsSinceEpoch}";
+      final purchaseData = {
+        'id': purchaseId,
+        'shopId': user.shopId,
+        'itemId': itemId,
+        'itemName': restockData['itemName'],
+        'barcode': restockData['barcode'] ?? '',
+        'quantity': incomingQty,
+        'unitCost': (restockData['buyingPrice'] ?? 0).toDouble(),
+        'totalCost': (restockData['buyingPrice'] ?? 0).toDouble() * incomingQty,
+        'supplierName': restockData['supplierName'],
+        'expiryDate': incomingExpiryStr,
+        'timestamp': DateTime.now().toIso8601String(),
+        'syncStatus': 0,
+        'branchId': branchId,
+      };
+      await _local.insert('purchases', purchaseData);
+    }
   }
 
   /// Sums all active unexpired batches for this product and returns the item cached `quantity` and `expiryDate`
-  Future<Map<String, dynamic>> _recalculateItemStock(String shopId, String itemId) async {
-    final batches = await _local.query('batches', where: 'shopId = ? AND itemId = ?', whereArgs: [shopId, itemId]);
+  Future<Map<String, dynamic>> _recalculateItemStock(String shopId, String itemId, {double? overrideBuyingPrice, double? overrideSellingPrice, String? branchId}) async {
+    // If branchId is null, we might need to find the product's assigned branch
+    final productRaw = await _local.query('products', where: 'id = ?', whereArgs: [itemId]);
+    final effectiveBranchId = branchId ?? (productRaw.isNotEmpty ? productRaw.first['branchId'] : 'main');
+
+    final batchesQuery = _local.query('batches', 
+      where: 'shop_id = ? AND item_id = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))', 
+      whereArgs: [shopId, itemId, effectiveBranchId, effectiveBranchId] 
+    );
+    List<Map<String, dynamic>> batches = await batchesQuery;
+    
+    // LEGACY FALLBACK: If no batches for this branch, try main (pre-migration data)
+    if (batches.isEmpty && effectiveBranchId != 'main') {
+      batches = await _local.query('batches', 
+        where: 'shop_id = ? AND item_id = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))',
+        whereArgs: [shopId, itemId, 'main', 'main']
+      );
+    }
+
     double activeStock = 0.0;
     DateTime? closestActiveExpiry;
     
     for (var b in batches) {
        final qty = (b['quantity'] ?? 0.0).toDouble();
-       final exp = DateTime.tryParse(b['expiryDate']?.toString() ?? '');
+       final exp = _parseDate(b['expiryDate']);
        
        if (qty > 0) {
-          if (exp != null) {
-              if (closestActiveExpiry == null || exp.isBefore(closestActiveExpiry)) {
-                 closestActiveExpiry = exp;
-              }
-          }
-          
-          // Fix: Ensure items expiring TODAY are still counted as active stock.
-          // DateTime.now() has time component, so we check against start of tomorrow or just date match.
           bool isExpired = false;
           if (exp != null) {
             final now = DateTime.now();
@@ -166,110 +248,146 @@ class InventoryRepository {
             final expiryDate = DateTime(exp.year, exp.month, exp.day);
             if (expiryDate.isBefore(today)) {
               isExpired = true;
+            } else {
+              if (closestActiveExpiry == null || exp.isBefore(closestActiveExpiry)) {
+                 closestActiveExpiry = exp;
+              }
             }
           }
 
           if (!isExpired) {
              activeStock += qty;
+          } else if (qty > 0) {
+            // BACKWARD COMPATIBILITY: If we find a batch with a 1970 date (seconds instead of ms),
+            // and it has quantity, we might want to count it if it's "obviously" not meant to be expired.
+            // But with the fix above it shouldn't happen for new data.
           }
        }
     }
 
     final updateData = {
-      'quantity': activeStock, 
-      if (closestActiveExpiry != null) 'expiryDate': closestActiveExpiry.toIso8601String()
-      else 'expiryDate': null,
+      'quantity': activeStock,
+      'expiryDate': closestActiveExpiry?.toIso8601String(),
+      if (overrideBuyingPrice != null) 'buyingPrice': overrideBuyingPrice,
+      if (overrideSellingPrice != null) 'sellingPrice': overrideSellingPrice,
+      'lastUpdated': DateTime.now().toIso8601String(),
     };
 
     // Update local immediately
-    await _local.update('products', {...updateData, 'isSynced': 0}, where: 'id = ?', whereArgs: [itemId]);
+    await _local.update('products', itemId, {...updateData, 'syncStatus': 0});
     return updateData;
   }
 
 
   Future<void> recordSale(AppUser user, Map<String, dynamic> saleData) async {
-    final totalPrice = (saleData['totalPrice'] ?? 0.0).toDouble();
-    if (totalPrice <= 0) throw Exception('Total price must be greater than zero.');
-
-    final itemId = saleData['itemId'];
-    double qtyToDeduct = (saleData['quantity'] ?? 0).toDouble();
-
-    // --- 1. LOCAL FEFO DEDUCTION (First-Expiry, First-Out) ---
-    // Fetch and sort batches by expiryDate ascending
-    final existingBatches = await _local.query('batches', 
-      where: 'shopId = ? AND itemId = ?', 
-      whereArgs: [user.shopId, itemId]);
-
-    // We can't mutate the db result list directly, make a mutable list of maps
-    List<Map<String, dynamic>> mutableBatches = existingBatches.map((e) => Map<String, dynamic>.from(e)).toList();
-
-    // Sort by Expiry Date
-    mutableBatches.sort((a, b) {
-      final tA = DateTime.tryParse(a['expiryDate']?.toString() ?? '') ?? DateTime(2100);
-      final tB = DateTime.tryParse(b['expiryDate']?.toString() ?? '') ?? DateTime(2100);
-      return tA.compareTo(tB);
-    });
-
-    List<Map<String, dynamic>> updatedBatchesToSync = [];
-    double totalRecalculatedProfit = 0;
-    final sellPrice = (saleData['sellingPrice'] ?? (totalPrice / ((saleData['quantity'] == 0 ? 1 : saleData['quantity'])))).toDouble();
-
-    for (var i = 0; i < mutableBatches.length; i++) {
-        if (qtyToDeduct <= 0) break;
-
-        var b = mutableBatches[i];
-        double bQty = (b['quantity'] ?? 0).toDouble();
-        
-        if (bQty <= 0) continue; // Skip empty batches
-
-        double qtyTaken = 0;
-        if (bQty <= qtyToDeduct) {
-           qtyTaken = bQty;
-           qtyToDeduct -= bQty;
-           b['quantity'] = 0.0;
-        } else {
-           qtyTaken = qtyToDeduct;
-           b['quantity'] = bQty - qtyToDeduct;
-           qtyToDeduct = 0;
-        }
-
-        final bBuyingPrice = (b['buyingPrice'] ?? 0).toDouble();
-        totalRecalculatedProfit += (sellPrice - bBuyingPrice) * qtyTaken;
-
-        b['isSynced'] = 0;
-        updatedBatchesToSync.add(b);
-        await _local.update('batches', b, where: 'id = ?', whereArgs: [b['id']]);
-    }
-
-    if (qtyToDeduct > 0) {
-      final defaultProfitPerUnit = (saleData['profit'] ?? 0) / (saleData['quantity'] == 0 ? 1 : saleData['quantity']);
-      totalRecalculatedProfit += (defaultProfitPerUnit * qtyToDeduct);
-    }
-
-    // --- 2. RECORD SALE ---
-    final id = _uuid.v4();
-    final finalSale = {
-      ...saleData,
-      'profit': totalRecalculatedProfit, // OVERRIDE WITH EXACT TRACEABLE BATCH PROFIT
-      'id': id,
-      'isSynced': 0,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-
-    await _local.saveSale(finalSale);
-    final summaryUpdate = await _recalculateItemStock(user.shopId, itemId);
+    final double totalQuantity = (saleData['quantity'] ?? 0.0).toDouble();
+    if (totalQuantity <= 0) throw Exception('Quantity must be greater than zero.');
     
-    // --- 3. SYNC TO CLOUD ---
-    // We send BOTH the sale AND the batch deduction updates + absolute item summary in one atomic push!
-    _remote.recordSaleWithBatches(finalSale, updatedBatchesToSync, itemSummaryUpdate: summaryUpdate).then((_) {
-       _local.markSynced('sales', id);
-       for (var b in updatedBatchesToSync) {
-          _local.markSynced('batches', b['id']);
-       }
-    }).catchError((e) {
-       debugPrint("Background Sync Delay (Sales/Batches): $e");
+    final itemId = saleData['itemId'];
+    final totalPrice = (saleData['totalPrice'] ?? 0.0).toDouble();
+
+    await _local.runTransaction(() async {
+      // 1. Fetch existing batches for the product IN THIS BRANCH
+      final branchId = saleData['branchId'] ?? user.branchId;
+      List<Map<String, dynamic>> batchesRaw = await _local.query('batches', 
+        where: 'shop_id = ? AND item_id = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))', 
+        whereArgs: [user.shopId, itemId, branchId, branchId]
+      );
+      
+      // LEGACY FALLBACK: Products added before multi-branch was enabled
+      // have batches stored with branchId='main'. If we find none for the
+      // requested branch, check 'main' as a fallback for migrated data.
+      if (batchesRaw.isEmpty && branchId != 'main') {
+        batchesRaw = await _local.query('batches',
+          where: 'shop_id = ? AND item_id = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))',
+          whereArgs: [user.shopId, itemId, 'main', 'main']
+        );
+      }
+      
+      if (batchesRaw.isEmpty) {
+         throw Exception("Out of stock: No batches found for this product. Please restock first.");
+      }
+
+      List<Map<String, dynamic>> mutableBatches = batchesRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+
+      // 2. FEFO (First Expiry First Out) Sorting
+      mutableBatches.sort((a, b) {
+        final tA = _parseDate(a['expiryDate']) ?? DateTime(2100);
+        final tB = _parseDate(b['expiryDate']) ?? DateTime(2100);
+        return tA.compareTo(tB);
+      });
+
+      double remainingToDeduct = totalQuantity;
+      double totalSaleProfit = 0;
+      final unitSellingPrice = totalPrice / totalQuantity;
+
+      // 3. Atomically Deduct from Batches
+      for (var b in mutableBatches) {
+        if (remainingToDeduct <= 0) break;
+        
+        final double batchQty = (b['quantity'] ?? 0.0).toDouble();
+        if (batchQty <= 0) continue;
+
+        final deduction = batchQty > remainingToDeduct ? remainingToDeduct : batchQty;
+        final double batchBuyingPrice = (b['buyingPrice'] ?? 0.0).toDouble();
+        
+        // Calculate profit based on the actual buying price of this specific batch
+        totalSaleProfit += (unitSellingPrice - batchBuyingPrice) * deduction;
+        
+        // UPDATE BATCH QUANTITY correctly (FIX BUG #2)
+        final newBatchQty = batchQty - deduction;
+        await _local.update('batches', b['id'], {'quantity': newBatchQty});
+        
+        remainingToDeduct -= deduction;
+      }
+
+      if (remainingToDeduct > 0.001) {
+        throw Exception("Insufficient stock to complete sale. Missing $remainingToDeduct units.");
+      }
+
+      // 4. Record the Sale Transaction record
+      final saleId = _uuid.v4();
+      final finalSale = {
+        ...saleData,
+        'id': saleId,
+        'profit': totalSaleProfit,
+        'syncStatus': 0,
+        'timestamp': DateTime.now().toIso8601String(),
+        'branchId': saleData['branchId'] ?? user.branchId,
+      };
+
+      await _local.saveSale(finalSale);
+
+      // 5. Trigger flat stock recalculation cache
+      await _recalculateItemStock(user.shopId, itemId, branchId: branchId);
+      
+      // 6. Audit Log
+      final itemName = saleData['itemName'] ?? 'Unknown Item';
+      await recordAuditLog(user.shopId, user.username, 'SALE', 'Sold $totalQuantity units of $itemName (Total: $totalPrice)', branchId: branchId);
     });
   }
+
+  Future<void> processBulkCheckoutSync(List<Map<String, dynamic>> items) async {
+    // Standard validation
+    for (var i in items) {
+       final qty = (i['quantity'] ?? 0).toDouble();
+       if (qty <= 0) throw Exception("Quantity must be greater than zero.");
+    }
+    
+    // Process each locally (which inherently handles background syncing)
+    final user = AppUser(
+      id: items.first['userId'],
+      username: items.first['username'],
+      email: '',
+      roles: [],
+      shopId: items.first['shopId'],
+    );
+    
+    for (var i in items) {
+       await recordSale(user, i);
+    }
+  }
+
 
   Future<void> updatePurchase(AppUser user, String purchaseId, Map<String, dynamic> data) async {
     // Only supplierName and price allowed for editing in logs as per request
@@ -277,13 +395,10 @@ class InventoryRepository {
       if (data.containsKey('supplierName')) 'supplierName': data['supplierName'],
       if (data.containsKey('unitCost')) 'unitCost': data['unitCost'],
       if (data.containsKey('totalCost')) 'totalCost': data['totalCost'],
-      'isSynced': 0,
+      'syncStatus': 0,
     };
     
-    await _local.update('purchases', cleanData, where: 'id = ?', whereArgs: [purchaseId]);
-    _remote.updatePurchase(purchaseId, cleanData).then((_) {
-       _local.markSynced('purchases', purchaseId);
-    });
+    await _local.update('purchases', purchaseId, cleanData);
   }
 
   Future<void> recordPurchase(AppUser user, Map<String, dynamic> purchaseData) async {
@@ -291,7 +406,7 @@ class InventoryRepository {
     final finalPurchase = {
       ...purchaseData,
       'id': id,
-      'isSynced': 0,
+      'syncStatus': 0,
       'timestamp': DateTime.now().toIso8601String(),
     };
 
@@ -300,9 +415,13 @@ class InventoryRepository {
     final barcode = finalPurchase['barcode']?.toString() ?? '';
     final itemName = finalPurchase['itemName']?.toString() ?? '';
 
-    // Search for existing product by barcode (Cross-check)
+    final branchId = purchaseData['branchId'] ?? user.branchId;
+    // Search for existing product by barcode IN THIS BRANCH
     if (barcode.isNotEmpty) {
-       final barcodeMatches = await _local.searchItems(user.shopId, '', barcode);
+       final barcodeMatches = await _local.query('products', 
+         where: 'shop_id = ? AND barcode = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))', 
+         whereArgs: [user.shopId, barcode, branchId, branchId]
+       );
        if (barcodeMatches.isNotEmpty) {
           final existing = barcodeMatches.first;
           // Rule: If barcode exists, Name MUST match exactly (case-insensitive check handled by DB or app)
@@ -313,59 +432,59 @@ class InventoryRepository {
        }
     }
 
-    // Fallback: If no barcode match, try name-only match
-    if (actualItemId == null || actualItemId.isEmpty) {
-       final nameMatches = await _local.searchItems(user.shopId, itemName, '');
+    // Fallback: If no barcode match, try name-only match IN THIS BRANCH
+    if (actualItemId == null || actualItemId!.isEmpty) {
+       final nameMatches = await _local.query('products', 
+         where: 'shop_id = ? AND name = ? AND (branch_id = ? OR (branch_id IS NULL AND ? = "main"))', 
+         whereArgs: [user.shopId, itemName, branchId, branchId]
+       );
        if (nameMatches.isNotEmpty) {
           actualItemId = nameMatches.first['id'];
        }
     }
     
-    // Logic: If still no match, this is a brand new product definition
-    if (actualItemId == null || actualItemId.isEmpty) {
-       final newItemId = _uuid.v4();
-       actualItemId = newItemId;
-       
-       await registerItem(user, {
-         'id': newItemId,
-         'name': itemName,
-         'barcode': barcode,
-         'sellingPrice': finalPurchase['sellingPrice'] ?? (finalPurchase['unitCost'] ?? 0.0) * 1.25,
-         'buyingPrice': finalPurchase['unitCost'],
-         'lowStockThreshold': finalPurchase['lowStockThreshold'] ?? 5,
-         'quantity': 0, // recordRestock will add the actual quantity
-       });
-    }
+    await _local.runTransaction(() async {
+      // Logic: If still no match, this is a brand new product definition
+      if (actualItemId == null || actualItemId!.isEmpty) {
+        final newItemId = _uuid.v4();
+        actualItemId = newItemId;
+        
+        await registerItem(user, {
+          'id': newItemId,
+          'name': itemName,
+          'barcode': barcode,
+          'branchId': branchId,
+          'sellingPrice': finalPurchase['sellingPrice'] ?? (finalPurchase['unitCost'] ?? 0.0) * 1.25,
+          'buyingPrice': finalPurchase['unitCost'],
+          'lowStockThreshold': finalPurchase['lowStockThreshold'] ?? 5,
+          'quantity': 0, 
+        });
+      }
 
-    // SUCCESS: We have an ID. Set it BEFORE saving the log entry!
-    finalPurchase['itemId'] = actualItemId;
+      finalPurchase['itemId'] = actualItemId;
 
-    // 2. Instant Local Save (Now with guaranteed itemId)
-    await _local.savePurchase(finalPurchase);
+      // 2. Instant Local Save
+      await _local.savePurchase(finalPurchase);
 
-    // 2b. Register stock as a traceable batch movement
-    await recordRestock(user, {
-      'shopId': user.shopId,
-      'itemId': actualItemId,
-      'itemName': finalPurchase['itemName'],
-      'addedQuantity': finalPurchase['quantity'],
-      'buyingPrice': finalPurchase['unitCost'],
-      'expiryDate': finalPurchase['expiryDate'] is Timestamp 
-          ? (finalPurchase['expiryDate'] as Timestamp).toDate().toIso8601String()
-          : finalPurchase['expiryDate']?.toString(),
-      'supplierName': finalPurchase['supplierName'],
+      // 2b. Register stock as a traceable batch movement
+      await recordRestock(user, {
+        'shopId': user.shopId,
+        'itemId': actualItemId,
+        'itemName': finalPurchase['itemName'],
+        'addedQuantity': finalPurchase['quantity'],
+        'buyingPrice': finalPurchase['unitCost'],
+        'expiryDate': finalPurchase['expiryDate']?.toString(),
+        'supplierName': finalPurchase['supplierName'],
+        'batchNumber': finalPurchase['batchNumber'],
+        'branchId': branchId,
+      });
     });
 
-    // 3. Fire-and-forget Background Sync for the log entry itself
-    _remote.recordPurchase(finalPurchase).then((_) {
-      _local.markSynced('purchases', id);
-    }).catchError((e) {
-      debugPrint("Background Sync Delay (Purchases): $e");
-    });
+    // 3. Sync Removed
   }
 
-  Future<String?> findItemByNameOrBarcode(String shopId, String name, String barcode) async {
-     final results = await _local.searchItems(shopId, name, barcode);
+  Future<String?> findItemByNameOrBarcode(String shopId, String name, String barcode, {String? branchId}) async {
+     final results = await _local.searchItems(shopId, name, barcode, branchId: branchId);
      if (results.isNotEmpty) {
        return results.first['id'];
      }
@@ -373,21 +492,117 @@ class InventoryRepository {
   }
 
   Future<void> deleteItem(AppUser user, String productId) async {
-    await _local.delete('products', where: 'id = ?', whereArgs: [productId]);
-    await _remote.deleteItem(productId);
-    await recordAuditLog(user.shopId, user.username, 'DELETE_ITEM', 'Permanently deleted item $productId');
+    await _local.delete('products', productId);
+    await recordAuditLog(user.shopId, user.username, 'DELETE_ITEM', 'Permanently deleted item $productId', branchId: user.branchId);
   }
 
   Future<void> deleteUser(AppUser admin, String userId) async {
-    await _remote.deleteUser(userId);
-    await recordAuditLog(admin.shopId, admin.username, 'DELETE_USER', 'Deleted user account $userId');
+    await recordAuditLog(admin.shopId, admin.username, 'DELETE_USER', 'Deleted user account $userId', branchId: admin.branchId);
   }
 
   Future<void> factoryReset(String shopId) async {
-    await _remote.fullFactoryReset(shopId);
+    await _local.factoryReset();
   }
 
-  Future<void> recordAuditLog(String shopId, String username, String action, String details) async {
-    await _remote.recordAuditLog(shopId, username, action, details);
+  Future<void> transferStock({
+    required AppUser admin,
+    required String itemId,
+    required String itemName,
+    required String fromBranchId,
+    required String toBranchId,
+    required double quantity,
+  }) async {
+    if (fromBranchId == toBranchId) throw Exception("Source and destination branches must be different.");
+    if (quantity <= 0) throw Exception("Quantity must be greater than zero.");
+
+    await _local.runTransaction(() async {
+      // 1. Deduct from Source
+      final sourceBatchesRaw = await _local.query('batches', 
+        where: 'shop_id = ? AND item_id = ? AND branch_id = ? AND quantity > 0', 
+        whereArgs: [admin.shopId, itemId, fromBranchId]
+      );
+      
+      if (sourceBatchesRaw.isEmpty) throw Exception("No stock available in source branch.");
+      
+      double remaining = quantity;
+      List<Map<String, dynamic>> sourceBatches = sourceBatchesRaw.map((e) => Map<String, dynamic>.from(e)).toList();
+      sourceBatches.sort((a,b) => (a['expiryDate'] ?? '').compareTo(b['expiryDate'] ?? ''));
+
+      for (var b in sourceBatches) {
+        if (remaining <= 0) break;
+        final bQty = (b['quantity'] ?? 0.0).toDouble();
+        final deduct = bQty > remaining ? remaining : bQty;
+        
+        await _local.update('batches', b['id'], {'quantity': bQty - deduct});
+        
+        // 2. Add to Destination (preserving batch details like expiry)
+        await recordRestock(admin, {
+          'itemId': itemId,
+          'itemName': itemName,
+          'addedQuantity': deduct,
+          'buyingPrice': b['buyingPrice'],
+          'expiryDate': b['expiryDate'],
+          'batchNumber': b['batchNumber'],
+          'branchId': toBranchId,
+        });
+        
+        remaining -= deduct;
+      }
+
+      if (remaining > 0.001) throw Exception("Insufficient stock in source branch. Missing $remaining units.");
+
+      await _recalculateItemStock(admin.shopId, itemId, branchId: fromBranchId);
+      await _recalculateItemStock(admin.shopId, itemId, branchId: toBranchId);
+      
+      await recordAuditLog(admin.shopId, admin.username, 'STOCK_TRANSFER', 
+        'Transferred $quantity units of $itemName from $fromBranchId to $toBranchId', 
+        branchId: fromBranchId);
+    });
+  }
+
+  Future<void> updateDebtPayments(AppUser user, List<Map<String, dynamic>> items, double totalAmount) async {
+    await _local.runTransaction(() async {
+      double paymentLeft = totalAmount;
+      for (var m in items) {
+        if (paymentLeft <= 0) break;
+        final docRemaining = (m['debtRemaining'] ?? 0.0).toDouble();
+        if (docRemaining <= 0) continue;
+
+        final payToDoc = docRemaining > paymentLeft ? paymentLeft : docRemaining;
+        final newRem = docRemaining - payToDoc;
+        final currentPaid = (m['amountPaid'] ?? 0.0).toDouble();
+
+        await _local.update('sales', m['id'], {
+          'debtRemaining': newRem < 0 ? 0 : newRem,
+          'isDebt': newRem > 0.1 ? 1 : 0,
+          'amountPaid': currentPaid + payToDoc,
+          'syncStatus': 0,
+        });
+        
+        paymentLeft -= payToDoc;
+      }
+    });
+
+    await recordAuditLog(user.shopId, user.username, 'DEBT_PAYMENT', 'Paid debt of $totalAmount', branchId: user.branchId);
+  }
+
+  Future<void> recordAuditLog(String shopId, String username, String action, String details, {String branchId = 'main'}) async {
+    final logId = _uuid.v4();
+    final log = {
+      'id': logId,
+      'shopId': shopId,
+      'username': username,
+      'action': action,
+      'details': details,
+      'timestamp': DateTime.now().toIso8601String(),
+      'syncStatus': 0,
+      'branchId': branchId,
+    };
+    
+    try {
+      await _local.insert('audit_logs', log);
+    } catch(e) {
+      debugPrint("Local Audit Log Error: $e");
+    }
   }
 }

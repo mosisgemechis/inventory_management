@@ -1,20 +1,33 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import '../models/models.dart';
-import 'notification_service.dart';
-import 'sync_service.dart';
-import 'firestore_service.dart';
-import '../utils/thread_safe_stream.dart';
+import 'database_service.dart';
+import 'package:flutter/foundation.dart';
+import 'subscription_service.dart';
 
 class AuthService with ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  // OFFLINE MODE OVERRIDE:
+  // All Firebase Auth features are disabled. 
+  // Identity management is provided exclusively via the local SQLite 'users' table.
 
   AppUser? _user;
   AppUser? get user => _user;
   bool _initialized = false;
   bool get initialized => _initialized;
+  bool get firebaseReady => true; // Bypassed for offline operation
+
+  Future<void> syncStaffIdentities(String shopId) async {} // Stubbed for offline operation
+
+  int _loginAttempts = 0;
+  DateTime? _lockoutUntil;
+  static const int maxAttempts = 5;
+  static const Duration lockoutDuration = Duration(minutes: 5);
+
+  final Completer<void> _initCompleter = Completer<void>();
+  Future<void> get initialization => _initCompleter.future;
 
   void _safeNotify() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -23,134 +36,231 @@ class AuthService with ChangeNotifier {
   }
 
   AuthService() {
-    _auth.authStateChanges().toMainThread().listen((user) async {
-      if (user != null) {
-        _user = await _fetchUserDetails(user);
-        if (_user != null) {
-           SyncService.start(FirestoreService(), _user!.shopId);
-        }
-        await NotificationService.saveTokenToFirestore();
-      } else {
-        _user = null;
-        SyncService.stop();
-      }
-      _initialized = true;
-      _safeNotify();
-    });
+    // Session is loaded explicitly via ..loadSession() in main.dart
   }
 
-  Future<AppUser?> _fetchUserDetails(User firebaseUser) async {
+  Future<void> loadSession() async {
+    debugPrint("OFFLINE MODE: Loading local enterprise session...");
+    
+    // 1. Seed the database with a default Admin if empty
+    await _seedDefaultAdmin();
+    
+    // 2. Load the last active session from the users table
     try {
-      DocumentSnapshot doc = await _db.collection('users').doc(firebaseUser.uid).get();
-      if (!doc.exists) return null;
-      return AppUser.fromMap(doc.data() as Map<String, dynamic>, firebaseUser.uid);
+      final userMap = await DatabaseService().getCachedUser();
+      if (userMap != null) {
+        _user = AppUser.fromMap(userMap, userMap['uid']);
+      }
     } catch (e) {
-      print("AuthService: Error fetching user details: $e");
-      return null;
+      debugPrint("Error loading local session: $e");
+    }
+    
+    _initialized = true;
+    if (!_initCompleter.isCompleted) _initCompleter.complete();
+    _safeNotify();
+  }
+
+  Future<void> _seedDefaultAdmin() async {
+    try {
+      final db = DatabaseService();
+      final users = await db.query('users');
+      if (users.isEmpty) {
+        debugPrint("OFFLINE MODE: No users found. Seeding enterprise administrator...");
+        final adminData = {
+          'uid': 'admin-uuid-001',
+          'email': 'admin@pos.erp',
+          'username': 'admin',
+          'fullName': 'System Administrator',
+          'currency': 'USD',
+          'roles': [UserRole.admin.name],
+          'shopId': 'shop-main-001',
+          'branchId': 'main',
+          'branchName': 'Headquarters',
+          'permissions': {for (var p in AppUser.allPermissions) p: true},
+          'passwordHash': _hashPassword('admin123'),
+          'isActive': true,
+        };
+        await db.saveUserRecord(adminData);
+        await db.saveSetting('shopName', 'Enterprise POS System');
+      }
+    } catch (e) {
+      debugPrint("OFFLINE MODE: Seeding error: $e");
     }
   }
 
   Future<void> signIn(String identifier, String password) async {
-    String email = identifier.trim();
-    if (!email.contains('@')) {
-      final query = await _db.collection('users').where('username', isEqualTo: email.toLowerCase()).get();
-      if (query.docs.isEmpty) throw Exception("User with username '$identifier' not found.");
-      email = query.docs.first.get('email');
-    }
+    await initialization;
+    
+    final inputLower = identifier.trim().toLowerCase();
+    final passwordTrimmed = password.trim();
+    final hashedInput = _hashPassword(passwordTrimmed);
 
-    final result = await _auth.signInWithEmailAndPassword(email: email, password: password);
-    if (result.user != null) {
-      final details = await _fetchUserDetails(result.user!);
-      if (details == null) {
-        await _auth.signOut();
-        throw Exception("Profile not found in Database.");
-      }
-      _user = details;
-      _safeNotify();
-    }
-  }
-
-  Future<void> updateUsername(String newUsername) async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) throw Exception("Not logged in");
-    await _db.collection('users').doc(currentUser.uid).update({'username': newUsername});
-    if (_user != null) {
-      _user = AppUser(
-        id: _user!.id,
-        email: _user!.email,
-        username: newUsername,
-        roles: _user!.roles,
-        shopId: _user!.shopId,
-        branchId: _user!.branchId,
-        branchName: _user!.branchName,
-      );
-    }
-    _safeNotify();
-  }
-
-  Future<void> updateEmail(String newEmail) async {
-    User? currentUser = _auth.currentUser;
-    if (currentUser == null) throw Exception("Not logged in");
-    await currentUser.updateEmail(newEmail);
-    await _db.collection('users').doc(currentUser.uid).update({'email': newEmail});
-  }
-
-  Future<void> signUp(String email, String password, String username, String shopName) async {
     try {
-      // 1. Create Auth User
-      UserCredential res = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      
-      if (res.user != null) {
-        // 2. Setup Shop
-        final shopDoc = await _db.collection('shops').add({
-          'name': shopName,
-          'createdAt': DateTime.now().toIso8601String(),
-          'plan': 'enterprise_trial',
-        });
+      // Query local users table
+      final localUsers = await DatabaseService().query('users', 
+        where: 'username = ? OR email = ?', 
+        whereArgs: [inputLower, inputLower]
+      );
 
-        // 3. Setup User Profile
-        final userData = {
-          'email': email,
-          'username': username.toLowerCase().trim(),
-          'roles': ['admin'],
-          'shopId': shopDoc.id,
-          'branchId': 'main',
-          'branchName': 'Main Branch',
-        };
-
-        await _db.collection('users').doc(res.user!.uid).set(userData);
-
-        _user = AppUser.fromMap(userData, res.user!.uid);
-        _safeNotify();
+      if (localUsers.isEmpty) {
+        throw Exception("Invalid username or password.");
       }
-    } on FirebaseAuthException catch (e) {
-      throw Exception(e.message ?? "Registration failed");
+
+      final userData = localUsers.first;
+      final storedHash = userData['passwordHash'] as String?;
+
+      if (storedHash != null && storedHash == hashedInput) {
+        final currency = await DatabaseService().getSetting('currency') ?? 'USD';
+        final userWithCurrency = {...userData, 'currency': currency};
+        
+        final newUser = AppUser.fromMap(userWithCurrency, userData['uid'].toString());
+        
+        if (!newUser.isActive) {
+          throw Exception("This account has been disabled by the administrator.");
+        }
+
+        _user = newUser;
+
+        _loginAttempts = 0;
+        _lockoutUntil = null;
+        
+        await DatabaseService().cacheUser(userWithCurrency);
+        _safeNotify();
+        debugPrint("OFFLINE MODE: Login successful for $identifier");
+      } else {
+        throw Exception("Invalid username or password.");
+      }
     } catch (e) {
-      throw Exception("Setup failed: $e");
+      debugPrint("Login Error: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> signUp(String email, String password, String username, String fullName, String shopName, {String? currency, String? country}) async {
+    final uid = const Uuid().v4();
+    final shopId = const Uuid().v4();
+    final usernameKey = username.toLowerCase().trim();
+    final emailLower = email.trim().toLowerCase();
+    final passwordTrimmed = password.trim();
+
+    final userData = {
+      'uid': uid,
+      'fullName': fullName.trim(),
+      'email': emailLower,
+      'username': usernameKey,
+      'roles': ['admin'],
+      'shopId': shopId,
+      'branchId': 'main',
+      'branchName': 'Main Branch',
+      'currency': currency ?? 'USD',
+      'country': country,
+      'permissions': jsonEncode({for (var p in AppUser.allPermissions) p: true}),
+      'passwordHash': _hashPassword(passwordTrimmed),
+      'isActive': true,
+    };
+
+    try {
+      // 1. Check if username or email already exists locally
+      final existing = await DatabaseService().query('users', 
+        where: 'username = ? OR email = ?', 
+        whereArgs: [usernameKey, email.trim().toLowerCase()]
+      );
+
+      if (existing.isNotEmpty) {
+        throw Exception("Username or email already in use.");
+      }
+
+      // 2. Save locally
+      await DatabaseService().saveUserRecord(userData);
+      
+      // 3. Save shop settings
+      await DatabaseService().saveSetting('shopName', shopName);
+      if (currency != null) {
+        await DatabaseService().saveSetting('currency', currency);
+      }
+
+      final authenticatedUser = {...userData, 'currency': currency ?? 'USD'};
+      _user = AppUser.fromMap(authenticatedUser, uid);
+      await DatabaseService().cacheUser(authenticatedUser);
+      _safeNotify();
+    } catch (e) {
+      throw Exception("Registration failed: $e");
+    }
+  }
+
+  Future<void> createStaffAccount({
+    required String email,
+    required String password,
+    required String username,
+    required String fullName,
+    required String shopId,
+    required String branchId,
+    required String branchName,
+    required String role, // Now literal string of UserRole
+    required Map<String, bool> permissions,
+  }) async {
+    final uid = const Uuid().v4();
+    final usernameKey = username.toLowerCase().trim();
+
+    final userData = {
+      'uid': uid,
+      'fullName': fullName.trim(),
+      'email': email.trim().toLowerCase(),
+      'username': usernameKey,
+      'roles': [role], // Use provided role
+      'shopId': shopId,
+      'branchId': branchId,
+      'branchName': branchName,
+      'permissions': permissions,
+      'passwordHash': _hashPassword(password.trim()),
+      'isActive': true,
+    };
+
+    try {
+      await DatabaseService().saveUserRecord(userData);
+    } catch (e) {
+      throw Exception("Failed to create user account locally: $e");
     }
   }
 
   Future<void> signOut() async {
-    await _auth.signOut();
+    SubscriptionService().clear();
+    await DatabaseService().clearCachedUser();
+    _user = null;
+    notifyListeners();
   }
 
-  // ── SHOP PROFILE MANAGEMENT ──────────────────────────────────────────────
-  
-  Stream<DocumentSnapshot> get shopStream {
-    if (_user == null) return const Stream.empty();
-    return _db.collection('shops').doc(_user!.shopId).snapshots().toMainThread();
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    return sha256.convert(bytes).toString();
+  }
+
+  // --- STUBS FOR TRANSITION ---
+  Future<void> resetPassword(String email) async {
+    throw Exception("Password reset is not available in standalone offline mode. Please contact your system administrator.");
+  }
+
+  Future<void> signInWithGoogle() async {
+    throw Exception("Cloud authentication is disabled in standalone offline mode.");
+  }
+
+  Stream<Map<String, dynamic>> get shopStream async* {
+    if (_user == null) return;
+    final name = await DatabaseService().getSetting('shopName');
+    yield {
+      'id': _user?.shopId ?? '',
+      'name': name ?? 'Local ERP',
+    };
   }
 
   Future<void> updateShop(String name, String phone) async {
-    if (_user == null) throw Exception("Not logged in");
-    await _db.collection('shops').doc(_user!.shopId).update({
-      'name': name.trim(),
-      'phone': phone.trim(),
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
-    
-    // Log as Audit log if needed, but here we just ensure Firestore is updated.
+    await DatabaseService().saveSetting('shopName', name);
+    await DatabaseService().saveSetting('shopPhone', phone);
     _safeNotify();
+  }
+
+  bool isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 }
 

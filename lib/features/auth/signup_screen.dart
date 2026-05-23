@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import '../../core/widgets/privacy_dialog.dart';
+import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/constants/colors.dart';
 
@@ -22,6 +24,13 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _loading = false;
   String? _error;
   bool _obscure = true;
+  bool _agreedToTerms = false;
+  String _selectedCurrency = 'USD';
+  String _selectedCountry = 'United States';
+
+  final List<String> _currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'ETB', 'KES', 'NGN', 'ZAR'];
+  final List<String> _countries = ['United States', 'Ethiopia', 'Kenya', 'Nigeria', 'South Africa', 'United Kingdom', 'Germany', 'France', 'Japan', 'Canada', 'Australia'];
+
 
   bool _hasUppercase = false;
   bool _hasDigits = false;
@@ -78,11 +87,27 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() { _loading = true; _error = null; });
     try {
-      await Provider.of<AuthService>(context, listen: false).signUp(
-        _emailController.text,
+      final email = _emailController.text.trim();
+      final auth = Provider.of<AuthService>(context, listen: false);
+      
+      if (!auth.isValidEmail(email)) {
+        setState(() { _loading = false; _error = "Please enter a valid email address."; });
+        return;
+      }
+      
+      if (!_agreedToTerms) {
+        setState(() { _loading = false; _error = "Please agree to the Privacy Policy and Terms of Service."; });
+        return;
+      }
+
+      await auth.signUp(
+        email,
         _passwordController.text,
         _usernameController.text,
+        _fullNameController.text,
         _shopNameController.text,
+        currency: _selectedCurrency,
+        country: _selectedCountry,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -112,11 +137,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Create Account', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                    const Text('Join SmartInventory Enterprise', style: TextStyle(color: AppColors.textSecondary)),
+                    const Text('Join Core Inventory Enterprise', style: TextStyle(color: AppColors.textSecondary)),
                     const SizedBox(height: 32),
                     TextField(
                       controller: _shopNameController,
-                      decoration: const InputDecoration(labelText: 'Pharmacy / Shop Name', prefixIcon: Icon(Icons.business_rounded)),
+                      decoration: const InputDecoration(labelText: 'Shop Name', prefixIcon: Icon(Icons.business_rounded)),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -136,6 +161,19 @@ class _SignupScreenState extends State<SignupScreen> {
                     TextField(
                       controller: _emailController,
                       decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined)),
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCountry,
+                      decoration: const InputDecoration(labelText: 'Country', prefixIcon: Icon(Icons.public)),
+                      items: _countries.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) => setState(() => _selectedCountry = v!),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCurrency,
+                      decoration: const InputDecoration(labelText: 'Primary Currency', prefixIcon: Icon(Icons.payments_outlined)),
+                      items: _currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (v) => setState(() => _selectedCurrency = v!),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -157,6 +195,22 @@ class _SignupScreenState extends State<SignupScreen> {
                       controller: _confirmPasswordController,
                       obscureText: _obscure,
                       decoration: const InputDecoration(labelText: 'Confirm Password', prefixIcon: Icon(Icons.lock_reset_rounded)),
+                    ),
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      value: _agreedToTerms,
+                      onChanged: (v) => setState(() => _agreedToTerms = v!),
+                      title: Wrap(
+                        children: [
+                          const Text('I agree to the ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          InkWell(
+                            onTap: () => showDialog(context: context, builder: (_) => const PrivacyPolicyDialog()),
+                            child: const Text('Privacy Policy & Terms', style: TextStyle(fontSize: 12, color: AppColors.secondary, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+                          ),
+                        ],
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
                     ),
                     const SizedBox(height: 32),
                     if (_error != null)

@@ -9,7 +9,7 @@ plugins {
 android {
     namespace = "com.example.pharmacy_inventory_management"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -49,4 +49,11 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
     implementation("com.google.firebase:firebase-analytics")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("androidx.core:core-ktx:1.15.0")
+        force("androidx.core:core:1.15.0")
+    }
 }
