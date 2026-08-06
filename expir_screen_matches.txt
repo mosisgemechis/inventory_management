@@ -1,0 +1,491 @@
+﻿
+lib\features\admin\admin_dash
+board_screen.dart:979:       
+     int expiredCount = 0;
+lib\features\admin\admin_dash
+board_screen.dart:992:       
+         final ed = 
+m['expiry'] ?? m['exp'];
+lib\features\admin\admin_dash
+board_screen.dart:997:       
+                  
+expiredCount++;
+lib\features\admin\admin_dash
+board_screen.dart:1090:      
+                if 
+(soonCount > 0 || 
+expiredCount > 0)
+lib\features\admin\admin_dash
+board_screen.dart:1092:      
+                    title: 
+'Expiry Alerts',
+lib\features\admin\admin_dash
+board_screen.dart:1093:      
+                    value: 
+'${soonCount + expiredCount} 
+items',
+lib\features\admin\admin_dash
+board_screen.dart:1094:      
+                    color: 
+expiredCount > 0 ? 
+AppColors.danger : 
+AppColors.warning,
+lib\features\admin\admin_dash
+board_screen.dart:1096:      
+                    change: 
+expiredCount > 0 ? "EXPIRED 
+Found" : "Expiring Soon",
+lib\features\admin\admin_dash
+board_screen.dart:2364:      
+            Widget? 
+expiryBadge;
+lib\features\admin\admin_dash
+board_screen.dart:2365:      
+            final ed = 
+d['expiry'] ?? d['exp'] ?? 
+d['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:2367:      
+              final expiry = 
+parseDT(ed);
+lib\features\admin\admin_dash
+board_screen.dart:2368:      
+              if (expiry != 
+null) {
+lib\features\admin\admin_dash
+board_screen.dart:2369:      
+                final days = 
+expiry.difference(DateTime.no
+w()).inDays;
+lib\features\admin\admin_dash
+board_screen.dart:2371:      
+                  
+expiryBadge = 
+PastelBadge(label: 'EXP: 
+${days.abs()}d ago', 
+baseColor: AppColors.danger);
+lib\features\admin\admin_dash
+board_screen.dart:2373:      
+                  
+expiryBadge = 
+PastelBadge(label: 'EXP: 
+${days}d left', baseColor: 
+AppColors.danger);
+lib\features\admin\admin_dash
+board_screen.dart:2375:      
+                  
+expiryBadge = 
+PastelBadge(label: 'EXP: 
+${days}d left', baseColor: 
+Colors.orange);
+lib\features\admin\admin_dash
+board_screen.dart:2397:      
+                    // Stock 
++ expiry badges
+lib\features\admin\admin_dash
+board_screen.dart:2403:      
+                        if 
+(expiryBadge != null) 
+expiryBadge,
+lib\features\admin\admin_dash
+board_screen.dart:2759:      
+              final exp = 
+parseDT(b['expiry'] ?? 
+b['exp'] ?? b['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:2760:      
+              final 
+isExpired = exp != null && 
+exp.isBefore(DateTime.now());
+lib\features\admin\admin_dash
+board_screen.dart:2761:      
+              return qty > 0 
+&& !isExpired;
+lib\features\admin\admin_dash
+board_screen.dart:2765:      
+               final da = 
+parseDT(a['expiry'] ?? 
+a['exp'] ?? a['expiryDate']) 
+?? DateTime(2100);
+lib\features\admin\admin_dash
+board_screen.dart:2766:      
+               final db = 
+parseDT(b['expiry'] ?? 
+b['exp'] ?? b['expiryDate']) 
+?? DateTime(2100);
+lib\features\admin\admin_dash
+board_screen.dart:3027:    
+DateTime? expiry = 
+parseDT(product['expiry'] ?? 
+product['exp']);
+lib\features\admin\admin_dash
+board_screen.dart:3058:      
+            title: 
+Text(expiry == null ? "Set 
+Expiry" : "Expires: 
+${DateFormat('dd MMM 
+yyyy').format(expiry!)}"),
+lib\features\admin\admin_dash
+board_screen.dart:3061:      
+              final d = 
+await 
+showDatePicker(context: 
+context, initialDate: expiry 
+?? DateTime.now(), 
+firstDate: DateTime.now(), 
+lastDate: DateTime(2040));
+lib\features\admin\admin_dash
+board_screen.dart:3062:      
+              if (d != null) 
+setS(() => expiry = d);
+lib\features\admin\admin_dash
+board_screen.dart:3101:      
+              'expiry': 
+expiry,
+lib\features\admin\admin_dash
+board_screen.dart:3221:    
+DateTime? expiry = parseDT(pr
+efillProduct?['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:3288:      
+                  title: 
+Text(expiry == null
+lib\features\admin\admin_dash
+board_screen.dart:3289:      
+                      ? "Set 
+Expiry (Optional)"
+lib\features\admin\admin_dash
+board_screen.dart:3290:      
+                      : 
+"Expires: ${DateFormat('dd 
+MMM 
+yyyy').format(expiry!)}"),
+lib\features\admin\admin_dash
+board_screen.dart:3299:      
+                      
+setS(() => expiry = d);
+lib\features\admin\admin_dash
+board_screen.dart:3380:      
+                  'expiry': 
+expiry,
+lib\features\admin\admin_dash
+board_screen.dart:3449:      
+      int expiringSoon = 0;
+lib\features\admin\admin_dash
+board_screen.dart:3456:      
+        final ed = 
+doc['expiry'] ?? doc['exp'] 
+?? doc['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:3460:      
+            expiringSoon++;
+lib\features\admin\admin_dash
+board_screen.dart:3587:      
+                      int 
+lowCount = 0, outCount = 0, 
+soonCount = 0, expiredCount 
+= 0;
+lib\features\admin\admin_dash
+board_screen.dart:3596:      
+                        
+final expiry = 
+m['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:3597:      
+                        if 
+(expiry != null) {
+lib\features\admin\admin_dash
+board_screen.dart:3598:      
+                          
+final date = (expiry is 
+DateTime)
+lib\features\admin\admin_dash
+board_screen.dart:3599:      
+                             
+ ? expiry
+lib\features\admin\admin_dash
+board_screen.dart:3600:      
+                             
+ : DateTime.tryParse(expiry.t
+oString());
+lib\features\admin\admin_dash
+board_screen.dart:3602:      
+                            
+if (date.isBefore(now)) 
+expiredCount++;
+lib\features\admin\admin_dash
+board_screen.dart:3624:      
+                        
+'expiredCount': expiredCount,
+lib\features\admin\admin_dash
+board_screen.dart:3761:      
+                      title: 
+'Expiring Soon',
+lib\features\admin\admin_dash
+board_screen.dart:3762:      
+                      value: 
+expiringSoon.toString(),
+lib\features\admin\admin_dash
+board_screen.dart:3879:      
+            final expired = 
+products.where((d) {
+lib\features\admin\admin_dash
+board_screen.dart:3881:      
+              final rawValue 
+= m['expiry'] ?? m['exp'] ?? 
+m['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:3885:      
+            final 
+expiringSoon = 
+products.where((d) {
+lib\features\admin\admin_dash
+board_screen.dart:3887:      
+              final rawValue 
+= m['expiry'] ?? m['exp'] ?? 
+m['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:3897:      
+                if 
+(expired.isNotEmpty) ...[
+lib\features\admin\admin_dash
+board_screen.dart:3899:      
+                      
+"Expired Products (Action 
+Required)",
+lib\features\admin\admin_dash
+board_screen.dart:3901:      
+                  _buildHoriz
+ontalInventoryList(expired, 
+cardDecor,
+lib\features\admin\admin_dash
+board_screen.dart:3905:      
+                if 
+(expiringSoon.isNotEmpty) 
+...[
+lib\features\admin\admin_dash
+board_screen.dart:3907:      
+                      
+"Expiring Soon (< 30 Days)", 
+Colors.orange),
+lib\features\admin\admin_dash
+board_screen.dart:3908:      
+                  _buildHoriz
+ontalInventoryList(expiringSo
+on, cardDecor,
+lib\features\admin\admin_dash
+board_screen.dart:4344:      
+                        
+final da = 
+parseDT(a['expiry'] ?? 
+a['exp'] ?? a['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:4345:      
+                        
+final db = 
+parseDT(b['expiry'] ?? 
+b['exp'] ?? b['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:4357:      
+                            
+final ed = b['expiry'] ?? 
+b['exp'] ?? b['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:4360:      
+                            
+final expStr = dVal != null 
+? DateFormat('dd MMM 
+yy').format(dVal) : 'No 
+Expiry';
+lib\features\admin\admin_dash
+board_screen.dart:4507:      
+              final rawValue 
+= d['expiry'] ?? d['exp'] ?? 
+d['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:4509:      
+              return 
+_detailRow("Expiry Date", 
+parsed != null 
+lib\features\admin\admin_dash
+board_screen.dart:4511:      
+                : "No 
+Expiry");
+lib\features\admin\admin_dash
+board_screen.dart:5063:      
+              final exp = 
+parseDT(b['expiry'] ?? 
+b['exp'] ?? b['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:5102:    
+DateTime? expiryDate = 
+parseDT(item?['expiry'] ?? 
+item?['exp'] ?? 
+item?['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:5184:      
+                  title: 
+Text(expiryDate == null
+lib\features\admin\admin_dash
+board_screen.dart:5185:      
+                      ? "Set 
+Expiry Date"
+lib\features\admin\admin_dash
+board_screen.dart:5186:      
+                      : 
+"Expires: ${DateFormat('dd 
+MMM yyyy').format(expiryDate!
+)}"),
+lib\features\admin\admin_dash
+board_screen.dart:5190:      
+                        
+initialDate: expiryDate ?? 
+DateTime.now(),
+lib\features\admin\admin_dash
+board_screen.dart:5193:      
+                    if 
+(picked != null) setS(() => 
+expiryDate = picked);
+lib\features\admin\admin_dash
+board_screen.dart:5274:      
+                    
+'expiryDate': expiryDate,
+lib\features\admin\admin_dash
+board_screen.dart:5298:      
+                        
+'expiry': expiryDate?.toIso86
+01String(),
+lib\features\admin\admin_dash
+board_screen.dart:5310:      
+                      // 
+Trigger recalibration of 
+main product stock/expiry 
+from all batches
+lib\features\admin\admin_dash
+board_screen.dart:5741:      
+final expiry = 
+parseDT(m['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:5742:      
+if (expiry != null) {
+lib\features\admin\admin_dash
+board_screen.dart:5743:      
+  final days = expiry.differe
+nce(now).inDays;
+lib\features\admin\admin_dash
+board_screen.dart:5764:      
+        final expiry = 
+parseDT(m['expiry'] ?? 
+m['exp'] ?? m['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:5765:      
+        final days = expiry?.
+difference(now).inDays ?? 
+999;
+lib\features\admin\admin_dash
+board_screen.dart:5766:      
+        bool isExpiring = 
+days >= 0 && days <= 30;
+lib\features\admin\admin_dash
+board_screen.dart:5768:      
+        bool isCritical = 
+(isLow && qty <= 2) || 
+(isExpiring && days <= 7);
+lib\features\admin\admin_dash
+board_screen.dart:5780:      
+                    
+Text(isExpiring ? "Expires 
+in $days days" : "Low Stock 
+Alert ($qty left)", 
+lib\features\admin\admin_dash
+board_screen.dart:5785:      
+              if (isExpiring)
+lib\features\admin\admin_dash
+board_screen.dart:5789:      
+                  child: 
+const Text("EXPIRING", 
+style: TextStyle(color: 
+AppColors.danger, fontSize: 
+8, fontWeight: 
+FontWeight.bold)),
+lib\features\admin\admin_dash
+board_screen.dart:6692:      
+    final ed = doc['expiry'] 
+?? doc['exp'] ?? 
+doc['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:6693:      
+    DateTime? expiry = ed != 
+null ? parseDT(ed) : null;
+lib\features\admin\admin_dash
+board_screen.dart:6694:      
+    if (expiry != null && 
+expiry.isBefore(now)) availab
+leFilters.add('Expired');
+lib\features\admin\admin_dash
+board_screen.dart:6695:      
+    else if (expiry != null 
+&& expiry.difference(now).inD
+ays <= 30) availableFilters.a
+dd('Expiring Soon');
+lib\features\admin\admin_dash
+board_screen.dart:6711:      
+    final ed = m['expiry'] 
+?? m['exp'] ?? 
+m['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:6719:      
+      case 'Expiring Soon': 
+ok = exp != null && 
+exp.isAfter(now) && 
+exp.difference(now).inDays 
+<= 30; break;
+lib\features\admin\admin_dash
+board_screen.dart:6720:      
+      case 'Expired': ok = 
+exp != null && 
+exp.isBefore(now); break;
+lib\features\admin\admin_dash
+board_screen.dart:6899:      
+    final exp = 
+parseDT(b['expiry'] ?? 
+b['exp'] ?? b['expiryDate']);
+lib\features\admin\admin_dash
+board_screen.dart:6920:      
+          
+_detailRow("Expiry", exp != 
+null ? DateFormat('MMM dd, 
+yyyy').format(exp) : "No 
+Expiry"),
+lib\features\admin\admin_dash
+board_screen.dart:6962:    
+final ed = d['expiry'] ?? 
+d['exp'] ?? d['expiryDate'];
+lib\features\admin\admin_dash
+board_screen.dart:6963:    
+Widget? expiryBadge;
+lib\features\admin\admin_dash
+board_screen.dart:6969:      
+    expiryBadge = const 
+PastelBadge(label: 
+'EXPIRED', baseColor: 
+AppColors.danger);
+lib\features\admin\admin_dash
+board_screen.dart:6971:      
+    expiryBadge = 
+PastelBadge(label: 'Expiring 
+Soon ($days d left)', 
+baseColor: AppColors.danger);
+lib\features\admin\admin_dash
+board_screen.dart:6973:      
+    expiryBadge = 
+PastelBadge(label: 'Expiring 
+Soon ($days d left)', 
+baseColor: Colors.orange);
+lib\features\admin\admin_dash
+board_screen.dart:7131:      
+                      if 
+(expiryBadge != null) 
+expiryBadge,
+
+

@@ -1,0 +1,112 @@
+﻿
+lib\features\admin\admin_dash
+board_screen.dart:803:    if 
+(type == 'stock_transfer' && 
+payload['recordId'] != null) 
+{
+lib\features\admin\admin_dash
+board_screen.dart:805:       
+ScaffoldMessenger.of(context)
+.showSnackBar(SnackBar(conten
+t: Text("Transfer Details: 
+${req['message']}")));
+lib\features\admin\admin_dash
+board_screen.dart:1936:      
+  targetMap[AppUser.pManageSt
+ockTransfers] = true;
+lib\features\admin\admin_dash
+board_screen.dart:1946:      
+  targetMap[AppUser.pManageSt
+ockTransfers] = true;
+lib\features\admin\admin_dash
+board_screen.dart:2207:      
+  onTransfer: () => _showTran
+sferStockDialog(user),
+lib\features\admin\admin_dash
+board_screen.dart:4225:  
+void _showTransferStockDialog
+(AppUser user) {
+lib\features\admin\admin_dash
+board_screen.dart:4230:    
+double transferQty = 0;
+lib\features\admin\admin_dash
+board_screen.dart:4238:      
+      title: const 
+Text("Transfer Stock Between 
+Branches"),
+lib\features\admin\admin_dash
+board_screen.dart:4373:      
+                  const 
+Text("Transfer Quantity", 
+style: TextStyle(fontWeight: 
+FontWeight.bold)),
+lib\features\admin\admin_dash
+board_screen.dart:4380:      
+                        
+transferQty = 
+double.tryParse(v) ?? 0;
+lib\features\admin\admin_dash
+board_screen.dart:4393:      
+          onPressed: 
+(sourceBranchId != null && 
+destBranchId != null && 
+selectedItemId != null && 
+transferQty > 0) ? () async {
+lib\features\admin\admin_dash
+board_screen.dart:4399:      
+               await 
+_repo.transferStock(
+lib\features\admin\admin_dash
+board_screen.dart:4405:      
+                  quantity: 
+transferQty,
+lib\features\admin\admin_dash
+board_screen.dart:4408:      
+               if (mounted) S
+caffoldMessenger.of(context).
+showSnackBar(const 
+SnackBar(content: 
+Text('Stock transferred 
+successfully!'), 
+backgroundColor: 
+AppColors.success));
+lib\features\admin\admin_dash
+board_screen.dart:4410:      
+               if (mounted) S
+caffoldMessenger.of(context).
+showSnackBar(SnackBar(content
+: Text('Transfer Failed: 
+$e'), backgroundColor: 
+AppColors.danger));
+lib\features\admin\admin_dash
+board_screen.dart:4415:      
+          child: const 
+Text("Transfer Stock"),
+lib\features\admin\admin_dash
+board_screen.dart:6589:  
+final VoidCallback 
+onTransfer;
+lib\features\admin\admin_dash
+board_screen.dart:6603:    
+required this.onTransfer,
+lib\features\admin\admin_dash
+board_screen.dart:6841:      
+    if (widget.user.hasPermis
+sion(AppUser.pTransferStock))
+lib\features\admin\admin_dash
+board_screen.dart:6842:      
+      _buildHeaderButton(onPr
+essed: widget.onTransfer, 
+icon: 
+Icons.swap_horiz_rounded, 
+label: "Transfer", color: 
+AppColors.secondary),
+lib\features\admin\admin_dash
+board_screen.dart:7541:      
+'INVENTORY': 
+[AppUser.pViewInventory, 
+AppUser.pAddEditProducts, 
+AppUser.pSetSellingPrice, 
+AppUser.pTransferStock],
+
+

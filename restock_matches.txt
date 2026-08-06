@@ -1,0 +1,147 @@
+﻿
+lib\features\admin\admin_dash
+board_screen.dart:2227:      
+  onRestock: (prefill) => _sh
+owQuickRestockDialog(user, 
+prefill),
+lib\features\admin\admin_dash
+board_screen.dart:2230:      
+  onRestockSearch: () => _sho
+wGlobalRestockSearchDialog(us
+er, isForPurchase: false),
+lib\features\admin\admin_dash
+board_screen.dart:2274:      
+            onPressed: () => 
+_showGlobalRestockSearchDialo
+g(user),
+lib\features\admin\admin_dash
+board_screen.dart:2282:      
+            label: const 
+Text("Restock"),
+lib\features\admin\admin_dash
+board_screen.dart:2889:      
+                      
+onPressed: () => _showGlobalR
+estockSearchDialog(user, 
+isForPurchase: true),
+lib\features\admin\admin_dash
+board_screen.dart:2891:      
+                      label: 
+const Text('Restock', style: 
+TextStyle(fontSize: 12)),
+lib\features\admin\admin_dash
+board_screen.dart:3053:    
+void _showQuickRestockDialog(
+AppUser user, Map<String, 
+dynamic> product) {
+lib\features\admin\admin_dash
+board_screen.dart:3066:      
+    title: Text("Restock: 
+${product['name']}"),
+lib\features\admin\admin_dash
+board_screen.dart:3126:      
+            await 
+_repo.recordRestock(user, {
+lib\features\admin\admin_dash
+board_screen.dart:3155:  
+void _showGlobalRestockSearch
+Dialog(AppUser user, {bool 
+isForPurchase = false}) {
+lib\features\admin\admin_dash
+board_screen.dart:3161:      
+    title: const 
+Text("Restock: Search 
+Inventory"),
+lib\features\admin\admin_dash
+board_screen.dart:3219:      
+                            _
+showQuickRestockDialog(user, 
+prefill);
+lib\features\admin\admin_dash
+board_screen.dart:3241:    
+final bool isRestock = 
+prefillProduct != null;
+lib\features\admin\admin_dash
+board_screen.dart:3242:    
+final bool showSupplierField 
+= !isRestock || 
+forceShowSupplier;
+lib\features\admin\admin_dash
+board_screen.dart:3278:      
+                    enabled: 
+!isRestock, // Identity 
+locked on direct restock
+lib\features\admin\admin_dash
+board_screen.dart:3285:      
+                    enabled: 
+!isRestock,
+lib\features\admin\admin_dash
+board_screen.dart:3404:      
+                  'itemId': 
+isRestock ? 
+prefillProduct['id'] : null, 
+lib\features\admin\admin_dash
+board_screen.dart:3416:      
+                if 
+(!isRestock) {
+lib\features\admin\admin_dash
+board_screen.dart:5039:      
+      child: const 
+Text("Update Existing 
+(Restock)"),
+lib\features\admin\admin_dash
+board_screen.dart:6129:      
+                    items: 
+['All Actions', 'SALE', 
+'REFUND', 'RESTOCK', 
+'PURCHASE', 'LOGIN']
+lib\features\admin\admin_dash
+board_screen.dart:6651:  
+final void 
+Function(Map<String, 
+dynamic> prefill) onRestock;
+lib\features\admin\admin_dash
+board_screen.dart:6654:  
+final VoidCallback 
+onRestockSearch;
+lib\features\admin\admin_dash
+board_screen.dart:6665:    
+required this.onRestock,
+lib\features\admin\admin_dash
+board_screen.dart:6668:    
+required 
+this.onRestockSearch,
+lib\features\admin\admin_dash
+board_screen.dart:6901:      
+    if (widget.user.hasPermis
+sion(AppUser.pRestockInventor
+y))
+lib\features\admin\admin_dash
+board_screen.dart:6902:      
+      _buildHeaderButton(onPr
+essed: 
+widget.onRestockSearch, 
+icon: 
+Icons.add_to_photos_rounded, 
+label: "Restock", color: 
+AppColors.info),
+lib\features\admin\admin_dash
+board_screen.dart:7055:      
+  if (widget.user.hasPermissi
+on(AppUser.pRestockInventory)
+)
+lib\features\admin\admin_dash
+board_screen.dart:7058:      
+      onPressed: () => 
+widget.onRestock({
+lib\features\admin\admin_dash
+board_screen.dart:7387:      
+        onPressed: 
+widget.onRestockSearch,
+lib\features\admin\admin_dash
+board_screen.dart:7395:      
+        label: const 
+Text("Restock", style: 
+TextStyle(fontSize: 11)),
+
+

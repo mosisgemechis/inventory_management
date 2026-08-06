@@ -1,0 +1,32 @@
+﻿
+lib\features\admin\admin_dash
+board_screen.dart:2194:      
+child: _InventoryTabView(
+lib\features\admin\admin_dash
+board_screen.dart:6573:// 
+_InventoryTabView — fully 
+self-contained inventory tab 
+widget.
+lib\features\admin\admin_dash
+board_screen.dart:6578:class 
+_InventoryTabView extends 
+StatefulWidget {
+lib\features\admin\admin_dash
+board_screen.dart:6592:  
+const _InventoryTabView({
+lib\features\admin\admin_dash
+board_screen.dart:6608:  
+State<_InventoryTabView> 
+createState() => 
+_InventoryTabViewState();
+lib\features\admin\admin_dash
+board_screen.dart:6611:class 
+_InventoryTabViewState 
+extends 
+State<_InventoryTabView> {
+lib\features\admin\admin_dash
+board_screen.dart:6658:  
+void didUpdateWidget(_Invento
+ryTabView oldWidget) {
+
+

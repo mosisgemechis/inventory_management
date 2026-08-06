@@ -46,6 +46,11 @@ class ReportingServiceImpl implements ReportingInterface {
   }
 
   @override
+  Future<String> exportReportToExcel(String fileName, Map<String, dynamic> data) async {
+    return "Excel export helper ready on native desktop/mobile.";
+  }
+
+  @override
   Future<String> exportToPdf(String fileName, Map<String, dynamic> data) async {
     return "PDF Export not yet optimized for Web. Use Desktop or Mobile.";
   }

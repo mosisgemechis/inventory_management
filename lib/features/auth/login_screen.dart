@@ -89,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                            BoxShadow(color: AppColors.secondary.withOpacity(0.2), blurRadius: 40, spreadRadius: 0)
                         ]
                       ),
-                      child: Image.asset('assets/logo.png', width: 80, height: 80, errorBuilder: (c, e, s) => const Icon(Icons.inventory_2_rounded, size: 64, color: AppColors.secondary)),
+                      child: const Icon(Icons.barcode_reader, size: 64, color: AppColors.secondary),
                     ).animate().fadeIn(duration: 1.seconds).scale(),
                     
                     const SizedBox(height: 24),

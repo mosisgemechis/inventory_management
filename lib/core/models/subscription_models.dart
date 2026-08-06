@@ -1,13 +1,6 @@
 import 'dart:convert';
 
-enum SubscriptionPlan { 
-  starter,
-  business, 
-  enterprise,
-  trial,
-  free,
-  none 
-}
+enum SubscriptionPlan { starter, business, enterprise, trial, free, none }
 
 enum SubscriptionAddOn {
   fefoBatchTracking,
@@ -25,23 +18,35 @@ enum SubscriptionAddOn {
 extension SubscriptionPlanExtension on SubscriptionPlan {
   String get name {
     switch (this) {
-      case SubscriptionPlan.starter: return "Starter";
-      case SubscriptionPlan.business: return "Business";
-      case SubscriptionPlan.enterprise: return "Enterprise";
-      case SubscriptionPlan.trial: return "Trial";
-      case SubscriptionPlan.free: return "Free";
-      default: return "None";
+      case SubscriptionPlan.starter:
+        return "Starter";
+      case SubscriptionPlan.business:
+        return "Business";
+      case SubscriptionPlan.enterprise:
+        return "Enterprise";
+      case SubscriptionPlan.trial:
+        return "Trial";
+      case SubscriptionPlan.free:
+        return "Free";
+      default:
+        return "None";
     }
   }
 
   double get price {
     switch (this) {
-      case SubscriptionPlan.starter: return 15;
-      case SubscriptionPlan.business: return 25;
-      case SubscriptionPlan.enterprise: return 25;
-      case SubscriptionPlan.trial: return 0;
-      case SubscriptionPlan.free: return 0;
-      default: return 0;
+      case SubscriptionPlan.starter:
+        return 15;
+      case SubscriptionPlan.business:
+        return 25;
+      case SubscriptionPlan.enterprise:
+        return 35;
+      case SubscriptionPlan.trial:
+        return 0;
+      case SubscriptionPlan.free:
+        return 0;
+      default:
+        return 0;
     }
   }
 }
@@ -49,16 +54,26 @@ extension SubscriptionPlanExtension on SubscriptionPlan {
 extension SubscriptionAddOnExtension on SubscriptionAddOn {
   String get name {
     switch (this) {
-      case SubscriptionAddOn.fefoBatchTracking: return "FEFO + Batch Tracking";
-      case SubscriptionAddOn.expiryTracking: return "Expiry Tracking";
-      case SubscriptionAddOn.advancedReports: return "Advanced Reports";
-      case SubscriptionAddOn.analyticsDashboard: return "Analytics Dashboard";
-      case SubscriptionAddOn.auditLogs: return "Audit Logs";
-      case SubscriptionAddOn.extraUser: return "Extra User";
-      case SubscriptionAddOn.extraBranch: return "Extra Branch";
-      case SubscriptionAddOn.advancedAnalyticsPack: return "Advanced Analytics Pack";
-      case SubscriptionAddOn.auditLogsPack: return "Audit Logs Pack";
-      case SubscriptionAddOn.prioritySupport: return "Priority Support";
+      case SubscriptionAddOn.fefoBatchTracking:
+        return "FEFO + Batch Tracking";
+      case SubscriptionAddOn.expiryTracking:
+        return "Expiry Tracking";
+      case SubscriptionAddOn.advancedReports:
+        return "Advanced Reports";
+      case SubscriptionAddOn.analyticsDashboard:
+        return "Analytics Dashboard";
+      case SubscriptionAddOn.auditLogs:
+        return "Audit Logs";
+      case SubscriptionAddOn.extraUser:
+        return "Extra User";
+      case SubscriptionAddOn.extraBranch:
+        return "Extra Branch";
+      case SubscriptionAddOn.advancedAnalyticsPack:
+        return "Advanced Analytics Pack";
+      case SubscriptionAddOn.auditLogsPack:
+        return "Audit Logs Pack";
+      case SubscriptionAddOn.prioritySupport:
+        return "Priority Support";
     }
   }
 
@@ -66,32 +81,51 @@ extension SubscriptionAddOnExtension on SubscriptionAddOn {
     switch (plan) {
       case SubscriptionPlan.starter:
         switch (this) {
-          case SubscriptionAddOn.fefoBatchTracking: return 5;
-          case SubscriptionAddOn.expiryTracking: return 3;
-          case SubscriptionAddOn.advancedReports: return 4;
-          case SubscriptionAddOn.analyticsDashboard: return 4;
-          case SubscriptionAddOn.auditLogs: return 3;
-          case SubscriptionAddOn.extraUser: return 2;
-          case SubscriptionAddOn.extraBranch: return 5;
-          default: return 0;
+          case SubscriptionAddOn.fefoBatchTracking:
+            return 5;
+          case SubscriptionAddOn.expiryTracking:
+            return 3;
+          case SubscriptionAddOn.advancedReports:
+            return 4;
+          case SubscriptionAddOn.analyticsDashboard:
+            return 4;
+          case SubscriptionAddOn.auditLogs:
+            return 3;
+          case SubscriptionAddOn.extraUser:
+            return 2;
+          case SubscriptionAddOn.extraBranch:
+            return 5;
+          default:
+            return 0;
         }
       case SubscriptionPlan.business:
         switch (this) {
-          case SubscriptionAddOn.extraUser: return 2;
-          case SubscriptionAddOn.extraBranch: return 5;
-          case SubscriptionAddOn.advancedAnalyticsPack: return 4;
-          case SubscriptionAddOn.auditLogsPack: return 3;
-          default: return 0;
+          case SubscriptionAddOn.extraUser:
+            return 1;
+          case SubscriptionAddOn.extraBranch:
+            return 2;
+          case SubscriptionAddOn.advancedAnalyticsPack:
+            return 2;
+          case SubscriptionAddOn.auditLogsPack:
+            return 1;
+          default:
+            return 0;
         }
       case SubscriptionPlan.enterprise:
         switch (this) {
-          case SubscriptionAddOn.extraUser: return 1.50;
-          case SubscriptionAddOn.extraBranch: return 4;
-          case SubscriptionAddOn.prioritySupport: return 5;
-          case SubscriptionAddOn.advancedAnalyticsPack: return 3.50;
-          default: return 0;
+          case SubscriptionAddOn.extraUser:
+            return 1;
+          case SubscriptionAddOn.extraBranch:
+            return 2;
+          case SubscriptionAddOn.advancedAnalyticsPack:
+            return 2;
+          case SubscriptionAddOn.auditLogsPack:
+            return 1;
+          default:
+            return 0;
         }
-      default: return 0;
+      default:
+        return 0;
     }
   }
 }
@@ -129,7 +163,7 @@ class ActiveSubscription {
   final SubscriptionPlan plan;
   final DateTime activationDate;
   final DateTime expiryDate;
-  final List<SubscriptionAddOn> addOns; 
+  final List<SubscriptionAddOn> addOns;
   final bool isTrial;
   final int userLimit;
   final int branchLimit;
@@ -215,17 +249,22 @@ class ActiveSubscription {
 
   static List<Feature> _getAddOnFeatures(SubscriptionAddOn addon) {
     switch (addon) {
-      case SubscriptionAddOn.fefoBatchTracking: return [Feature.fefoTracking];
-      case SubscriptionAddOn.expiryTracking: return [Feature.expiryTracking];
-      case SubscriptionAddOn.advancedReports: return [Feature.advancedReports];
-      case SubscriptionAddOn.analyticsDashboard: 
+      case SubscriptionAddOn.fefoBatchTracking:
+        return [Feature.fefoTracking];
+      case SubscriptionAddOn.expiryTracking:
+        return [Feature.expiryTracking];
+      case SubscriptionAddOn.advancedReports:
+        return [Feature.advancedReports];
+      case SubscriptionAddOn.analyticsDashboard:
       case SubscriptionAddOn.advancedAnalyticsPack:
         return [Feature.analyticsDashboard];
       case SubscriptionAddOn.auditLogs:
       case SubscriptionAddOn.auditLogsPack:
         return [Feature.auditLogs];
-      case SubscriptionAddOn.extraBranch: return [Feature.multiBranchManagement];
-      default: return [];
+      case SubscriptionAddOn.extraBranch:
+        return [Feature.multiBranchManagement];
+      default:
+        return [];
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:drift/native.dart';
 
 part 'app_database.g.dart';
 
@@ -29,7 +30,17 @@ class Products extends SyncableTable {
   TextColumn get imageUrl => text().nullable()();
 
   @override
-  Set<Column> get primaryKey => {id};
+  Set<Column> get primaryKey => {id, branchId};
+}
+
+class ProductStocks extends SyncableTable {
+  TextColumn get shopId => text()();
+  TextColumn get productId => text()();
+  TextColumn get branchId => text()();
+  RealColumn get quantity => real().withDefault(const Constant(0.0))();
+
+  @override
+  Set<Column> get primaryKey => {shopId, productId, branchId};
 }
 
 class Sales extends SyncableTable {
@@ -49,6 +60,10 @@ class Sales extends SyncableTable {
   RealColumn get amountPaid => real().withDefault(const Constant(0.0))();
   RealColumn get debtRemaining => real().withDefault(const Constant(0.0))();
   TextColumn get saleGroupId => text().nullable()();
+  RealColumn get refundedQuantity => real().withDefault(const Constant(0.0))();
+  /// Stores the primary batch ID deducted during this sale line.
+  /// Used at refund time to restore stock to the exact original batch (FEFO/FIFO integrity).
+  TextColumn get batchId => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -93,10 +108,12 @@ class Batches extends SyncableTable {
   TextColumn get itemId => text()();
   RealColumn get quantity => real()();
   RealColumn get buyingPrice => real()();
+  RealColumn get sellingPrice => real().nullable()();
   DateTimeColumn get expiryDate => dateTime().nullable()();
   TextColumn get batchNumber => text().nullable()();
   DateTimeColumn get timestamp => dateTime()();
   TextColumn get branchId => text().withDefault(const Constant('main'))();
+  TextColumn get type => text().nullable()(); // initial | restock | import | adjustment
 
   @override
   Set<Column> get primaryKey => {id};
@@ -154,12 +171,19 @@ class Notifications extends SyncableTable {
   TextColumn get id => text()();
   TextColumn get shopId => text()();
   TextColumn get title => text()();
-  TextColumn get message => text()();
+  TextColumn get body => text()(); // Renamed from message for consistency
   TextColumn get type => text()(); // 'pricing_alert', 'low_stock', etc.
+  TextColumn get priority => text().withDefault(const Constant('normal'))(); // low|normal|high
+  TextColumn get relatedEntityId => text().nullable()(); // productId / saleId / etc
+  TextColumn get createdBy => text().nullable()(); // userId/username
   TextColumn get targetRole => text().nullable()();
   TextColumn get itemId => text().nullable()();
+  /// Branch that generated this notification (nullable for shop-wide alerts).
+  TextColumn get branchId => text().nullable()();
   BoolColumn get isRead => boolean().withDefault(const Constant(false))();
   DateTimeColumn get timestamp => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get route => text().nullable()();
+  TextColumn get payloadJson => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -196,6 +220,12 @@ class ProductsDao extends DatabaseAccessor<AppDatabase> with _$ProductsDaoMixin 
     
   Future<int> upsert(Insertable<Product> product) => 
     into(products).insertOnConflictUpdate(product);
+}
+
+@DriftAccessor(tables: [ProductStocks])
+class ProductStocksDao extends DatabaseAccessor<AppDatabase>
+    with _$ProductStocksDaoMixin {
+  ProductStocksDao(AppDatabase db) : super(db);
 }
 
 @DriftAccessor(tables: [Sales])
@@ -317,6 +347,7 @@ class Subscriptions extends Table {
 @DriftDatabase(
   tables: [
     Products,
+    ProductStocks,
     Sales,
     Suppliers,
     Purchases,
@@ -331,6 +362,7 @@ class Subscriptions extends Table {
   ],
   daos: [
     ProductsDao,
+    ProductStocksDao,
     SalesDao,
     DebtsDao,
     UsersDao,
@@ -342,8 +374,12 @@ class Subscriptions extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// Test hook: set `AppDatabase.forceInMemory = true` before constructing
+  /// [DatabaseService]/[AppDatabase] to avoid plugin dependencies in widget tests.
+  static bool forceInMemory = false;
+
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -354,8 +390,8 @@ class AppDatabase extends _$AppDatabase {
        }
        if (from < 9) {
          try { 
-           await m.addColumn(batches, batches.branchId);
-           await m.addColumn(purchases, purchases.branchId);
+            await m.addColumn(batches, batches.branchId);
+            await m.addColumn(purchases, purchases.branchId);
          } catch (_) {}
        }
        if (from < 10) {
@@ -395,11 +431,87 @@ class AppDatabase extends _$AppDatabase {
          try { await m.addColumn(syncOutbox, syncOutbox.userId); } catch (_) {}
          try { await m.addColumn(syncOutbox, syncOutbox.updatedAt); } catch (_) {}
        }
+       if (from < 15) {
+          try { await m.addColumn(notifications, notifications.route as GeneratedColumn<Object>); } catch (_) {}
+          try { await m.addColumn(notifications, notifications.payloadJson as GeneratedColumn<Object>); } catch (_) {}
+       }
+       if (from < 16) {
+         try { await m.addColumn(notifications, notifications.priority); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.relatedEntityId); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.createdBy); } catch (_) {}
+       }
+       if (from < 17) {
+         try { await m.createTable(productStocks); } catch (_) {}
+       }
+       if (from < 18) {
+         try {
+            await m.renameColumn(notifications, 'message', notifications.body);
+         } catch (_) {}
+         try { await m.addColumn(notifications, notifications.body); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.priority); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.relatedEntityId); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.createdBy); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.route); } catch (_) {}
+         try { await m.addColumn(notifications, notifications.payloadJson); } catch (_) {}
+       }
+       if (from < 19) {
+         try { await m.addColumn(sales, sales.refundedQuantity); } catch (_) {}
+       }
+       if (from < 20) {
+         try { await m.addColumn(batches, batches.type as GeneratedColumn<Object>); } catch (_) {}
+       }
+       if (from < 22) {
+         try { 
+           await m.renameColumn(batches, 'expiry', (batches as dynamic).expiryDate); 
+           await m.renameColumn(products, 'expiry', (products as dynamic).expiryDate);
+         } catch (_) {}
+       }
+       if (from < 24) {
+         try { 
+           await m.addColumn(batches, batches.sellingPrice); 
+         } catch (_) {}
+       }
+       if (from < 26) {
+         // Critical Architecture Change: Products table needs composite PK {id, branchId}
+         // to support independent pricing and thresholds per branch.
+         try {
+           await customStatement('ALTER TABLE products RENAME TO products_old;');
+           await m.createTable(products);
+           await customStatement('''
+             INSERT INTO products (
+               id, shop_id, branch_id, name, barcode, quantity, 
+               buying_price, selling_price, low_stock_threshold, 
+               expiry_date, batch_number, image_url, 
+               remote_id, version, sync_status, last_modified
+             ) 
+             SELECT 
+               id, shop_id, branch_id, name, barcode, quantity, 
+               buying_price, selling_price, low_stock_threshold, 
+               expiry_date, batch_number, image_url, 
+               remote_id, version, sync_status, last_modified 
+             FROM products_old;
+           ''');
+           try { await customStatement('DROP TABLE products_old;'); } catch (_) {}
+         } catch (e) {
+           print("Migration 26 Failed: $e");
+         }
+       }
+       if (from < 27) {
+         try { await m.addColumn(sales, sales.batchId); } catch (_) {}
+       }
+       if (from < 28) {
+         // Add branchId to notifications for per-branch alert isolation.
+         try { await m.addColumn(notifications, notifications.branchId); } catch (_) {}
+       }
        await m.createAll(); // For any new tables
     },
   );
 
   static QueryExecutor _openConnection() {
+    // Widget tests run without platform plugins (path_provider). Use in-memory DB there.
+    if (forceInMemory) {
+      return NativeDatabase.memory();
+    }
     return driftDatabase(name: 'inventory_db');
   }
 }

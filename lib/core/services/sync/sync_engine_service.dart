@@ -463,7 +463,7 @@ class SyncEngineService {
             id: recordId,
             shopId: payload['shopId']?.toString() ?? '',
             title: payload['title']?.toString() ?? '',
-            message: payload['message']?.toString() ?? '',
+            body: payload['message']?.toString() ?? '',
             type: payload['type']?.toString() ?? 'info',
             targetRole: Value(payload['targetRole']?.toString()),
             itemId: Value(payload['itemId']?.toString()),

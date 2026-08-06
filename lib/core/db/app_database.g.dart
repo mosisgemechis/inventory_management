@@ -6,6 +6,9 @@ part of 'app_database.dart';
 mixin _$ProductsDaoMixin on DatabaseAccessor<AppDatabase> {
   $ProductsTable get products => attachedDatabase.products;
 }
+mixin _$ProductStocksDaoMixin on DatabaseAccessor<AppDatabase> {
+  $ProductStocksTable get productStocks => attachedDatabase.productStocks;
+}
 mixin _$SalesDaoMixin on DatabaseAccessor<AppDatabase> {
   $SalesTable get sales => attachedDatabase.sales;
 }
@@ -258,7 +261,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {id};
+  Set<GeneratedColumn> get $primaryKey => {id, branchId};
   @override
   Product map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -794,6 +797,440 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   }
 }
 
+class $ProductStocksTable extends ProductStocks
+    with TableInfo<$ProductStocksTable, ProductStock> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductStocksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('synced'));
+  static const VerificationMeta _lastModifiedMeta =
+      const VerificationMeta('lastModified');
+  @override
+  late final GeneratedColumn<DateTime> lastModified = GeneratedColumn<DateTime>(
+      'last_modified', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _remoteIdMeta =
+      const VerificationMeta('remoteId');
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+      'remote_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _versionMeta =
+      const VerificationMeta('version');
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+      'version', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _shopIdMeta = const VerificationMeta('shopId');
+  @override
+  late final GeneratedColumn<String> shopId = GeneratedColumn<String>(
+      'shop_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _productIdMeta =
+      const VerificationMeta('productId');
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+      'product_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _quantityMeta =
+      const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+      'quantity', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  @override
+  List<GeneratedColumn> get $columns => [
+        syncStatus,
+        lastModified,
+        remoteId,
+        version,
+        shopId,
+        productId,
+        branchId,
+        quantity
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_stocks';
+  @override
+  VerificationContext validateIntegrity(Insertable<ProductStock> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
+    if (data.containsKey('last_modified')) {
+      context.handle(
+          _lastModifiedMeta,
+          lastModified.isAcceptableOrUnknown(
+              data['last_modified']!, _lastModifiedMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(_remoteIdMeta,
+          remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta));
+    }
+    if (data.containsKey('version')) {
+      context.handle(_versionMeta,
+          version.isAcceptableOrUnknown(data['version']!, _versionMeta));
+    }
+    if (data.containsKey('shop_id')) {
+      context.handle(_shopIdMeta,
+          shopId.isAcceptableOrUnknown(data['shop_id']!, _shopIdMeta));
+    } else if (isInserting) {
+      context.missing(_shopIdMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(_productIdMeta,
+          productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta));
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    } else if (isInserting) {
+      context.missing(_branchIdMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta,
+          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {shopId, productId, branchId};
+  @override
+  ProductStock map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductStock(
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      lastModified: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_modified'])!,
+      remoteId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remote_id']),
+      version: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}version'])!,
+      shopId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}shop_id'])!,
+      productId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}product_id'])!,
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}quantity'])!,
+    );
+  }
+
+  @override
+  $ProductStocksTable createAlias(String alias) {
+    return $ProductStocksTable(attachedDatabase, alias);
+  }
+}
+
+class ProductStock extends DataClass implements Insertable<ProductStock> {
+  final String syncStatus;
+  final DateTime lastModified;
+  final String? remoteId;
+  final int version;
+  final String shopId;
+  final String productId;
+  final String branchId;
+  final double quantity;
+  const ProductStock(
+      {required this.syncStatus,
+      required this.lastModified,
+      this.remoteId,
+      required this.version,
+      required this.shopId,
+      required this.productId,
+      required this.branchId,
+      required this.quantity});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['sync_status'] = Variable<String>(syncStatus);
+    map['last_modified'] = Variable<DateTime>(lastModified);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
+    }
+    map['version'] = Variable<int>(version);
+    map['shop_id'] = Variable<String>(shopId);
+    map['product_id'] = Variable<String>(productId);
+    map['branch_id'] = Variable<String>(branchId);
+    map['quantity'] = Variable<double>(quantity);
+    return map;
+  }
+
+  ProductStocksCompanion toCompanion(bool nullToAbsent) {
+    return ProductStocksCompanion(
+      syncStatus: Value(syncStatus),
+      lastModified: Value(lastModified),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      version: Value(version),
+      shopId: Value(shopId),
+      productId: Value(productId),
+      branchId: Value(branchId),
+      quantity: Value(quantity),
+    );
+  }
+
+  factory ProductStock.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductStock(
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      lastModified: serializer.fromJson<DateTime>(json['lastModified']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
+      version: serializer.fromJson<int>(json['version']),
+      shopId: serializer.fromJson<String>(json['shopId']),
+      productId: serializer.fromJson<String>(json['productId']),
+      branchId: serializer.fromJson<String>(json['branchId']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'lastModified': serializer.toJson<DateTime>(lastModified),
+      'remoteId': serializer.toJson<String?>(remoteId),
+      'version': serializer.toJson<int>(version),
+      'shopId': serializer.toJson<String>(shopId),
+      'productId': serializer.toJson<String>(productId),
+      'branchId': serializer.toJson<String>(branchId),
+      'quantity': serializer.toJson<double>(quantity),
+    };
+  }
+
+  ProductStock copyWith(
+          {String? syncStatus,
+          DateTime? lastModified,
+          Value<String?> remoteId = const Value.absent(),
+          int? version,
+          String? shopId,
+          String? productId,
+          String? branchId,
+          double? quantity}) =>
+      ProductStock(
+        syncStatus: syncStatus ?? this.syncStatus,
+        lastModified: lastModified ?? this.lastModified,
+        remoteId: remoteId.present ? remoteId.value : this.remoteId,
+        version: version ?? this.version,
+        shopId: shopId ?? this.shopId,
+        productId: productId ?? this.productId,
+        branchId: branchId ?? this.branchId,
+        quantity: quantity ?? this.quantity,
+      );
+  ProductStock copyWithCompanion(ProductStocksCompanion data) {
+    return ProductStock(
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      lastModified: data.lastModified.present
+          ? data.lastModified.value
+          : this.lastModified,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      version: data.version.present ? data.version.value : this.version,
+      shopId: data.shopId.present ? data.shopId.value : this.shopId,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductStock(')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastModified: $lastModified, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('version: $version, ')
+          ..write('shopId: $shopId, ')
+          ..write('productId: $productId, ')
+          ..write('branchId: $branchId, ')
+          ..write('quantity: $quantity')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(syncStatus, lastModified, remoteId, version,
+      shopId, productId, branchId, quantity);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductStock &&
+          other.syncStatus == this.syncStatus &&
+          other.lastModified == this.lastModified &&
+          other.remoteId == this.remoteId &&
+          other.version == this.version &&
+          other.shopId == this.shopId &&
+          other.productId == this.productId &&
+          other.branchId == this.branchId &&
+          other.quantity == this.quantity);
+}
+
+class ProductStocksCompanion extends UpdateCompanion<ProductStock> {
+  final Value<String> syncStatus;
+  final Value<DateTime> lastModified;
+  final Value<String?> remoteId;
+  final Value<int> version;
+  final Value<String> shopId;
+  final Value<String> productId;
+  final Value<String> branchId;
+  final Value<double> quantity;
+  final Value<int> rowid;
+  const ProductStocksCompanion({
+    this.syncStatus = const Value.absent(),
+    this.lastModified = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.shopId = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.branchId = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductStocksCompanion.insert({
+    this.syncStatus = const Value.absent(),
+    this.lastModified = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.version = const Value.absent(),
+    required String shopId,
+    required String productId,
+    required String branchId,
+    this.quantity = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : shopId = Value(shopId),
+        productId = Value(productId),
+        branchId = Value(branchId);
+  static Insertable<ProductStock> custom({
+    Expression<String>? syncStatus,
+    Expression<DateTime>? lastModified,
+    Expression<String>? remoteId,
+    Expression<int>? version,
+    Expression<String>? shopId,
+    Expression<String>? productId,
+    Expression<String>? branchId,
+    Expression<double>? quantity,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (lastModified != null) 'last_modified': lastModified,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (version != null) 'version': version,
+      if (shopId != null) 'shop_id': shopId,
+      if (productId != null) 'product_id': productId,
+      if (branchId != null) 'branch_id': branchId,
+      if (quantity != null) 'quantity': quantity,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductStocksCompanion copyWith(
+      {Value<String>? syncStatus,
+      Value<DateTime>? lastModified,
+      Value<String?>? remoteId,
+      Value<int>? version,
+      Value<String>? shopId,
+      Value<String>? productId,
+      Value<String>? branchId,
+      Value<double>? quantity,
+      Value<int>? rowid}) {
+    return ProductStocksCompanion(
+      syncStatus: syncStatus ?? this.syncStatus,
+      lastModified: lastModified ?? this.lastModified,
+      remoteId: remoteId ?? this.remoteId,
+      version: version ?? this.version,
+      shopId: shopId ?? this.shopId,
+      productId: productId ?? this.productId,
+      branchId: branchId ?? this.branchId,
+      quantity: quantity ?? this.quantity,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (lastModified.present) {
+      map['last_modified'] = Variable<DateTime>(lastModified.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (shopId.present) {
+      map['shop_id'] = Variable<String>(shopId.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductStocksCompanion(')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('lastModified: $lastModified, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('version: $version, ')
+          ..write('shopId: $shopId, ')
+          ..write('productId: $productId, ')
+          ..write('branchId: $branchId, ')
+          ..write('quantity: $quantity, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -927,6 +1364,20 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
   late final GeneratedColumn<String> saleGroupId = GeneratedColumn<String>(
       'sale_group_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _refundedQuantityMeta =
+      const VerificationMeta('refundedQuantity');
+  @override
+  late final GeneratedColumn<double> refundedQuantity = GeneratedColumn<double>(
+      'refunded_quantity', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _batchIdMeta =
+      const VerificationMeta('batchId');
+  @override
+  late final GeneratedColumn<String> batchId = GeneratedColumn<String>(
+      'batch_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         syncStatus,
@@ -948,7 +1399,9 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
         isDebt,
         amountPaid,
         debtRemaining,
-        saleGroupId
+        saleGroupId,
+        refundedQuantity,
+        batchId
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1075,6 +1528,16 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
           saleGroupId.isAcceptableOrUnknown(
               data['sale_group_id']!, _saleGroupIdMeta));
     }
+    if (data.containsKey('refunded_quantity')) {
+      context.handle(
+          _refundedQuantityMeta,
+          refundedQuantity.isAcceptableOrUnknown(
+              data['refunded_quantity']!, _refundedQuantityMeta));
+    }
+    if (data.containsKey('batch_id')) {
+      context.handle(_batchIdMeta,
+          batchId.isAcceptableOrUnknown(data['batch_id']!, _batchIdMeta));
+    }
     return context;
   }
 
@@ -1124,6 +1587,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, Sale> {
           .read(DriftSqlType.double, data['${effectivePrefix}debt_remaining'])!,
       saleGroupId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sale_group_id']),
+      refundedQuantity: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}refunded_quantity'])!,
+      batchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}batch_id']),
     );
   }
 
@@ -1154,6 +1621,11 @@ class Sale extends DataClass implements Insertable<Sale> {
   final double amountPaid;
   final double debtRemaining;
   final String? saleGroupId;
+  final double refundedQuantity;
+
+  /// Stores the primary batch ID deducted during this sale line.
+  /// Used at refund time to restore stock to the exact original batch (FEFO/FIFO integrity).
+  final String? batchId;
   const Sale(
       {required this.syncStatus,
       required this.lastModified,
@@ -1174,7 +1646,9 @@ class Sale extends DataClass implements Insertable<Sale> {
       required this.isDebt,
       required this.amountPaid,
       required this.debtRemaining,
-      this.saleGroupId});
+      this.saleGroupId,
+      required this.refundedQuantity,
+      this.batchId});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1203,6 +1677,10 @@ class Sale extends DataClass implements Insertable<Sale> {
     map['debt_remaining'] = Variable<double>(debtRemaining);
     if (!nullToAbsent || saleGroupId != null) {
       map['sale_group_id'] = Variable<String>(saleGroupId);
+    }
+    map['refunded_quantity'] = Variable<double>(refundedQuantity);
+    if (!nullToAbsent || batchId != null) {
+      map['batch_id'] = Variable<String>(batchId);
     }
     return map;
   }
@@ -1235,6 +1713,10 @@ class Sale extends DataClass implements Insertable<Sale> {
       saleGroupId: saleGroupId == null && nullToAbsent
           ? const Value.absent()
           : Value(saleGroupId),
+      refundedQuantity: Value(refundedQuantity),
+      batchId: batchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(batchId),
     );
   }
 
@@ -1262,6 +1744,8 @@ class Sale extends DataClass implements Insertable<Sale> {
       amountPaid: serializer.fromJson<double>(json['amountPaid']),
       debtRemaining: serializer.fromJson<double>(json['debtRemaining']),
       saleGroupId: serializer.fromJson<String?>(json['saleGroupId']),
+      refundedQuantity: serializer.fromJson<double>(json['refundedQuantity']),
+      batchId: serializer.fromJson<String?>(json['batchId']),
     );
   }
   @override
@@ -1288,6 +1772,8 @@ class Sale extends DataClass implements Insertable<Sale> {
       'amountPaid': serializer.toJson<double>(amountPaid),
       'debtRemaining': serializer.toJson<double>(debtRemaining),
       'saleGroupId': serializer.toJson<String?>(saleGroupId),
+      'refundedQuantity': serializer.toJson<double>(refundedQuantity),
+      'batchId': serializer.toJson<String?>(batchId),
     };
   }
 
@@ -1311,7 +1797,9 @@ class Sale extends DataClass implements Insertable<Sale> {
           bool? isDebt,
           double? amountPaid,
           double? debtRemaining,
-          Value<String?> saleGroupId = const Value.absent()}) =>
+          Value<String?> saleGroupId = const Value.absent(),
+          double? refundedQuantity,
+          Value<String?> batchId = const Value.absent()}) =>
       Sale(
         syncStatus: syncStatus ?? this.syncStatus,
         lastModified: lastModified ?? this.lastModified,
@@ -1334,6 +1822,8 @@ class Sale extends DataClass implements Insertable<Sale> {
         amountPaid: amountPaid ?? this.amountPaid,
         debtRemaining: debtRemaining ?? this.debtRemaining,
         saleGroupId: saleGroupId.present ? saleGroupId.value : this.saleGroupId,
+        refundedQuantity: refundedQuantity ?? this.refundedQuantity,
+        batchId: batchId.present ? batchId.value : this.batchId,
       );
   Sale copyWithCompanion(SalesCompanion data) {
     return Sale(
@@ -1367,6 +1857,10 @@ class Sale extends DataClass implements Insertable<Sale> {
           : this.debtRemaining,
       saleGroupId:
           data.saleGroupId.present ? data.saleGroupId.value : this.saleGroupId,
+      refundedQuantity: data.refundedQuantity.present
+          ? data.refundedQuantity.value
+          : this.refundedQuantity,
+      batchId: data.batchId.present ? data.batchId.value : this.batchId,
     );
   }
 
@@ -1392,33 +1886,38 @@ class Sale extends DataClass implements Insertable<Sale> {
           ..write('isDebt: $isDebt, ')
           ..write('amountPaid: $amountPaid, ')
           ..write('debtRemaining: $debtRemaining, ')
-          ..write('saleGroupId: $saleGroupId')
+          ..write('saleGroupId: $saleGroupId, ')
+          ..write('refundedQuantity: $refundedQuantity, ')
+          ..write('batchId: $batchId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      syncStatus,
-      lastModified,
-      remoteId,
-      version,
-      id,
-      shopId,
-      branchId,
-      itemId,
-      itemName,
-      quantity,
-      totalPrice,
-      profit,
-      userId,
-      username,
-      timestamp,
-      customerName,
-      isDebt,
-      amountPaid,
-      debtRemaining,
-      saleGroupId);
+  int get hashCode => Object.hashAll([
+        syncStatus,
+        lastModified,
+        remoteId,
+        version,
+        id,
+        shopId,
+        branchId,
+        itemId,
+        itemName,
+        quantity,
+        totalPrice,
+        profit,
+        userId,
+        username,
+        timestamp,
+        customerName,
+        isDebt,
+        amountPaid,
+        debtRemaining,
+        saleGroupId,
+        refundedQuantity,
+        batchId
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1442,7 +1941,9 @@ class Sale extends DataClass implements Insertable<Sale> {
           other.isDebt == this.isDebt &&
           other.amountPaid == this.amountPaid &&
           other.debtRemaining == this.debtRemaining &&
-          other.saleGroupId == this.saleGroupId);
+          other.saleGroupId == this.saleGroupId &&
+          other.refundedQuantity == this.refundedQuantity &&
+          other.batchId == this.batchId);
 }
 
 class SalesCompanion extends UpdateCompanion<Sale> {
@@ -1466,6 +1967,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
   final Value<double> amountPaid;
   final Value<double> debtRemaining;
   final Value<String?> saleGroupId;
+  final Value<double> refundedQuantity;
+  final Value<String?> batchId;
   final Value<int> rowid;
   const SalesCompanion({
     this.syncStatus = const Value.absent(),
@@ -1488,6 +1991,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     this.amountPaid = const Value.absent(),
     this.debtRemaining = const Value.absent(),
     this.saleGroupId = const Value.absent(),
+    this.refundedQuantity = const Value.absent(),
+    this.batchId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -1511,6 +2016,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     this.amountPaid = const Value.absent(),
     this.debtRemaining = const Value.absent(),
     this.saleGroupId = const Value.absent(),
+    this.refundedQuantity = const Value.absent(),
+    this.batchId = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shopId = Value(shopId),
@@ -1544,6 +2051,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     Expression<double>? amountPaid,
     Expression<double>? debtRemaining,
     Expression<String>? saleGroupId,
+    Expression<double>? refundedQuantity,
+    Expression<String>? batchId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1567,6 +2076,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       if (amountPaid != null) 'amount_paid': amountPaid,
       if (debtRemaining != null) 'debt_remaining': debtRemaining,
       if (saleGroupId != null) 'sale_group_id': saleGroupId,
+      if (refundedQuantity != null) 'refunded_quantity': refundedQuantity,
+      if (batchId != null) 'batch_id': batchId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1592,6 +2103,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       Value<double>? amountPaid,
       Value<double>? debtRemaining,
       Value<String?>? saleGroupId,
+      Value<double>? refundedQuantity,
+      Value<String?>? batchId,
       Value<int>? rowid}) {
     return SalesCompanion(
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1614,6 +2127,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
       amountPaid: amountPaid ?? this.amountPaid,
       debtRemaining: debtRemaining ?? this.debtRemaining,
       saleGroupId: saleGroupId ?? this.saleGroupId,
+      refundedQuantity: refundedQuantity ?? this.refundedQuantity,
+      batchId: batchId ?? this.batchId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1681,6 +2196,12 @@ class SalesCompanion extends UpdateCompanion<Sale> {
     if (saleGroupId.present) {
       map['sale_group_id'] = Variable<String>(saleGroupId.value);
     }
+    if (refundedQuantity.present) {
+      map['refunded_quantity'] = Variable<double>(refundedQuantity.value);
+    }
+    if (batchId.present) {
+      map['batch_id'] = Variable<String>(batchId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1710,6 +2231,8 @@ class SalesCompanion extends UpdateCompanion<Sale> {
           ..write('amountPaid: $amountPaid, ')
           ..write('debtRemaining: $debtRemaining, ')
           ..write('saleGroupId: $saleGroupId, ')
+          ..write('refundedQuantity: $refundedQuantity, ')
+          ..write('batchId: $batchId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3166,6 +3689,12 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
   late final GeneratedColumn<double> buyingPrice = GeneratedColumn<double>(
       'buying_price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _sellingPriceMeta =
+      const VerificationMeta('sellingPrice');
+  @override
+  late final GeneratedColumn<double> sellingPrice = GeneratedColumn<double>(
+      'selling_price', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _expiryDateMeta =
       const VerificationMeta('expiryDate');
   @override
@@ -3192,6 +3721,11 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('main'));
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         syncStatus,
@@ -3203,10 +3737,12 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
         itemId,
         quantity,
         buyingPrice,
+        sellingPrice,
         expiryDate,
         batchNumber,
         timestamp,
-        branchId
+        branchId,
+        type
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3269,6 +3805,12 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
     } else if (isInserting) {
       context.missing(_buyingPriceMeta);
     }
+    if (data.containsKey('selling_price')) {
+      context.handle(
+          _sellingPriceMeta,
+          sellingPrice.isAcceptableOrUnknown(
+              data['selling_price']!, _sellingPriceMeta));
+    }
     if (data.containsKey('expiry_date')) {
       context.handle(
           _expiryDateMeta,
@@ -3290,6 +3832,10 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
     if (data.containsKey('branch_id')) {
       context.handle(_branchIdMeta,
           branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
     }
     return context;
   }
@@ -3318,6 +3864,8 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
           .read(DriftSqlType.double, data['${effectivePrefix}quantity'])!,
       buyingPrice: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}buying_price'])!,
+      sellingPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}selling_price']),
       expiryDate: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}expiry_date']),
       batchNumber: attachedDatabase.typeMapping
@@ -3326,6 +3874,8 @@ class $BatchesTable extends Batches with TableInfo<$BatchesTable, Batche> {
           .read(DriftSqlType.dateTime, data['${effectivePrefix}timestamp'])!,
       branchId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}branch_id'])!,
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type']),
     );
   }
 
@@ -3345,10 +3895,12 @@ class Batche extends DataClass implements Insertable<Batche> {
   final String itemId;
   final double quantity;
   final double buyingPrice;
+  final double? sellingPrice;
   final DateTime? expiryDate;
   final String? batchNumber;
   final DateTime timestamp;
   final String branchId;
+  final String? type;
   const Batche(
       {required this.syncStatus,
       required this.lastModified,
@@ -3359,10 +3911,12 @@ class Batche extends DataClass implements Insertable<Batche> {
       required this.itemId,
       required this.quantity,
       required this.buyingPrice,
+      this.sellingPrice,
       this.expiryDate,
       this.batchNumber,
       required this.timestamp,
-      required this.branchId});
+      required this.branchId,
+      this.type});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3377,6 +3931,9 @@ class Batche extends DataClass implements Insertable<Batche> {
     map['item_id'] = Variable<String>(itemId);
     map['quantity'] = Variable<double>(quantity);
     map['buying_price'] = Variable<double>(buyingPrice);
+    if (!nullToAbsent || sellingPrice != null) {
+      map['selling_price'] = Variable<double>(sellingPrice);
+    }
     if (!nullToAbsent || expiryDate != null) {
       map['expiry_date'] = Variable<DateTime>(expiryDate);
     }
@@ -3385,6 +3942,9 @@ class Batche extends DataClass implements Insertable<Batche> {
     }
     map['timestamp'] = Variable<DateTime>(timestamp);
     map['branch_id'] = Variable<String>(branchId);
+    if (!nullToAbsent || type != null) {
+      map['type'] = Variable<String>(type);
+    }
     return map;
   }
 
@@ -3401,6 +3961,9 @@ class Batche extends DataClass implements Insertable<Batche> {
       itemId: Value(itemId),
       quantity: Value(quantity),
       buyingPrice: Value(buyingPrice),
+      sellingPrice: sellingPrice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sellingPrice),
       expiryDate: expiryDate == null && nullToAbsent
           ? const Value.absent()
           : Value(expiryDate),
@@ -3409,6 +3972,7 @@ class Batche extends DataClass implements Insertable<Batche> {
           : Value(batchNumber),
       timestamp: Value(timestamp),
       branchId: Value(branchId),
+      type: type == null && nullToAbsent ? const Value.absent() : Value(type),
     );
   }
 
@@ -3425,10 +3989,12 @@ class Batche extends DataClass implements Insertable<Batche> {
       itemId: serializer.fromJson<String>(json['itemId']),
       quantity: serializer.fromJson<double>(json['quantity']),
       buyingPrice: serializer.fromJson<double>(json['buyingPrice']),
+      sellingPrice: serializer.fromJson<double?>(json['sellingPrice']),
       expiryDate: serializer.fromJson<DateTime?>(json['expiryDate']),
       batchNumber: serializer.fromJson<String?>(json['batchNumber']),
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
       branchId: serializer.fromJson<String>(json['branchId']),
+      type: serializer.fromJson<String?>(json['type']),
     );
   }
   @override
@@ -3444,10 +4010,12 @@ class Batche extends DataClass implements Insertable<Batche> {
       'itemId': serializer.toJson<String>(itemId),
       'quantity': serializer.toJson<double>(quantity),
       'buyingPrice': serializer.toJson<double>(buyingPrice),
+      'sellingPrice': serializer.toJson<double?>(sellingPrice),
       'expiryDate': serializer.toJson<DateTime?>(expiryDate),
       'batchNumber': serializer.toJson<String?>(batchNumber),
       'timestamp': serializer.toJson<DateTime>(timestamp),
       'branchId': serializer.toJson<String>(branchId),
+      'type': serializer.toJson<String?>(type),
     };
   }
 
@@ -3461,10 +4029,12 @@ class Batche extends DataClass implements Insertable<Batche> {
           String? itemId,
           double? quantity,
           double? buyingPrice,
+          Value<double?> sellingPrice = const Value.absent(),
           Value<DateTime?> expiryDate = const Value.absent(),
           Value<String?> batchNumber = const Value.absent(),
           DateTime? timestamp,
-          String? branchId}) =>
+          String? branchId,
+          Value<String?> type = const Value.absent()}) =>
       Batche(
         syncStatus: syncStatus ?? this.syncStatus,
         lastModified: lastModified ?? this.lastModified,
@@ -3475,10 +4045,13 @@ class Batche extends DataClass implements Insertable<Batche> {
         itemId: itemId ?? this.itemId,
         quantity: quantity ?? this.quantity,
         buyingPrice: buyingPrice ?? this.buyingPrice,
+        sellingPrice:
+            sellingPrice.present ? sellingPrice.value : this.sellingPrice,
         expiryDate: expiryDate.present ? expiryDate.value : this.expiryDate,
         batchNumber: batchNumber.present ? batchNumber.value : this.batchNumber,
         timestamp: timestamp ?? this.timestamp,
         branchId: branchId ?? this.branchId,
+        type: type.present ? type.value : this.type,
       );
   Batche copyWithCompanion(BatchesCompanion data) {
     return Batche(
@@ -3495,12 +4068,16 @@ class Batche extends DataClass implements Insertable<Batche> {
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
       buyingPrice:
           data.buyingPrice.present ? data.buyingPrice.value : this.buyingPrice,
+      sellingPrice: data.sellingPrice.present
+          ? data.sellingPrice.value
+          : this.sellingPrice,
       expiryDate:
           data.expiryDate.present ? data.expiryDate.value : this.expiryDate,
       batchNumber:
           data.batchNumber.present ? data.batchNumber.value : this.batchNumber,
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
       branchId: data.branchId.present ? data.branchId.value : this.branchId,
+      type: data.type.present ? data.type.value : this.type,
     );
   }
 
@@ -3516,10 +4093,12 @@ class Batche extends DataClass implements Insertable<Batche> {
           ..write('itemId: $itemId, ')
           ..write('quantity: $quantity, ')
           ..write('buyingPrice: $buyingPrice, ')
+          ..write('sellingPrice: $sellingPrice, ')
           ..write('expiryDate: $expiryDate, ')
           ..write('batchNumber: $batchNumber, ')
           ..write('timestamp: $timestamp, ')
-          ..write('branchId: $branchId')
+          ..write('branchId: $branchId, ')
+          ..write('type: $type')
           ..write(')'))
         .toString();
   }
@@ -3535,10 +4114,12 @@ class Batche extends DataClass implements Insertable<Batche> {
       itemId,
       quantity,
       buyingPrice,
+      sellingPrice,
       expiryDate,
       batchNumber,
       timestamp,
-      branchId);
+      branchId,
+      type);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3552,10 +4133,12 @@ class Batche extends DataClass implements Insertable<Batche> {
           other.itemId == this.itemId &&
           other.quantity == this.quantity &&
           other.buyingPrice == this.buyingPrice &&
+          other.sellingPrice == this.sellingPrice &&
           other.expiryDate == this.expiryDate &&
           other.batchNumber == this.batchNumber &&
           other.timestamp == this.timestamp &&
-          other.branchId == this.branchId);
+          other.branchId == this.branchId &&
+          other.type == this.type);
 }
 
 class BatchesCompanion extends UpdateCompanion<Batche> {
@@ -3568,10 +4151,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
   final Value<String> itemId;
   final Value<double> quantity;
   final Value<double> buyingPrice;
+  final Value<double?> sellingPrice;
   final Value<DateTime?> expiryDate;
   final Value<String?> batchNumber;
   final Value<DateTime> timestamp;
   final Value<String> branchId;
+  final Value<String?> type;
   final Value<int> rowid;
   const BatchesCompanion({
     this.syncStatus = const Value.absent(),
@@ -3583,10 +4168,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
     this.itemId = const Value.absent(),
     this.quantity = const Value.absent(),
     this.buyingPrice = const Value.absent(),
+    this.sellingPrice = const Value.absent(),
     this.expiryDate = const Value.absent(),
     this.batchNumber = const Value.absent(),
     this.timestamp = const Value.absent(),
     this.branchId = const Value.absent(),
+    this.type = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BatchesCompanion.insert({
@@ -3599,10 +4186,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
     required String itemId,
     required double quantity,
     required double buyingPrice,
+    this.sellingPrice = const Value.absent(),
     this.expiryDate = const Value.absent(),
     this.batchNumber = const Value.absent(),
     required DateTime timestamp,
     this.branchId = const Value.absent(),
+    this.type = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shopId = Value(shopId),
@@ -3620,10 +4209,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
     Expression<String>? itemId,
     Expression<double>? quantity,
     Expression<double>? buyingPrice,
+    Expression<double>? sellingPrice,
     Expression<DateTime>? expiryDate,
     Expression<String>? batchNumber,
     Expression<DateTime>? timestamp,
     Expression<String>? branchId,
+    Expression<String>? type,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3636,10 +4227,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
       if (itemId != null) 'item_id': itemId,
       if (quantity != null) 'quantity': quantity,
       if (buyingPrice != null) 'buying_price': buyingPrice,
+      if (sellingPrice != null) 'selling_price': sellingPrice,
       if (expiryDate != null) 'expiry_date': expiryDate,
       if (batchNumber != null) 'batch_number': batchNumber,
       if (timestamp != null) 'timestamp': timestamp,
       if (branchId != null) 'branch_id': branchId,
+      if (type != null) 'type': type,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3654,10 +4247,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
       Value<String>? itemId,
       Value<double>? quantity,
       Value<double>? buyingPrice,
+      Value<double?>? sellingPrice,
       Value<DateTime?>? expiryDate,
       Value<String?>? batchNumber,
       Value<DateTime>? timestamp,
       Value<String>? branchId,
+      Value<String?>? type,
       Value<int>? rowid}) {
     return BatchesCompanion(
       syncStatus: syncStatus ?? this.syncStatus,
@@ -3669,10 +4264,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
       itemId: itemId ?? this.itemId,
       quantity: quantity ?? this.quantity,
       buyingPrice: buyingPrice ?? this.buyingPrice,
+      sellingPrice: sellingPrice ?? this.sellingPrice,
       expiryDate: expiryDate ?? this.expiryDate,
       batchNumber: batchNumber ?? this.batchNumber,
       timestamp: timestamp ?? this.timestamp,
       branchId: branchId ?? this.branchId,
+      type: type ?? this.type,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3707,6 +4304,9 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
     if (buyingPrice.present) {
       map['buying_price'] = Variable<double>(buyingPrice.value);
     }
+    if (sellingPrice.present) {
+      map['selling_price'] = Variable<double>(sellingPrice.value);
+    }
     if (expiryDate.present) {
       map['expiry_date'] = Variable<DateTime>(expiryDate.value);
     }
@@ -3718,6 +4318,9 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
     }
     if (branchId.present) {
       map['branch_id'] = Variable<String>(branchId.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -3737,10 +4340,12 @@ class BatchesCompanion extends UpdateCompanion<Batche> {
           ..write('itemId: $itemId, ')
           ..write('quantity: $quantity, ')
           ..write('buyingPrice: $buyingPrice, ')
+          ..write('sellingPrice: $sellingPrice, ')
           ..write('expiryDate: $expiryDate, ')
           ..write('batchNumber: $batchNumber, ')
           ..write('timestamp: $timestamp, ')
           ..write('branchId: $branchId, ')
+          ..write('type: $type, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5556,17 +6161,36 @@ class $NotificationsTable extends Notifications
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
       'title', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _messageMeta =
-      const VerificationMeta('message');
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
   @override
-  late final GeneratedColumn<String> message = GeneratedColumn<String>(
-      'message', aliasedName, false,
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+      'body', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
       'type', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _priorityMeta =
+      const VerificationMeta('priority');
+  @override
+  late final GeneratedColumn<String> priority = GeneratedColumn<String>(
+      'priority', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('normal'));
+  static const VerificationMeta _relatedEntityIdMeta =
+      const VerificationMeta('relatedEntityId');
+  @override
+  late final GeneratedColumn<String> relatedEntityId = GeneratedColumn<String>(
+      'related_entity_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdByMeta =
+      const VerificationMeta('createdBy');
+  @override
+  late final GeneratedColumn<String> createdBy = GeneratedColumn<String>(
+      'created_by', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _targetRoleMeta =
       const VerificationMeta('targetRole');
   @override
@@ -5577,6 +6201,12 @@ class $NotificationsTable extends Notifications
   @override
   late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
       'item_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _branchIdMeta =
+      const VerificationMeta('branchId');
+  @override
+  late final GeneratedColumn<String> branchId = GeneratedColumn<String>(
+      'branch_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _isReadMeta = const VerificationMeta('isRead');
   @override
@@ -5595,6 +6225,17 @@ class $NotificationsTable extends Notifications
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _routeMeta = const VerificationMeta('route');
+  @override
+  late final GeneratedColumn<String> route = GeneratedColumn<String>(
+      'route', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _payloadJsonMeta =
+      const VerificationMeta('payloadJson');
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+      'payload_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         syncStatus,
@@ -5604,12 +6245,18 @@ class $NotificationsTable extends Notifications
         id,
         shopId,
         title,
-        message,
+        body,
         type,
+        priority,
+        relatedEntityId,
+        createdBy,
         targetRole,
         itemId,
+        branchId,
         isRead,
-        timestamp
+        timestamp,
+        route,
+        payloadJson
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5658,17 +6305,31 @@ class $NotificationsTable extends Notifications
     } else if (isInserting) {
       context.missing(_titleMeta);
     }
-    if (data.containsKey('message')) {
-      context.handle(_messageMeta,
-          message.isAcceptableOrUnknown(data['message']!, _messageMeta));
+    if (data.containsKey('body')) {
+      context.handle(
+          _bodyMeta, body.isAcceptableOrUnknown(data['body']!, _bodyMeta));
     } else if (isInserting) {
-      context.missing(_messageMeta);
+      context.missing(_bodyMeta);
     }
     if (data.containsKey('type')) {
       context.handle(
           _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
     } else if (isInserting) {
       context.missing(_typeMeta);
+    }
+    if (data.containsKey('priority')) {
+      context.handle(_priorityMeta,
+          priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta));
+    }
+    if (data.containsKey('related_entity_id')) {
+      context.handle(
+          _relatedEntityIdMeta,
+          relatedEntityId.isAcceptableOrUnknown(
+              data['related_entity_id']!, _relatedEntityIdMeta));
+    }
+    if (data.containsKey('created_by')) {
+      context.handle(_createdByMeta,
+          createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta));
     }
     if (data.containsKey('target_role')) {
       context.handle(
@@ -5680,6 +6341,10 @@ class $NotificationsTable extends Notifications
       context.handle(_itemIdMeta,
           itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
     }
+    if (data.containsKey('branch_id')) {
+      context.handle(_branchIdMeta,
+          branchId.isAcceptableOrUnknown(data['branch_id']!, _branchIdMeta));
+    }
     if (data.containsKey('is_read')) {
       context.handle(_isReadMeta,
           isRead.isAcceptableOrUnknown(data['is_read']!, _isReadMeta));
@@ -5687,6 +6352,16 @@ class $NotificationsTable extends Notifications
     if (data.containsKey('timestamp')) {
       context.handle(_timestampMeta,
           timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta));
+    }
+    if (data.containsKey('route')) {
+      context.handle(
+          _routeMeta, route.isAcceptableOrUnknown(data['route']!, _routeMeta));
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+          _payloadJsonMeta,
+          payloadJson.isAcceptableOrUnknown(
+              data['payload_json']!, _payloadJsonMeta));
     }
     return context;
   }
@@ -5711,18 +6386,30 @@ class $NotificationsTable extends Notifications
           .read(DriftSqlType.string, data['${effectivePrefix}shop_id'])!,
       title: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
-      message: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}message'])!,
+      body: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}body'])!,
       type: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      priority: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}priority'])!,
+      relatedEntityId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}related_entity_id']),
+      createdBy: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}created_by']),
       targetRole: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}target_role']),
       itemId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}item_id']),
+      branchId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}branch_id']),
       isRead: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_read'])!,
       timestamp: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}timestamp'])!,
+      route: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}route']),
+      payloadJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload_json']),
     );
   }
 
@@ -5740,12 +6427,20 @@ class Notification extends DataClass implements Insertable<Notification> {
   final String id;
   final String shopId;
   final String title;
-  final String message;
+  final String body;
   final String type;
+  final String priority;
+  final String? relatedEntityId;
+  final String? createdBy;
   final String? targetRole;
   final String? itemId;
+
+  /// Branch that generated this notification (nullable for shop-wide alerts).
+  final String? branchId;
   final bool isRead;
   final DateTime timestamp;
+  final String? route;
+  final String? payloadJson;
   const Notification(
       {required this.syncStatus,
       required this.lastModified,
@@ -5754,12 +6449,18 @@ class Notification extends DataClass implements Insertable<Notification> {
       required this.id,
       required this.shopId,
       required this.title,
-      required this.message,
+      required this.body,
       required this.type,
+      required this.priority,
+      this.relatedEntityId,
+      this.createdBy,
       this.targetRole,
       this.itemId,
+      this.branchId,
       required this.isRead,
-      required this.timestamp});
+      required this.timestamp,
+      this.route,
+      this.payloadJson});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -5772,16 +6473,32 @@ class Notification extends DataClass implements Insertable<Notification> {
     map['id'] = Variable<String>(id);
     map['shop_id'] = Variable<String>(shopId);
     map['title'] = Variable<String>(title);
-    map['message'] = Variable<String>(message);
+    map['body'] = Variable<String>(body);
     map['type'] = Variable<String>(type);
+    map['priority'] = Variable<String>(priority);
+    if (!nullToAbsent || relatedEntityId != null) {
+      map['related_entity_id'] = Variable<String>(relatedEntityId);
+    }
+    if (!nullToAbsent || createdBy != null) {
+      map['created_by'] = Variable<String>(createdBy);
+    }
     if (!nullToAbsent || targetRole != null) {
       map['target_role'] = Variable<String>(targetRole);
     }
     if (!nullToAbsent || itemId != null) {
       map['item_id'] = Variable<String>(itemId);
     }
+    if (!nullToAbsent || branchId != null) {
+      map['branch_id'] = Variable<String>(branchId);
+    }
     map['is_read'] = Variable<bool>(isRead);
     map['timestamp'] = Variable<DateTime>(timestamp);
+    if (!nullToAbsent || route != null) {
+      map['route'] = Variable<String>(route);
+    }
+    if (!nullToAbsent || payloadJson != null) {
+      map['payload_json'] = Variable<String>(payloadJson);
+    }
     return map;
   }
 
@@ -5796,15 +6513,30 @@ class Notification extends DataClass implements Insertable<Notification> {
       id: Value(id),
       shopId: Value(shopId),
       title: Value(title),
-      message: Value(message),
+      body: Value(body),
       type: Value(type),
+      priority: Value(priority),
+      relatedEntityId: relatedEntityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(relatedEntityId),
+      createdBy: createdBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdBy),
       targetRole: targetRole == null && nullToAbsent
           ? const Value.absent()
           : Value(targetRole),
       itemId:
           itemId == null && nullToAbsent ? const Value.absent() : Value(itemId),
+      branchId: branchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(branchId),
       isRead: Value(isRead),
       timestamp: Value(timestamp),
+      route:
+          route == null && nullToAbsent ? const Value.absent() : Value(route),
+      payloadJson: payloadJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(payloadJson),
     );
   }
 
@@ -5819,12 +6551,18 @@ class Notification extends DataClass implements Insertable<Notification> {
       id: serializer.fromJson<String>(json['id']),
       shopId: serializer.fromJson<String>(json['shopId']),
       title: serializer.fromJson<String>(json['title']),
-      message: serializer.fromJson<String>(json['message']),
+      body: serializer.fromJson<String>(json['body']),
       type: serializer.fromJson<String>(json['type']),
+      priority: serializer.fromJson<String>(json['priority']),
+      relatedEntityId: serializer.fromJson<String?>(json['relatedEntityId']),
+      createdBy: serializer.fromJson<String?>(json['createdBy']),
       targetRole: serializer.fromJson<String?>(json['targetRole']),
       itemId: serializer.fromJson<String?>(json['itemId']),
+      branchId: serializer.fromJson<String?>(json['branchId']),
       isRead: serializer.fromJson<bool>(json['isRead']),
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+      route: serializer.fromJson<String?>(json['route']),
+      payloadJson: serializer.fromJson<String?>(json['payloadJson']),
     );
   }
   @override
@@ -5838,12 +6576,18 @@ class Notification extends DataClass implements Insertable<Notification> {
       'id': serializer.toJson<String>(id),
       'shopId': serializer.toJson<String>(shopId),
       'title': serializer.toJson<String>(title),
-      'message': serializer.toJson<String>(message),
+      'body': serializer.toJson<String>(body),
       'type': serializer.toJson<String>(type),
+      'priority': serializer.toJson<String>(priority),
+      'relatedEntityId': serializer.toJson<String?>(relatedEntityId),
+      'createdBy': serializer.toJson<String?>(createdBy),
       'targetRole': serializer.toJson<String?>(targetRole),
       'itemId': serializer.toJson<String?>(itemId),
+      'branchId': serializer.toJson<String?>(branchId),
       'isRead': serializer.toJson<bool>(isRead),
       'timestamp': serializer.toJson<DateTime>(timestamp),
+      'route': serializer.toJson<String?>(route),
+      'payloadJson': serializer.toJson<String?>(payloadJson),
     };
   }
 
@@ -5855,12 +6599,18 @@ class Notification extends DataClass implements Insertable<Notification> {
           String? id,
           String? shopId,
           String? title,
-          String? message,
+          String? body,
           String? type,
+          String? priority,
+          Value<String?> relatedEntityId = const Value.absent(),
+          Value<String?> createdBy = const Value.absent(),
           Value<String?> targetRole = const Value.absent(),
           Value<String?> itemId = const Value.absent(),
+          Value<String?> branchId = const Value.absent(),
           bool? isRead,
-          DateTime? timestamp}) =>
+          DateTime? timestamp,
+          Value<String?> route = const Value.absent(),
+          Value<String?> payloadJson = const Value.absent()}) =>
       Notification(
         syncStatus: syncStatus ?? this.syncStatus,
         lastModified: lastModified ?? this.lastModified,
@@ -5869,12 +6619,20 @@ class Notification extends DataClass implements Insertable<Notification> {
         id: id ?? this.id,
         shopId: shopId ?? this.shopId,
         title: title ?? this.title,
-        message: message ?? this.message,
+        body: body ?? this.body,
         type: type ?? this.type,
+        priority: priority ?? this.priority,
+        relatedEntityId: relatedEntityId.present
+            ? relatedEntityId.value
+            : this.relatedEntityId,
+        createdBy: createdBy.present ? createdBy.value : this.createdBy,
         targetRole: targetRole.present ? targetRole.value : this.targetRole,
         itemId: itemId.present ? itemId.value : this.itemId,
+        branchId: branchId.present ? branchId.value : this.branchId,
         isRead: isRead ?? this.isRead,
         timestamp: timestamp ?? this.timestamp,
+        route: route.present ? route.value : this.route,
+        payloadJson: payloadJson.present ? payloadJson.value : this.payloadJson,
       );
   Notification copyWithCompanion(NotificationsCompanion data) {
     return Notification(
@@ -5888,13 +6646,22 @@ class Notification extends DataClass implements Insertable<Notification> {
       id: data.id.present ? data.id.value : this.id,
       shopId: data.shopId.present ? data.shopId.value : this.shopId,
       title: data.title.present ? data.title.value : this.title,
-      message: data.message.present ? data.message.value : this.message,
+      body: data.body.present ? data.body.value : this.body,
       type: data.type.present ? data.type.value : this.type,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      relatedEntityId: data.relatedEntityId.present
+          ? data.relatedEntityId.value
+          : this.relatedEntityId,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
       targetRole:
           data.targetRole.present ? data.targetRole.value : this.targetRole,
       itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      branchId: data.branchId.present ? data.branchId.value : this.branchId,
       isRead: data.isRead.present ? data.isRead.value : this.isRead,
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+      route: data.route.present ? data.route.value : this.route,
+      payloadJson:
+          data.payloadJson.present ? data.payloadJson.value : this.payloadJson,
     );
   }
 
@@ -5908,19 +6675,43 @@ class Notification extends DataClass implements Insertable<Notification> {
           ..write('id: $id, ')
           ..write('shopId: $shopId, ')
           ..write('title: $title, ')
-          ..write('message: $message, ')
+          ..write('body: $body, ')
           ..write('type: $type, ')
+          ..write('priority: $priority, ')
+          ..write('relatedEntityId: $relatedEntityId, ')
+          ..write('createdBy: $createdBy, ')
           ..write('targetRole: $targetRole, ')
           ..write('itemId: $itemId, ')
+          ..write('branchId: $branchId, ')
           ..write('isRead: $isRead, ')
-          ..write('timestamp: $timestamp')
+          ..write('timestamp: $timestamp, ')
+          ..write('route: $route, ')
+          ..write('payloadJson: $payloadJson')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(syncStatus, lastModified, remoteId, version,
-      id, shopId, title, message, type, targetRole, itemId, isRead, timestamp);
+  int get hashCode => Object.hash(
+      syncStatus,
+      lastModified,
+      remoteId,
+      version,
+      id,
+      shopId,
+      title,
+      body,
+      type,
+      priority,
+      relatedEntityId,
+      createdBy,
+      targetRole,
+      itemId,
+      branchId,
+      isRead,
+      timestamp,
+      route,
+      payloadJson);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5932,12 +6723,18 @@ class Notification extends DataClass implements Insertable<Notification> {
           other.id == this.id &&
           other.shopId == this.shopId &&
           other.title == this.title &&
-          other.message == this.message &&
+          other.body == this.body &&
           other.type == this.type &&
+          other.priority == this.priority &&
+          other.relatedEntityId == this.relatedEntityId &&
+          other.createdBy == this.createdBy &&
           other.targetRole == this.targetRole &&
           other.itemId == this.itemId &&
+          other.branchId == this.branchId &&
           other.isRead == this.isRead &&
-          other.timestamp == this.timestamp);
+          other.timestamp == this.timestamp &&
+          other.route == this.route &&
+          other.payloadJson == this.payloadJson);
 }
 
 class NotificationsCompanion extends UpdateCompanion<Notification> {
@@ -5948,12 +6745,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
   final Value<String> id;
   final Value<String> shopId;
   final Value<String> title;
-  final Value<String> message;
+  final Value<String> body;
   final Value<String> type;
+  final Value<String> priority;
+  final Value<String?> relatedEntityId;
+  final Value<String?> createdBy;
   final Value<String?> targetRole;
   final Value<String?> itemId;
+  final Value<String?> branchId;
   final Value<bool> isRead;
   final Value<DateTime> timestamp;
+  final Value<String?> route;
+  final Value<String?> payloadJson;
   final Value<int> rowid;
   const NotificationsCompanion({
     this.syncStatus = const Value.absent(),
@@ -5963,12 +6766,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     this.id = const Value.absent(),
     this.shopId = const Value.absent(),
     this.title = const Value.absent(),
-    this.message = const Value.absent(),
+    this.body = const Value.absent(),
     this.type = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.relatedEntityId = const Value.absent(),
+    this.createdBy = const Value.absent(),
     this.targetRole = const Value.absent(),
     this.itemId = const Value.absent(),
+    this.branchId = const Value.absent(),
     this.isRead = const Value.absent(),
     this.timestamp = const Value.absent(),
+    this.route = const Value.absent(),
+    this.payloadJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotificationsCompanion.insert({
@@ -5979,17 +6788,23 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     required String id,
     required String shopId,
     required String title,
-    required String message,
+    required String body,
     required String type,
+    this.priority = const Value.absent(),
+    this.relatedEntityId = const Value.absent(),
+    this.createdBy = const Value.absent(),
     this.targetRole = const Value.absent(),
     this.itemId = const Value.absent(),
+    this.branchId = const Value.absent(),
     this.isRead = const Value.absent(),
     this.timestamp = const Value.absent(),
+    this.route = const Value.absent(),
+    this.payloadJson = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         shopId = Value(shopId),
         title = Value(title),
-        message = Value(message),
+        body = Value(body),
         type = Value(type);
   static Insertable<Notification> custom({
     Expression<String>? syncStatus,
@@ -5999,12 +6814,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     Expression<String>? id,
     Expression<String>? shopId,
     Expression<String>? title,
-    Expression<String>? message,
+    Expression<String>? body,
     Expression<String>? type,
+    Expression<String>? priority,
+    Expression<String>? relatedEntityId,
+    Expression<String>? createdBy,
     Expression<String>? targetRole,
     Expression<String>? itemId,
+    Expression<String>? branchId,
     Expression<bool>? isRead,
     Expression<DateTime>? timestamp,
+    Expression<String>? route,
+    Expression<String>? payloadJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6015,12 +6836,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
       if (id != null) 'id': id,
       if (shopId != null) 'shop_id': shopId,
       if (title != null) 'title': title,
-      if (message != null) 'message': message,
+      if (body != null) 'body': body,
       if (type != null) 'type': type,
+      if (priority != null) 'priority': priority,
+      if (relatedEntityId != null) 'related_entity_id': relatedEntityId,
+      if (createdBy != null) 'created_by': createdBy,
       if (targetRole != null) 'target_role': targetRole,
       if (itemId != null) 'item_id': itemId,
+      if (branchId != null) 'branch_id': branchId,
       if (isRead != null) 'is_read': isRead,
       if (timestamp != null) 'timestamp': timestamp,
+      if (route != null) 'route': route,
+      if (payloadJson != null) 'payload_json': payloadJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6033,12 +6860,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
       Value<String>? id,
       Value<String>? shopId,
       Value<String>? title,
-      Value<String>? message,
+      Value<String>? body,
       Value<String>? type,
+      Value<String>? priority,
+      Value<String?>? relatedEntityId,
+      Value<String?>? createdBy,
       Value<String?>? targetRole,
       Value<String?>? itemId,
+      Value<String?>? branchId,
       Value<bool>? isRead,
       Value<DateTime>? timestamp,
+      Value<String?>? route,
+      Value<String?>? payloadJson,
       Value<int>? rowid}) {
     return NotificationsCompanion(
       syncStatus: syncStatus ?? this.syncStatus,
@@ -6048,12 +6881,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
       id: id ?? this.id,
       shopId: shopId ?? this.shopId,
       title: title ?? this.title,
-      message: message ?? this.message,
+      body: body ?? this.body,
       type: type ?? this.type,
+      priority: priority ?? this.priority,
+      relatedEntityId: relatedEntityId ?? this.relatedEntityId,
+      createdBy: createdBy ?? this.createdBy,
       targetRole: targetRole ?? this.targetRole,
       itemId: itemId ?? this.itemId,
+      branchId: branchId ?? this.branchId,
       isRead: isRead ?? this.isRead,
       timestamp: timestamp ?? this.timestamp,
+      route: route ?? this.route,
+      payloadJson: payloadJson ?? this.payloadJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6082,11 +6921,20 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     if (title.present) {
       map['title'] = Variable<String>(title.value);
     }
-    if (message.present) {
-      map['message'] = Variable<String>(message.value);
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<String>(priority.value);
+    }
+    if (relatedEntityId.present) {
+      map['related_entity_id'] = Variable<String>(relatedEntityId.value);
+    }
+    if (createdBy.present) {
+      map['created_by'] = Variable<String>(createdBy.value);
     }
     if (targetRole.present) {
       map['target_role'] = Variable<String>(targetRole.value);
@@ -6094,11 +6942,20 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     if (itemId.present) {
       map['item_id'] = Variable<String>(itemId.value);
     }
+    if (branchId.present) {
+      map['branch_id'] = Variable<String>(branchId.value);
+    }
     if (isRead.present) {
       map['is_read'] = Variable<bool>(isRead.value);
     }
     if (timestamp.present) {
       map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    if (route.present) {
+      map['route'] = Variable<String>(route.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -6116,12 +6973,18 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
           ..write('id: $id, ')
           ..write('shopId: $shopId, ')
           ..write('title: $title, ')
-          ..write('message: $message, ')
+          ..write('body: $body, ')
           ..write('type: $type, ')
+          ..write('priority: $priority, ')
+          ..write('relatedEntityId: $relatedEntityId, ')
+          ..write('createdBy: $createdBy, ')
           ..write('targetRole: $targetRole, ')
           ..write('itemId: $itemId, ')
+          ..write('branchId: $branchId, ')
           ..write('isRead: $isRead, ')
           ..write('timestamp: $timestamp, ')
+          ..write('route: $route, ')
+          ..write('payloadJson: $payloadJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7251,6 +8114,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $ProductsTable products = $ProductsTable(this);
+  late final $ProductStocksTable productStocks = $ProductStocksTable(this);
   late final $SalesTable sales = $SalesTable(this);
   late final $SuppliersTable suppliers = $SuppliersTable(this);
   late final $PurchasesTable purchases = $PurchasesTable(this);
@@ -7263,6 +8127,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SubscriptionsTable subscriptions = $SubscriptionsTable(this);
   late final $SyncOutboxTable syncOutbox = $SyncOutboxTable(this);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
+  late final ProductStocksDao productStocksDao =
+      ProductStocksDao(this as AppDatabase);
   late final SalesDao salesDao = SalesDao(this as AppDatabase);
   late final DebtsDao debtsDao = DebtsDao(this as AppDatabase);
   late final UsersDao usersDao = UsersDao(this as AppDatabase);
@@ -7276,6 +8142,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         products,
+        productStocks,
         sales,
         suppliers,
         purchases,
@@ -7624,6 +8491,225 @@ typedef $$ProductsTableProcessedTableManager = ProcessedTableManager<
     (Product, BaseReferences<_$AppDatabase, $ProductsTable, Product>),
     Product,
     PrefetchHooks Function()>;
+typedef $$ProductStocksTableCreateCompanionBuilder = ProductStocksCompanion
+    Function({
+  Value<String> syncStatus,
+  Value<DateTime> lastModified,
+  Value<String?> remoteId,
+  Value<int> version,
+  required String shopId,
+  required String productId,
+  required String branchId,
+  Value<double> quantity,
+  Value<int> rowid,
+});
+typedef $$ProductStocksTableUpdateCompanionBuilder = ProductStocksCompanion
+    Function({
+  Value<String> syncStatus,
+  Value<DateTime> lastModified,
+  Value<String?> remoteId,
+  Value<int> version,
+  Value<String> shopId,
+  Value<String> productId,
+  Value<String> branchId,
+  Value<double> quantity,
+  Value<int> rowid,
+});
+
+class $$ProductStocksTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductStocksTable> {
+  $$ProductStocksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastModified => $composableBuilder(
+      column: $table.lastModified, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+      column: $table.remoteId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get version => $composableBuilder(
+      column: $table.version, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get shopId => $composableBuilder(
+      column: $table.shopId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get branchId => $composableBuilder(
+      column: $table.branchId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnFilters(column));
+}
+
+class $$ProductStocksTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductStocksTable> {
+  $$ProductStocksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastModified => $composableBuilder(
+      column: $table.lastModified,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+      column: $table.remoteId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get version => $composableBuilder(
+      column: $table.version, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get shopId => $composableBuilder(
+      column: $table.shopId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+      column: $table.productId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get branchId => $composableBuilder(
+      column: $table.branchId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ProductStocksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductStocksTable> {
+  $$ProductStocksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastModified => $composableBuilder(
+      column: $table.lastModified, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get shopId =>
+      $composableBuilder(column: $table.shopId, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get branchId =>
+      $composableBuilder(column: $table.branchId, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+}
+
+class $$ProductStocksTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ProductStocksTable,
+    ProductStock,
+    $$ProductStocksTableFilterComposer,
+    $$ProductStocksTableOrderingComposer,
+    $$ProductStocksTableAnnotationComposer,
+    $$ProductStocksTableCreateCompanionBuilder,
+    $$ProductStocksTableUpdateCompanionBuilder,
+    (
+      ProductStock,
+      BaseReferences<_$AppDatabase, $ProductStocksTable, ProductStock>
+    ),
+    ProductStock,
+    PrefetchHooks Function()> {
+  $$ProductStocksTableTableManager(_$AppDatabase db, $ProductStocksTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductStocksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductStocksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductStocksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime> lastModified = const Value.absent(),
+            Value<String?> remoteId = const Value.absent(),
+            Value<int> version = const Value.absent(),
+            Value<String> shopId = const Value.absent(),
+            Value<String> productId = const Value.absent(),
+            Value<String> branchId = const Value.absent(),
+            Value<double> quantity = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProductStocksCompanion(
+            syncStatus: syncStatus,
+            lastModified: lastModified,
+            remoteId: remoteId,
+            version: version,
+            shopId: shopId,
+            productId: productId,
+            branchId: branchId,
+            quantity: quantity,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            Value<String> syncStatus = const Value.absent(),
+            Value<DateTime> lastModified = const Value.absent(),
+            Value<String?> remoteId = const Value.absent(),
+            Value<int> version = const Value.absent(),
+            required String shopId,
+            required String productId,
+            required String branchId,
+            Value<double> quantity = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProductStocksCompanion.insert(
+            syncStatus: syncStatus,
+            lastModified: lastModified,
+            remoteId: remoteId,
+            version: version,
+            shopId: shopId,
+            productId: productId,
+            branchId: branchId,
+            quantity: quantity,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ProductStocksTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ProductStocksTable,
+    ProductStock,
+    $$ProductStocksTableFilterComposer,
+    $$ProductStocksTableOrderingComposer,
+    $$ProductStocksTableAnnotationComposer,
+    $$ProductStocksTableCreateCompanionBuilder,
+    $$ProductStocksTableUpdateCompanionBuilder,
+    (
+      ProductStock,
+      BaseReferences<_$AppDatabase, $ProductStocksTable, ProductStock>
+    ),
+    ProductStock,
+    PrefetchHooks Function()>;
 typedef $$SalesTableCreateCompanionBuilder = SalesCompanion Function({
   Value<String> syncStatus,
   Value<DateTime> lastModified,
@@ -7645,6 +8731,8 @@ typedef $$SalesTableCreateCompanionBuilder = SalesCompanion Function({
   Value<double> amountPaid,
   Value<double> debtRemaining,
   Value<String?> saleGroupId,
+  Value<double> refundedQuantity,
+  Value<String?> batchId,
   Value<int> rowid,
 });
 typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
@@ -7668,6 +8756,8 @@ typedef $$SalesTableUpdateCompanionBuilder = SalesCompanion Function({
   Value<double> amountPaid,
   Value<double> debtRemaining,
   Value<String?> saleGroupId,
+  Value<double> refundedQuantity,
+  Value<String?> batchId,
   Value<int> rowid,
 });
 
@@ -7738,6 +8828,13 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<String> get saleGroupId => $composableBuilder(
       column: $table.saleGroupId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get refundedQuantity => $composableBuilder(
+      column: $table.refundedQuantity,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get batchId => $composableBuilder(
+      column: $table.batchId, builder: (column) => ColumnFilters(column));
 }
 
 class $$SalesTableOrderingComposer
@@ -7811,6 +8908,13 @@ class $$SalesTableOrderingComposer
 
   ColumnOrderings<String> get saleGroupId => $composableBuilder(
       column: $table.saleGroupId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get refundedQuantity => $composableBuilder(
+      column: $table.refundedQuantity,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get batchId => $composableBuilder(
+      column: $table.batchId, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SalesTableAnnotationComposer
@@ -7881,6 +8985,12 @@ class $$SalesTableAnnotationComposer
 
   GeneratedColumn<String> get saleGroupId => $composableBuilder(
       column: $table.saleGroupId, builder: (column) => column);
+
+  GeneratedColumn<double> get refundedQuantity => $composableBuilder(
+      column: $table.refundedQuantity, builder: (column) => column);
+
+  GeneratedColumn<String> get batchId =>
+      $composableBuilder(column: $table.batchId, builder: (column) => column);
 }
 
 class $$SalesTableTableManager extends RootTableManager<
@@ -7926,6 +9036,8 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<double> amountPaid = const Value.absent(),
             Value<double> debtRemaining = const Value.absent(),
             Value<String?> saleGroupId = const Value.absent(),
+            Value<double> refundedQuantity = const Value.absent(),
+            Value<String?> batchId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion(
@@ -7949,6 +9061,8 @@ class $$SalesTableTableManager extends RootTableManager<
             amountPaid: amountPaid,
             debtRemaining: debtRemaining,
             saleGroupId: saleGroupId,
+            refundedQuantity: refundedQuantity,
+            batchId: batchId,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -7972,6 +9086,8 @@ class $$SalesTableTableManager extends RootTableManager<
             Value<double> amountPaid = const Value.absent(),
             Value<double> debtRemaining = const Value.absent(),
             Value<String?> saleGroupId = const Value.absent(),
+            Value<double> refundedQuantity = const Value.absent(),
+            Value<String?> batchId = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SalesCompanion.insert(
@@ -7995,6 +9111,8 @@ class $$SalesTableTableManager extends RootTableManager<
             amountPaid: amountPaid,
             debtRemaining: debtRemaining,
             saleGroupId: saleGroupId,
+            refundedQuantity: refundedQuantity,
+            batchId: batchId,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -8644,10 +9762,12 @@ typedef $$BatchesTableCreateCompanionBuilder = BatchesCompanion Function({
   required String itemId,
   required double quantity,
   required double buyingPrice,
+  Value<double?> sellingPrice,
   Value<DateTime?> expiryDate,
   Value<String?> batchNumber,
   required DateTime timestamp,
   Value<String> branchId,
+  Value<String?> type,
   Value<int> rowid,
 });
 typedef $$BatchesTableUpdateCompanionBuilder = BatchesCompanion Function({
@@ -8660,10 +9780,12 @@ typedef $$BatchesTableUpdateCompanionBuilder = BatchesCompanion Function({
   Value<String> itemId,
   Value<double> quantity,
   Value<double> buyingPrice,
+  Value<double?> sellingPrice,
   Value<DateTime?> expiryDate,
   Value<String?> batchNumber,
   Value<DateTime> timestamp,
   Value<String> branchId,
+  Value<String?> type,
   Value<int> rowid,
 });
 
@@ -8703,6 +9825,9 @@ class $$BatchesTableFilterComposer
   ColumnFilters<double> get buyingPrice => $composableBuilder(
       column: $table.buyingPrice, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<double> get sellingPrice => $composableBuilder(
+      column: $table.sellingPrice, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<DateTime> get expiryDate => $composableBuilder(
       column: $table.expiryDate, builder: (column) => ColumnFilters(column));
 
@@ -8714,6 +9839,9 @@ class $$BatchesTableFilterComposer
 
   ColumnFilters<String> get branchId => $composableBuilder(
       column: $table.branchId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
 }
 
 class $$BatchesTableOrderingComposer
@@ -8753,6 +9881,10 @@ class $$BatchesTableOrderingComposer
   ColumnOrderings<double> get buyingPrice => $composableBuilder(
       column: $table.buyingPrice, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get sellingPrice => $composableBuilder(
+      column: $table.sellingPrice,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get expiryDate => $composableBuilder(
       column: $table.expiryDate, builder: (column) => ColumnOrderings(column));
 
@@ -8764,6 +9896,9 @@ class $$BatchesTableOrderingComposer
 
   ColumnOrderings<String> get branchId => $composableBuilder(
       column: $table.branchId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
 }
 
 class $$BatchesTableAnnotationComposer
@@ -8802,6 +9937,9 @@ class $$BatchesTableAnnotationComposer
   GeneratedColumn<double> get buyingPrice => $composableBuilder(
       column: $table.buyingPrice, builder: (column) => column);
 
+  GeneratedColumn<double> get sellingPrice => $composableBuilder(
+      column: $table.sellingPrice, builder: (column) => column);
+
   GeneratedColumn<DateTime> get expiryDate => $composableBuilder(
       column: $table.expiryDate, builder: (column) => column);
 
@@ -8813,6 +9951,9 @@ class $$BatchesTableAnnotationComposer
 
   GeneratedColumn<String> get branchId =>
       $composableBuilder(column: $table.branchId, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
 }
 
 class $$BatchesTableTableManager extends RootTableManager<
@@ -8847,10 +9988,12 @@ class $$BatchesTableTableManager extends RootTableManager<
             Value<String> itemId = const Value.absent(),
             Value<double> quantity = const Value.absent(),
             Value<double> buyingPrice = const Value.absent(),
+            Value<double?> sellingPrice = const Value.absent(),
             Value<DateTime?> expiryDate = const Value.absent(),
             Value<String?> batchNumber = const Value.absent(),
             Value<DateTime> timestamp = const Value.absent(),
             Value<String> branchId = const Value.absent(),
+            Value<String?> type = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               BatchesCompanion(
@@ -8863,10 +10006,12 @@ class $$BatchesTableTableManager extends RootTableManager<
             itemId: itemId,
             quantity: quantity,
             buyingPrice: buyingPrice,
+            sellingPrice: sellingPrice,
             expiryDate: expiryDate,
             batchNumber: batchNumber,
             timestamp: timestamp,
             branchId: branchId,
+            type: type,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -8879,10 +10024,12 @@ class $$BatchesTableTableManager extends RootTableManager<
             required String itemId,
             required double quantity,
             required double buyingPrice,
+            Value<double?> sellingPrice = const Value.absent(),
             Value<DateTime?> expiryDate = const Value.absent(),
             Value<String?> batchNumber = const Value.absent(),
             required DateTime timestamp,
             Value<String> branchId = const Value.absent(),
+            Value<String?> type = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               BatchesCompanion.insert(
@@ -8895,10 +10042,12 @@ class $$BatchesTableTableManager extends RootTableManager<
             itemId: itemId,
             quantity: quantity,
             buyingPrice: buyingPrice,
+            sellingPrice: sellingPrice,
             expiryDate: expiryDate,
             batchNumber: batchNumber,
             timestamp: timestamp,
             branchId: branchId,
+            type: type,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -9788,12 +10937,18 @@ typedef $$NotificationsTableCreateCompanionBuilder = NotificationsCompanion
   required String id,
   required String shopId,
   required String title,
-  required String message,
+  required String body,
   required String type,
+  Value<String> priority,
+  Value<String?> relatedEntityId,
+  Value<String?> createdBy,
   Value<String?> targetRole,
   Value<String?> itemId,
+  Value<String?> branchId,
   Value<bool> isRead,
   Value<DateTime> timestamp,
+  Value<String?> route,
+  Value<String?> payloadJson,
   Value<int> rowid,
 });
 typedef $$NotificationsTableUpdateCompanionBuilder = NotificationsCompanion
@@ -9805,12 +10960,18 @@ typedef $$NotificationsTableUpdateCompanionBuilder = NotificationsCompanion
   Value<String> id,
   Value<String> shopId,
   Value<String> title,
-  Value<String> message,
+  Value<String> body,
   Value<String> type,
+  Value<String> priority,
+  Value<String?> relatedEntityId,
+  Value<String?> createdBy,
   Value<String?> targetRole,
   Value<String?> itemId,
+  Value<String?> branchId,
   Value<bool> isRead,
   Value<DateTime> timestamp,
+  Value<String?> route,
+  Value<String?> payloadJson,
   Value<int> rowid,
 });
 
@@ -9844,11 +11005,21 @@ class $$NotificationsTableFilterComposer
   ColumnFilters<String> get title => $composableBuilder(
       column: $table.title, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get message => $composableBuilder(
-      column: $table.message, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get body => $composableBuilder(
+      column: $table.body, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get priority => $composableBuilder(
+      column: $table.priority, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get relatedEntityId => $composableBuilder(
+      column: $table.relatedEntityId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get createdBy => $composableBuilder(
+      column: $table.createdBy, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get targetRole => $composableBuilder(
       column: $table.targetRole, builder: (column) => ColumnFilters(column));
@@ -9856,11 +11027,20 @@ class $$NotificationsTableFilterComposer
   ColumnFilters<String> get itemId => $composableBuilder(
       column: $table.itemId, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get branchId => $composableBuilder(
+      column: $table.branchId, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<bool> get isRead => $composableBuilder(
       column: $table.isRead, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get timestamp => $composableBuilder(
       column: $table.timestamp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get route => $composableBuilder(
+      column: $table.route, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+      column: $table.payloadJson, builder: (column) => ColumnFilters(column));
 }
 
 class $$NotificationsTableOrderingComposer
@@ -9894,11 +11074,21 @@ class $$NotificationsTableOrderingComposer
   ColumnOrderings<String> get title => $composableBuilder(
       column: $table.title, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get message => $composableBuilder(
-      column: $table.message, builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get body => $composableBuilder(
+      column: $table.body, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get type => $composableBuilder(
       column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get priority => $composableBuilder(
+      column: $table.priority, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get relatedEntityId => $composableBuilder(
+      column: $table.relatedEntityId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get createdBy => $composableBuilder(
+      column: $table.createdBy, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get targetRole => $composableBuilder(
       column: $table.targetRole, builder: (column) => ColumnOrderings(column));
@@ -9906,11 +11096,20 @@ class $$NotificationsTableOrderingComposer
   ColumnOrderings<String> get itemId => $composableBuilder(
       column: $table.itemId, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get branchId => $composableBuilder(
+      column: $table.branchId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isRead => $composableBuilder(
       column: $table.isRead, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get timestamp => $composableBuilder(
       column: $table.timestamp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get route => $composableBuilder(
+      column: $table.route, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+      column: $table.payloadJson, builder: (column) => ColumnOrderings(column));
 }
 
 class $$NotificationsTableAnnotationComposer
@@ -9943,11 +11142,20 @@ class $$NotificationsTableAnnotationComposer
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
-  GeneratedColumn<String> get message =>
-      $composableBuilder(column: $table.message, builder: (column) => column);
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get relatedEntityId => $composableBuilder(
+      column: $table.relatedEntityId, builder: (column) => column);
+
+  GeneratedColumn<String> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
 
   GeneratedColumn<String> get targetRole => $composableBuilder(
       column: $table.targetRole, builder: (column) => column);
@@ -9955,11 +11163,20 @@ class $$NotificationsTableAnnotationComposer
   GeneratedColumn<String> get itemId =>
       $composableBuilder(column: $table.itemId, builder: (column) => column);
 
+  GeneratedColumn<String> get branchId =>
+      $composableBuilder(column: $table.branchId, builder: (column) => column);
+
   GeneratedColumn<bool> get isRead =>
       $composableBuilder(column: $table.isRead, builder: (column) => column);
 
   GeneratedColumn<DateTime> get timestamp =>
       $composableBuilder(column: $table.timestamp, builder: (column) => column);
+
+  GeneratedColumn<String> get route =>
+      $composableBuilder(column: $table.route, builder: (column) => column);
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+      column: $table.payloadJson, builder: (column) => column);
 }
 
 class $$NotificationsTableTableManager extends RootTableManager<
@@ -9995,12 +11212,18 @@ class $$NotificationsTableTableManager extends RootTableManager<
             Value<String> id = const Value.absent(),
             Value<String> shopId = const Value.absent(),
             Value<String> title = const Value.absent(),
-            Value<String> message = const Value.absent(),
+            Value<String> body = const Value.absent(),
             Value<String> type = const Value.absent(),
+            Value<String> priority = const Value.absent(),
+            Value<String?> relatedEntityId = const Value.absent(),
+            Value<String?> createdBy = const Value.absent(),
             Value<String?> targetRole = const Value.absent(),
             Value<String?> itemId = const Value.absent(),
+            Value<String?> branchId = const Value.absent(),
             Value<bool> isRead = const Value.absent(),
             Value<DateTime> timestamp = const Value.absent(),
+            Value<String?> route = const Value.absent(),
+            Value<String?> payloadJson = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               NotificationsCompanion(
@@ -10011,12 +11234,18 @@ class $$NotificationsTableTableManager extends RootTableManager<
             id: id,
             shopId: shopId,
             title: title,
-            message: message,
+            body: body,
             type: type,
+            priority: priority,
+            relatedEntityId: relatedEntityId,
+            createdBy: createdBy,
             targetRole: targetRole,
             itemId: itemId,
+            branchId: branchId,
             isRead: isRead,
             timestamp: timestamp,
+            route: route,
+            payloadJson: payloadJson,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -10027,12 +11256,18 @@ class $$NotificationsTableTableManager extends RootTableManager<
             required String id,
             required String shopId,
             required String title,
-            required String message,
+            required String body,
             required String type,
+            Value<String> priority = const Value.absent(),
+            Value<String?> relatedEntityId = const Value.absent(),
+            Value<String?> createdBy = const Value.absent(),
             Value<String?> targetRole = const Value.absent(),
             Value<String?> itemId = const Value.absent(),
+            Value<String?> branchId = const Value.absent(),
             Value<bool> isRead = const Value.absent(),
             Value<DateTime> timestamp = const Value.absent(),
+            Value<String?> route = const Value.absent(),
+            Value<String?> payloadJson = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               NotificationsCompanion.insert(
@@ -10043,12 +11278,18 @@ class $$NotificationsTableTableManager extends RootTableManager<
             id: id,
             shopId: shopId,
             title: title,
-            message: message,
+            body: body,
             type: type,
+            priority: priority,
+            relatedEntityId: relatedEntityId,
+            createdBy: createdBy,
             targetRole: targetRole,
             itemId: itemId,
+            branchId: branchId,
             isRead: isRead,
             timestamp: timestamp,
+            route: route,
+            payloadJson: payloadJson,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -10607,6 +11848,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$ProductsTableTableManager get products =>
       $$ProductsTableTableManager(_db, _db.products);
+  $$ProductStocksTableTableManager get productStocks =>
+      $$ProductStocksTableTableManager(_db, _db.productStocks);
   $$SalesTableTableManager get sales =>
       $$SalesTableTableManager(_db, _db.sales);
   $$SuppliersTableTableManager get suppliers =>

@@ -28,7 +28,28 @@ class _SignupScreenState extends State<SignupScreen> {
   String _selectedCurrency = 'USD';
   String _selectedCountry = 'United States';
 
-  final List<String> _currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'ETB', 'KES', 'NGN', 'ZAR'];
+  static const List<Map<String, String>> _currencies = [
+    {'code': 'USD', 'name': 'US Dollar'},
+    {'code': 'EUR', 'name': 'Euro'},
+    {'code': 'GBP', 'name': 'British Pound'},
+    {'code': 'CAD', 'name': 'Canadian Dollar'},
+    {'code': 'AUD', 'name': 'Australian Dollar'},
+    {'code': 'NZD', 'name': 'New Zealand Dollar'},
+    {'code': 'JPY', 'name': 'Japanese Yen'},
+    {'code': 'CNY', 'name': 'Chinese Yuan'},
+    {'code': 'INR', 'name': 'Indian Rupee'},
+    {'code': 'SGD', 'name': 'Singapore Dollar'},
+    {'code': 'HKD', 'name': 'Hong Kong Dollar'},
+    {'code': 'AED', 'name': 'UAE Dirham'},
+    {'code': 'SAR', 'name': 'Saudi Riyal'},
+    {'code': 'ZAR', 'name': 'South African Rand'},
+    {'code': 'ETB', 'name': 'Ethiopian Birr'},
+    {'code': 'NGN', 'name': 'Nigerian Naira'},
+    {'code': 'KES', 'name': 'Kenyan Shilling'},
+    {'code': 'CHF', 'name': 'Swiss Franc'},
+    {'code': 'BRL', 'name': 'Brazilian Real'},
+    {'code': 'MXN', 'name': 'Mexican Peso'},
+  ];
   final List<String> _countries = ['United States', 'Ethiopia', 'Kenya', 'Nigeria', 'South Africa', 'United Kingdom', 'Germany', 'France', 'Japan', 'Canada', 'Australia'];
 
 
@@ -172,7 +193,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     DropdownButtonFormField<String>(
                       value: _selectedCurrency,
                       decoration: const InputDecoration(labelText: 'Primary Currency', prefixIcon: Icon(Icons.payments_outlined)),
-                      items: _currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      items: _currencies.map((c) => DropdownMenuItem(
+                        value: c['code'],
+                        child: Text('${c['code']} – ${c['name']}'),
+                      )).toList(),
                       onChanged: (v) => setState(() => _selectedCurrency = v!),
                     ),
                     const SizedBox(height: 16),

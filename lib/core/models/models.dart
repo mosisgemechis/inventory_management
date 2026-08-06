@@ -6,9 +6,9 @@ part 'models.g.dart';
 @HiveType(typeId: 4)
 enum UserRole { 
   @HiveField(0) admin, 
-  @HiveField(1) coAdmin,
-  @HiveField(2) manager,
-  @HiveField(3) staff, 
+  @HiveField(1) manager,
+  @HiveField(2) cashier,
+  @HiveField(3) inventoryStaff,
   @HiveField(4) none 
 }
 
@@ -22,7 +22,7 @@ class AppUser {
   final String username;
   final List<UserRole>? _roles;
   @HiveField(3)
-  List<UserRole> get roles => _roles ?? [UserRole.staff];
+  List<UserRole> get roles => _roles ?? [UserRole.inventoryStaff];
   @HiveField(4)
   final String shopId;
   @HiveField(5)
@@ -68,17 +68,20 @@ class AppUser {
     }
     
     List<UserRole> parsedRoles = rolesRaw.map((r) {
-      if (r == null) return UserRole.staff;
+      if (r == null) return UserRole.inventoryStaff;
       final search = r.toString().toLowerCase().trim();
       try {
         return UserRole.values.firstWhere((e) => e.name == search);
       } catch(_) {
-        return UserRole.staff;
+        if (search == 'coadmin') return UserRole.manager;
+        if (search == 'staff') return UserRole.inventoryStaff;
+        if (search == 'inventorystaff' || search == 'inventory_staff') return UserRole.inventoryStaff;
+        return UserRole.inventoryStaff;
       }
     }).toList();
     
     if (parsedRoles.isEmpty) {
-      parsedRoles = [UserRole.staff];
+      parsedRoles = [UserRole.inventoryStaff];
     }
 
     Map<String, bool>? perms;
@@ -131,79 +134,243 @@ class AppUser {
     };
   }
 
-  /// Permission constants
+  // --- Standardized Permissions (Requirement 2) ---
+  static const String pManageInventory = 'Manage Inventory';
+  static const String pManageSales = 'Manage Sales';
+  static const String pManagePurchases = 'Manage Purchases';
+  static const String pManageCustomers = 'Manage Customers';
+  static const String pManageStockTransfers = 'Manage Stock Transfers';
+  static const String pViewReports = 'View Reports';
+  static const String pViewFinancialData = 'View Financial Data';
+  static const String pManageUsers = 'Manage Users';
+  static const String pManageSettings = 'Manage Settings';
+  static const String pManageBilling = 'Manage Billing';
+  static const String pManageBranches = 'Manage Branches';
+
+  // Legacy mappings for backward compat
   static const String pViewInventory = 'canViewInventory';
-  static const String pAddProduct = 'canAddProduct';
-  static const String pEditProduct = 'canEditProduct';
-  static const String pDeleteProduct = 'canDeleteProduct';
-  static const String pAdjustStock = 'canAdjustStock';
-  static const String pViewBuyingPrice = 'canViewBuyingPrice';
-  static const String pSetSellingPrice = 'canSetSellingPrice';
-  static const String pEditSellingPrice = 'canEditSellingPrice';
-  static const String pAccessPOS = 'canAccessPOS';
-  static const String pAddPurchases = 'canAddPurchases';
-  static const String pEditPurchases = 'canEditPurchases';
-  static const String pViewReports = 'canViewReports';
-  static const String pViewProfitReports = 'canViewProfitReports';
+  static const String pAddInventory = 'canAddInventory';
+  static const String pEditInventory = 'canEditInventory';
+  static const String pDeleteInventory = 'canDeleteInventory';
+  static const String pRestockInventory = 'canRestockInventory';
+  static const String pTransferStock = 'canTransferStock';
+  static const String pViewPrices = 'canViewPrices';
+  static const String pEditPrices = 'canEditPrices';
+  static const String pApprovePrices = 'canApprovePriceChanges';
+  static const String pCreateSales = 'canCreateSales';
+  static const String pRefundSales = 'canRefundSales';
+  static const String pDeleteSales = 'canDeleteSales';
+  static const String pViewSalesHistory = 'canViewSalesHistory';
+  static const String pCreatePurchase = 'canCreatePurchase';
+  static const String pEditPurchase = 'canEditPurchase';
+  static const String pDeletePurchase = 'canDeletePurchase';
+  static const String pManageSuppliers = 'canManageSuppliers';
+  static const String pViewPurchases = 'canViewPurchases';
   static const String pExportReports = 'canExportReports';
-  static const String pAddUsers = 'canAddUsers';
+  static const String pViewProfit = 'canViewProfit';
+  static const String pCreateUsers = 'canCreateUsers';
   static const String pEditUsers = 'canEditUsers';
-  static const String pDisableUsers = 'canDisableUsers';
-  static const String pManagePermissions = 'canManagePermissions';
-  static const String pAccessSettings = 'canAccessSettings';
-  static const String pBackupRestore = 'canBackupRestore';
-  static const String pViewAdminDashboard = 'canViewAdminDashboard';
+  static const String pDeleteUsers = 'canDeleteUsers';
+  static const String pAssignPermissions = 'canAssignPermissions';
+  static const String pViewBranches = 'canViewBranches';
+  static const String pSendNotifications = 'canSendNotifications';
+  static const String pViewNotifications = 'View Notifications';
+  static const String pViewAuditLogs = 'canViewAuditLogs';
+  static const String pAddEditProducts = 'canEditInventory';
+  static const String pAccessPOS = 'canCreateSales';
+  static const String pSetSellingPrice = 'canEditPrices';
+  static const String pSellProducts = 'canCreateSales';
+  static const String pManageSubscription = 'canManageSettings';
 
   static const allPermissions = [
-    pViewInventory, pAddProduct, pEditProduct, pDeleteProduct, pAdjustStock,
-    pViewBuyingPrice, pSetSellingPrice, pEditSellingPrice, pAccessPOS,
-    pAddPurchases, pEditPurchases, pViewReports, pViewProfitReports,
-    pExportReports, pAddUsers, pEditUsers, pDisableUsers, pManagePermissions,
-    pAccessSettings, pBackupRestore, pViewAdminDashboard
+    pManageInventory,
+    pManageSales,
+    pManagePurchases,
+    pManageCustomers,
+    pManageStockTransfers,
+    pViewReports,
+    pViewFinancialData,
+    pManageUsers,
+    pManageSettings,
+    pManageBilling,
+    pManageBranches,
+    pViewNotifications,
   ];
+
+  static const Map<String, List<String>> permissionGroups = {
+    'Core Permissions': [
+      pManageInventory,
+      pManageSales,
+      pManagePurchases,
+      pManageCustomers,
+      pManageStockTransfers,
+    ],
+    'Reporting Permissions': [
+      pViewReports,
+      pViewFinancialData,
+    ],
+    'Administrative Permissions': [
+      pManageUsers,
+      pManageSettings,
+      pManageBilling,
+      pManageBranches,
+      pViewNotifications,
+    ],
+  };
 
   /// Permission Check with Role Fallback
   bool hasPermission(String permission) {
-    // 1. Admins have absolute power
+    // 1. ADMINS have absolute power (Master Key)
     if (roles.contains(UserRole.admin)) return true;
 
-    // 2. Explicit Permission Override check (from Drift string/JSON)
-    if (permissions != null && permissions!.containsKey(permission)) {
-      return permissions![permission] == true;
+    // Resolve legacy constants to their respective new permissions first:
+    String resolved = permission;
+    switch (permission) {
+      case 'canViewInventory':
+      case 'canAddInventory':
+      case 'canEditInventory':
+      case 'canDeleteInventory':
+      case 'canRestockInventory':
+      case 'canViewPrices':
+      case 'canEditPrices':
+      case 'canApprovePriceChanges':
+        resolved = pManageInventory;
+        break;
+
+      case 'canCreateSales':
+      case 'canRefundSales':
+      case 'canDeleteSales':
+      case 'canViewSalesHistory':
+      case 'canAccessPOS':
+      case 'canSellProducts':
+        resolved = pManageSales;
+        break;
+
+      case 'canCreatePurchase':
+      case 'canEditPurchase':
+      case 'canDeletePurchase':
+      case 'canManageSuppliers':
+      case 'canViewPurchases':
+      case 'canManagePurchases':
+        resolved = pManagePurchases;
+        break;
+
+      case 'canTransferStock':
+        resolved = pManageStockTransfers;
+        break;
+
+      case 'canViewReports':
+      case 'canExportReports':
+        resolved = pViewReports;
+        break;
+      
+      case 'canViewProfit':
+        resolved = pViewFinancialData;
+        break;
+
+      case 'canManageUsers':
+      case 'canCreateUsers':
+      case 'canEditUsers':
+      case 'canDeleteUsers':
+      case 'canAssignPermissions':
+        resolved = pManageUsers;
+        break;
+
+      case 'canManageSettings':
+      case 'canSendNotifications':
+      case 'canViewNotifications':
+      case 'canViewAuditLogs':
+        resolved = pManageSettings;
+        break;
+
+      case 'canManageSubscription':
+        resolved = pManageBilling;
+        break;
+
+      case 'canViewBranches':
+      case 'canManageBranches':
+        resolved = pManageBranches;
+        break;
+    }
+
+    // 2. Explicit Permission Overrides (e.g. from JSON permissions map)
+    if (permissions != null && permissions!.containsKey(resolved)) {
+      return permissions![resolved] == true;
     }
     
-    // 3. Role-based Defaults (Fallbacks)
+    // 3. Role-based Defaults (Strategic Logic)
     final r = role;
-    switch (permission) {
-      case pAccessPOS:
-      case pViewInventory:
-        return true; // Staff/Managers can do these by default
-      case pAddProduct:
-      case pEditProduct:
-      case pAdjustStock:
-      case pAddPurchases:
-        return r == UserRole.coAdmin || r == UserRole.manager;
-      case pDeleteProduct:
-      case pEditSellingPrice:
-      case pViewBuyingPrice:
-        return r == UserRole.coAdmin; // Restricted mostly to Co-Admin
-      case pSetSellingPrice:
-      case pViewReports:
-      case pViewProfitReports:
-      case pExportReports:
-        return r == UserRole.coAdmin || r == UserRole.manager;
-      case pAddUsers:
-      case pEditUsers:
-      case pDisableUsers:
-      case pManagePermissions:
-      case pAccessSettings:
-      case pBackupRestore:
-        return r == UserRole.coAdmin;
-      case pViewAdminDashboard:
-        return r == UserRole.coAdmin || r == UserRole.manager;
-      default:
-        return false;
+
+    // MANAGER Logic: Inventory, Sales, Purchases, Reports, Financial Data, Transfers, Branches, Settings (except Billing/Users)
+    if (r == UserRole.manager) {
+       switch (resolved) {
+         case pManageInventory:
+         case pManageSales:
+         case pManagePurchases:
+         case pManageCustomers:
+         case pManageStockTransfers:
+         case pViewReports:
+         case pViewFinancialData:
+         case pManageSettings:
+         case pManageBranches:
+           return true;
+         default:
+           return false; 
+       }
     }
+
+    // CASHIER Logic: POS/Sales, Customer management (debt)
+    if (r == UserRole.cashier) {
+       switch (resolved) {
+         case pManageSales:
+         case pManageCustomers:
+           return true;
+         default:
+           return false;
+       }
+    }
+
+    // INVENTORY STAFF Logic: Basic Inventory, Stock Transfers
+    if (r == UserRole.inventoryStaff) {
+       switch (resolved) {
+         case pManageInventory:
+         case pManageStockTransfers:
+           return true;
+         default:
+           return false;
+       }
+    }
+
+    return false;
+  }
+
+  bool hasBranchAccess(String targetBranchId) {
+    if (roles.contains(UserRole.admin)) return true;
+    if (permissions != null && permissions!['branch_access_all'] == true) return true;
+    if (targetBranchId == 'all') {
+      return roles.contains(UserRole.admin) || (permissions != null && permissions!['branch_access_all'] == true);
+    }
+    if (permissions != null && permissions!['branch_access_$targetBranchId'] == true) return true;
+    return branchId == targetBranchId;
+  }
+
+  List<String> getAssignedBranchIds(List<String> allShopBranchIds) {
+    if (roles.contains(UserRole.admin) || (permissions != null && permissions!['branch_access_all'] == true)) {
+      return ['all', ...allShopBranchIds];
+    }
+    final list = <String>[];
+    for (final bid in allShopBranchIds) {
+      if (permissions != null && permissions!['branch_access_$bid'] == true) {
+        list.add(bid);
+      }
+    }
+    if (!list.contains(branchId) && branchId.isNotEmpty) {
+      list.add(branchId);
+    }
+    if (list.isEmpty) {
+      list.add('main');
+    }
+    return list;
   }
 }
 
@@ -269,7 +436,7 @@ class Product {
       buyingPrice: (map['buyingPrice'] ?? 0.0).toDouble(),
       sellingPrice: (map['sellingPrice'] ?? 0.0).toDouble(),
       lowStockThreshold: map['lowStockThreshold'] ?? 5,
-      expiryDate: parseDT(map['expiryDate']),
+      expiryDate: parseDT(map['expiry'] ?? map['exp'] ?? map['expiryDate']),
       batchNumber: map['batchNumber'],
       isBundle: map['isBundle'] ?? false,
       bundleItems: map['bundleItems'] != null ? List<String>.from(map['bundleItems']) : null,
@@ -547,6 +714,8 @@ class AppNotification {
   final String type; // admin / staff / cashier / both
   final DateTime timestamp;
   final bool isRead;
+  final String? route;
+  final String? payloadJson;
 
   AppNotification({
     required this.id,
@@ -555,6 +724,8 @@ class AppNotification {
     required this.type,
     required this.timestamp,
     this.isRead = false,
+    this.route,
+    this.payloadJson,
   });
 
   factory AppNotification.fromMap(Map<String, dynamic> map, String docId) {
@@ -564,7 +735,9 @@ class AppNotification {
       message: map['message'] ?? '',
       type: map['type'] ?? 'staff',
       timestamp: parseDT(map['timestamp']) ?? DateTime.now(),
-      isRead: map['isRead'] ?? false,
+      isRead: map['isRead'] == true || map['isRead'] == 1,
+      route: map['route']?.toString(),
+      payloadJson: map['payloadJson']?.toString(),
     );
   }
 
@@ -575,6 +748,8 @@ class AppNotification {
       'type': type,
       'timestamp': timestamp.toIso8601String(),
       'isRead': isRead,
+      'route': route,
+      'payloadJson': payloadJson,
     };
   }
 }
@@ -611,9 +786,32 @@ class CartItem {
 
 DateTime? parseDT(dynamic timestamp) {
   if (timestamp == null) return null;
-  if (timestamp is String) return DateTime.tryParse(timestamp);
   if (timestamp is DateTime) return timestamp;
-  if (timestamp is int) return DateTime.fromMillisecondsSinceEpoch(timestamp);
-  return null;
+  DateTime? dt;
+  if (timestamp is int) {
+    if (timestamp < 10000000000) {
+      dt = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+    } else {
+      dt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    }
+  } else if (timestamp is String && timestamp.isNotEmpty) {
+    dt = DateTime.tryParse(timestamp);
+    if (dt == null) {
+      final numVal = int.tryParse(timestamp);
+      if (numVal != null) {
+        if (numVal < 10000000000) {
+          dt = DateTime.fromMillisecondsSinceEpoch(numVal * 1000);
+        } else {
+          dt = DateTime.fromMillisecondsSinceEpoch(numVal);
+        }
+      }
+    }
+  }
+  
+  // Sanity check: If date is too far in future (e.g. 178001 bug), reject it.
+  if (dt != null && (dt.year > 2100 || dt.year < 1980)) {
+    return null;
+  }
+  return dt?.toLocal();
 }
 

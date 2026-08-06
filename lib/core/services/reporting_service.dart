@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'reporting_interface.dart';
@@ -7,55 +6,71 @@ import 'reporting_native.dart' if (dart.library.html) 'reporting_web.dart';
 class ReportingService {
   final ReportingInterface _service = getReportingService();
 
-  Future<String> exportFullExcel(List<Map<String, dynamic>> sales,
-      List<Map<String, dynamic>> purchases, Map<String, dynamic> labels) async {
-    
-    // Convert snapshots to plain Maps and sanitize Timestamps for isolate compatibility
-    final salesData = sales.map((d) {
-      final m = Map<String, dynamic>.from(d);
-      m.forEach((k, v) { if (v is Timestamp) m[k] = v.toDate().toIso8601String(); });
-      return m;
-    }).toList();
-    final purchaseData = purchases.map((d) {
-       final m = Map<String, dynamic>.from(d);
-       m.forEach((k, v) { if (v is Timestamp) m[k] = v.toDate().toIso8601String(); });
-       return m;
-    }).toList();
-
-    final result = await compute(_calculateExcelData, {
-      'sales': salesData,
-      'purchases': purchaseData,
-      'labels': labels,
-    });
-
-    return _service.exportToExcel(
-        'Business_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}',
-        'Wealth Report',
-        result['headers'] as List<String>,
-        result['rows'] as List<List<dynamic>>);
+  Future<String> exportReportToExcel(String fileName, Map<String, dynamic> data) async {
+    return _service.exportReportToExcel(fileName, data);
   }
 
   Future<String> exportSalesExcel(List<Map<String, dynamic>> sales) async {
-    return exportFullExcel(sales, [], {
-       'metric': 'METRIC',
-       'value': 'VALUE',
-       'top_selling': 'TOP SELLING',
-       'revenue': 'REVENUE',
-       'total_revenue': 'Total Revenue',
-       'total_profit': 'Total Profit',
-       'total_purchases': 'Total Purchases',
-       'net_performance': 'Net Performance',
-       'profit_margin': 'Profit Margin',
-       'transactions': 'Transactions',
-       'date': 'DATE',
-       'product': 'PRODUCT',
-       'qty': 'QTY',
-       'profit': 'PROFIT',
-       'customer': 'CUSTOMER',
-       'type': 'TYPE',
-       'debt': 'Debt',
-       'cash': 'Cash',
-    });
+    double totalRev = 0, totalProf = 0, totalUnpaid = 0;
+    Map<String, double> productRevMap = {};
+    Map<String, double> productQtyMap = {};
+
+    for (var m in sales) {
+      final rev = (m['totalPrice'] ?? 0.0).toDouble();
+      final prof = (m['profit'] ?? 0.0).toDouble();
+      totalRev += rev;
+      totalProf += prof;
+      if (m['isDebt'] == true) {
+        totalUnpaid += (m['debtRemaining'] ?? m['totalPrice'] ?? 0.0).toDouble();
+      }
+      final name = m['itemName']?.toString() ?? 'Unknown';
+      productRevMap[name] = (productRevMap[name] ?? 0.0) + rev;
+      productQtyMap[name] = (productQtyMap[name] ?? 0.0) + (m['quantity'] ?? 0).toDouble();
+    }
+
+    final sortedByQty = productQtyMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topProducts = sortedByQty.take(10).map((e) {
+      final name = e.key;
+      final qty = e.value;
+      final rev = productRevMap[name] ?? 0.0;
+      double itemProf = 0;
+      for (var s in sales) {
+        if (s['itemName'] == name) {
+          itemProf += (s['profit'] ?? 0.0).toDouble();
+        }
+      }
+      return {
+        'name': name,
+        'qty': qty,
+        'rev': rev,
+        'profit': itemProf,
+        'avgPrice': qty > 0 ? (rev / qty) : 0.0,
+        'contrib': totalRev > 0 ? (rev / totalRev * 100) : 0.0,
+      };
+    }).toList();
+
+    final reportData = {
+      'revenue': totalRev,
+      'profit': totalProf,
+      'orders': sales.length,
+      'debt': totalUnpaid,
+      'purchases': 0.0,
+      'lowStockCount': 0,
+      'outStockCount': 0,
+      'expiredCount': 0,
+      'soonCount': 0,
+      'topProducts': topProducts,
+      'leastProducts': [],
+      'dailySales': [],
+      'sales': sales,
+      'companyName': 'SmartInventory ERP',
+      'branchName': 'All Branches',
+      'period': 'All Transactions',
+      'currency': 'ETB',
+      'generatedBy': 'System Admin',
+    };
+
+    return exportReportToExcel('Business_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}', reportData);
   }
 
   Future<String> exportToPdf(String fileName, Map<String, dynamic> data) async {
@@ -85,7 +100,7 @@ Map<String, dynamic> _calculateExcelData(Map<String, dynamic> input) {
   final detailRows = sales.map((m) {
     final tsRaw = m['timestamp'];
     DateTime? ts;
-    if (tsRaw is Timestamp) ts = tsRaw.toDate();
+    if (tsRaw is DateTime) ts = tsRaw;
     else if (tsRaw is String) ts = DateTime.tryParse(tsRaw);
 
     final rev = (m['totalPrice'] ?? 0).toDouble();

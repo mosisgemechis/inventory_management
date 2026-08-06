@@ -66,7 +66,7 @@ class FirestoreService {
   }
 
   Future<void> deleteEntireShop(String shopId) async {
-    await _offline.factoryReset();
+    await _offline.factoryReset(shopId);
   }
 
   Future<bool> isUsernameTaken(String username) async {
@@ -77,7 +77,7 @@ class FirestoreService {
   Future<void> checkExpiryAlerts(String shopId) async {}
 
   Future<void> fullFactoryReset(String shopId) async {
-    await _offline.factoryReset();
+    await _offline.factoryReset(shopId);
   }
 }
 

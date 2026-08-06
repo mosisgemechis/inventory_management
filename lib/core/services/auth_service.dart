@@ -10,7 +10,7 @@ import 'subscription_service.dart';
 
 class AuthService with ChangeNotifier {
   // OFFLINE MODE OVERRIDE:
-  // All Firebase Auth features are disabled. 
+  // All Firebase Auth features are disabled.
   // Identity management is provided exclusively via the local SQLite 'users' table.
 
   AppUser? _user;
@@ -29,9 +29,31 @@ class AuthService with ChangeNotifier {
   final Completer<void> _initCompleter = Completer<void>();
   Future<void> get initialization => _initCompleter.future;
 
+  StreamSubscription<Map<String, dynamic>?>? _userWatchSub;
+
   void _safeNotify() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
+    });
+  }
+
+  void _bindLiveUserUpdates() {
+    _userWatchSub?.cancel();
+    final uid = _user?.id;
+    if (uid == null || uid.isEmpty) return;
+    _userWatchSub = DatabaseService().watchUserById(uid).listen((m) async {
+      if (m == null) return;
+      final next = AppUser.fromMap(m, m['uid']?.toString() ?? uid);
+      if (!next.isActive) {
+        // Auto-signout if account is disabled.
+        await signOut();
+        return;
+      }
+      _user = next;
+      // Keep app settings aligned for branch-scoped streams and guards.
+      await DatabaseService().saveSetting('active_shop_id', next.shopId);
+      await DatabaseService().saveSetting('active_branch_id', next.branchId);
+      _safeNotify();
     });
   }
 
@@ -41,20 +63,21 @@ class AuthService with ChangeNotifier {
 
   Future<void> loadSession() async {
     debugPrint("OFFLINE MODE: Loading local enterprise session...");
-    
+
     // 1. Seed the database with a default Admin if empty
     await _seedDefaultAdmin();
-    
+
     // 2. Load the last active session from the users table
     try {
       final userMap = await DatabaseService().getCachedUser();
       if (userMap != null) {
         _user = AppUser.fromMap(userMap, userMap['uid']);
+        _bindLiveUserUpdates();
       }
     } catch (e) {
       debugPrint("Error loading local session: $e");
     }
-    
+
     _initialized = true;
     if (!_initCompleter.isCompleted) _initCompleter.complete();
     _safeNotify();
@@ -90,15 +113,15 @@ class AuthService with ChangeNotifier {
 
   Future<void> signIn(String identifier, String password) async {
     await initialization;
-    
+
     final inputLower = identifier.trim().toLowerCase();
     final passwordTrimmed = password.trim();
     final hashedInput = _hashPassword(passwordTrimmed);
 
     try {
       // Query local users table
-      final localUsers = await DatabaseService().query('users', 
-        where: 'username = ? OR email = ?', 
+      final localUsers = await DatabaseService().query('users',
+        where: 'username = ? OR email = ?',
         whereArgs: [inputLower, inputLower]
       );
 
@@ -112,19 +135,30 @@ class AuthService with ChangeNotifier {
       if (storedHash != null && storedHash == hashedInput) {
         final currency = await DatabaseService().getSetting('currency') ?? 'USD';
         final userWithCurrency = {...userData, 'currency': currency};
-        
+
         final newUser = AppUser.fromMap(userWithCurrency, userData['uid'].toString());
-        
+
         if (!newUser.isActive) {
           throw Exception("This account has been disabled by the administrator.");
         }
 
         _user = newUser;
+        _bindLiveUserUpdates();
 
         _loginAttempts = 0;
         _lockoutUntil = null;
-        
+
         await DatabaseService().cacheUser(userWithCurrency);
+
+        // Record a LOGIN audit event for every successful authentication (fire-and-forget).
+        DatabaseService().recordAuditLog(
+          newUser.shopId,
+          newUser.username,
+          'LOGIN',
+          '${newUser.username} logged in from ${newUser.branchName ?? newUser.branchId ?? 'main'}',
+          branchId: newUser.branchId ?? 'main',
+        ).catchError((_) {});
+
         _safeNotify();
         debugPrint("OFFLINE MODE: Login successful for $identifier");
       } else {
@@ -161,8 +195,8 @@ class AuthService with ChangeNotifier {
 
     try {
       // 1. Check if username or email already exists locally
-      final existing = await DatabaseService().query('users', 
-        where: 'username = ? OR email = ?', 
+      final existing = await DatabaseService().query('users',
+        where: 'username = ? OR email = ?',
         whereArgs: [usernameKey, email.trim().toLowerCase()]
       );
 
@@ -172,7 +206,7 @@ class AuthService with ChangeNotifier {
 
       // 2. Save locally
       await DatabaseService().saveUserRecord(userData);
-      
+
       // 3. Save shop settings
       await DatabaseService().saveSetting('shopName', shopName);
       if (currency != null) {
@@ -181,6 +215,7 @@ class AuthService with ChangeNotifier {
 
       final authenticatedUser = {...userData, 'currency': currency ?? 'USD'};
       _user = AppUser.fromMap(authenticatedUser, uid);
+      _bindLiveUserUpdates();
       await DatabaseService().cacheUser(authenticatedUser);
       _safeNotify();
     } catch (e) {
@@ -225,6 +260,8 @@ class AuthService with ChangeNotifier {
 
   Future<void> signOut() async {
     SubscriptionService().clear();
+    await _userWatchSub?.cancel();
+    _userWatchSub = null;
     await DatabaseService().clearCachedUser();
     _user = null;
     notifyListeners();
@@ -233,6 +270,104 @@ class AuthService with ChangeNotifier {
   String _hashPassword(String password) {
     final bytes = utf8.encode(password);
     return sha256.convert(bytes).toString();
+  }
+
+  /// Validates standard enterprise password complexity rules.
+  static String? validatePasswordRequirements(String password) {
+    final p = password.trim();
+    if (p.length < 8) return 'Password must be at least 8 characters long.';
+    if (!RegExp(r'[A-Z]').hasMatch(p)) return 'Password must contain at least 1 uppercase letter.';
+    if (!RegExp(r'[0-9]').hasMatch(p)) return 'Password must contain at least 1 digit.';
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(p)) return 'Password must contain at least 1 special character.';
+    return null;
+  }
+
+  /// Changes the currently logged in user's password after verifying their current password.
+  Future<void> changeCurrentPassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final currentUser = _user;
+    if (currentUser == null) throw Exception("User is not logged in.");
+
+    final currentTrimmed = currentPassword.trim();
+    final newTrimmed = newPassword.trim();
+    final confirmTrimmed = confirmPassword.trim();
+
+    if (currentTrimmed.isEmpty || newTrimmed.isEmpty || confirmTrimmed.isEmpty) {
+      throw Exception("All password fields are required.");
+    }
+
+    final userRows = await DatabaseService().query('users', where: 'uid = ?', whereArgs: [currentUser.id]);
+    if (userRows.isEmpty) throw Exception("User record not found.");
+
+    final storedHash = userRows.first['passwordHash']?.toString();
+    if (storedHash != _hashPassword(currentTrimmed)) {
+      throw Exception("Current password is incorrect.");
+    }
+
+    if (newTrimmed == currentTrimmed) {
+      throw Exception("New password cannot be identical to current password.");
+    }
+
+    if (newTrimmed != confirmTrimmed) {
+      throw Exception("New password confirmation does not match.");
+    }
+
+    final valError = validatePasswordRequirements(newTrimmed);
+    if (valError != null) throw Exception(valError);
+
+    final newHash = _hashPassword(newTrimmed);
+    await DatabaseService().updateUserPassword(currentUser.id, newHash);
+
+    await DatabaseService().recordAuditLog(
+      currentUser.shopId,
+      currentUser.username,
+      'PASSWORD_CHANGED',
+      'User ${currentUser.username} changed their password.',
+      branchId: currentUser.branchId ?? 'main',
+    );
+
+    await signOut();
+  }
+
+  /// Resets another user's password (requires Manage Users permission).
+  Future<void> adminResetUserPassword({
+    required String targetUserId,
+    required String targetUsername,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final adminUser = _user;
+    if (adminUser == null || !adminUser.hasPermission(AppUser.pManageUsers)) {
+      throw Exception("Permission denied: You do not have permission to reset user passwords.");
+    }
+
+    final newTrimmed = newPassword.trim();
+    final confirmTrimmed = confirmPassword.trim();
+
+    if (newTrimmed.isEmpty || confirmTrimmed.isEmpty) {
+      throw Exception("Password fields cannot be empty.");
+    }
+
+    if (newTrimmed != confirmTrimmed) {
+      throw Exception("Password confirmation does not match.");
+    }
+
+    final valError = validatePasswordRequirements(newTrimmed);
+    if (valError != null) throw Exception(valError);
+
+    final newHash = _hashPassword(newTrimmed);
+    await DatabaseService().updateUserPassword(targetUserId, newHash);
+
+    await DatabaseService().recordAuditLog(
+      adminUser.shopId,
+      adminUser.username,
+      'PASSWORD_RESET',
+      'Admin ${adminUser.username} reset password for user $targetUsername.',
+      branchId: adminUser.branchId ?? 'main',
+    );
   }
 
   // --- STUBS FOR TRANSITION ---
@@ -263,4 +398,3 @@ class AuthService with ChangeNotifier {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 }
-

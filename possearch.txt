@@ -1,0 +1,22 @@
+﻿
+lib\features\admin\admin_dash
+board_screen.dart:2308:      
+            onChanged: (v) 
+=> _handlePOSSearch(v, user),
+lib\features\admin\admin_dash
+board_screen.dart:2318:      
+                        
+onPressed: () { 
+_posBarcodeC.clear(); 
+_handlePOSSearch('', user); 
+}),
+lib\features\admin\admin_dash
+board_screen.dart:6467:      
+          if (user != null) 
+_handlePOSSearch(code, user);
+lib\features\admin\admin_dash
+board_screen.dart:6476:  
+void _handlePOSSearch(String 
+query, AppUser user) async {
+
+

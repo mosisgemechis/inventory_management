@@ -1,0 +1,71 @@
+﻿
+lib\core\repositories\invento
+ry_repository.dart:35:    // 
+2. Duplicate Check (Precise 
+Identity Matching)
+lib\core\repositories\invento
+ry_repository.dart:460:    
+// NO duplicate detector 
+constraint here because it 
+operates on existing items.
+lib\core\services\database_se
+rvice.dart:1115:  /// Scans 
+all products for a shop and 
+emits deduplicated expiry 
+notifications:
+lib\core\services\import_serv
+ice.dart:83:    if (parseResu
+lt.validCompanions.isEmpty 
+&& parseResult.duplicates.isE
+mpty) {
+lib\core\services\import_serv
+ice.dart:102:    final 
+List<ImportDuplicateRow> 
+duplicates = [];
+lib\core\services\import_serv
+ice.dart:112:        duplicat
+es.add(ImportDuplicateRow(
+lib\core\services\import_serv
+ice.dart:129:    return 
+ImportResult(valid, 
+parseResult.errors, 
+duplicates: duplicates, 
+totalRows: 
+parseResult.totalRows);
+lib\core\services\import_serv
+ice.dart:151:    for (var 
+duplicate in 
+parseResult.duplicates) {
+lib\core\services\import_serv
+ice.dart:152:      final id 
+= 
+duplicate.existingData['id'];
+lib\core\services\import_serv
+ice.dart:159:        
+...duplicate.newData,
+lib\core\services\validation_
+service.dart:20:    // 
+Retrieve products for this 
+branch specifically to check 
+for duplicates
+lib\core\services\validation_
+service.dart:32:        
+throw Exception('DUPLICATE 
+ERROR: Product with this 
+Barcode already exists in 
+this branch.');
+lib\core\services\validation_
+service.dart:38:      final 
+duplicateBatch = 
+allItems.any((item) => 
+lib\core\services\validation_
+service.dart:43:      if 
+(duplicateBatch) {
+lib\core\services\validation_
+service.dart:44:        
+throw Exception('DUPLICATE 
+ERROR: Product with this 
+Batch Number already exists 
+in this branch.');
+
+

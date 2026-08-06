@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../db/app_database.dart';
 import '../models/subscription_models.dart';
 import 'database_service.dart';
 
@@ -29,7 +28,7 @@ class SubscriptionService extends ChangeNotifier {
     _isInitializing = true;
     notifyListeners();
     await _loadSubscription(shopId);
-    
+
     // If no subscription exists, create a trial
     if (_current == null) {
       await startTrial(shopId);
@@ -41,7 +40,11 @@ class SubscriptionService extends ChangeNotifier {
   }
 
   Future<void> _loadSubscription(String shopId) async {
-    final results = await _db.query('subscriptions', where: 'shopId = ?', orderBy: 'activationDate DESC', limit: 1, whereArgs: [shopId]);
+    final results = await _db.query('subscriptions',
+        where: 'shopId = ?',
+        orderBy: 'activationDate DESC',
+        limit: 1,
+        whereArgs: [shopId]);
     if (results.isNotEmpty) {
       _current = ActiveSubscription.fromMap(results.first);
       notifyListeners();
@@ -51,11 +54,12 @@ class SubscriptionService extends ChangeNotifier {
   Future<void> startTrial(String shopId) async {
     final now = DateTime.now();
     // 5 minutes in test mode, 7 days in production
-    final expiry = now.add(_testMode ? const Duration(minutes: 5) : const Duration(days: 7));
-    
+    final expiry = now
+        .add(_testMode ? const Duration(minutes: 5) : const Duration(days: 7));
+
     final data = {
       'shopId': shopId,
-      'plan': SubscriptionPlan.trial.name.toLowerCase(), 
+      'plan': SubscriptionPlan.trial.name.toLowerCase(),
       'activationDate': now.toIso8601String(),
       'expiryDate': expiry.toIso8601String(),
       'addOns': '[]',
@@ -70,11 +74,13 @@ class SubscriptionService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> activateSubscription(String shopId, SubscriptionPlan plan, {List<SubscriptionAddOn> addOns = const []}) async {
+  Future<void> activateSubscription(String shopId, SubscriptionPlan plan,
+      {List<SubscriptionAddOn> addOns = const []}) async {
     final now = DateTime.now();
     // 5 minutes for payment testing, 30 days for production
-    final expiry = now.add(_testMode ? const Duration(minutes: 5) : const Duration(days: 30));
-    
+    final expiry = now
+        .add(_testMode ? const Duration(minutes: 5) : const Duration(days: 30));
+
     int uLimit = 3;
     int bLimit = 1;
     if (plan == SubscriptionPlan.business) {
@@ -85,15 +91,21 @@ class SubscriptionService extends ChangeNotifier {
       bLimit = 70;
     }
 
-    if (addOns.contains(SubscriptionAddOn.extraUser)) uLimit += 5;
-    if (addOns.contains(SubscriptionAddOn.extraBranch)) bLimit += 2;
+    final extraUserCount =
+        addOns.where((addon) => addon == SubscriptionAddOn.extraUser).length;
+    final extraBranchCount =
+        addOns.where((addon) => addon == SubscriptionAddOn.extraBranch).length;
+
+    uLimit += extraUserCount;
+    bLimit += extraBranchCount;
 
     final data = {
       'shopId': shopId,
       'plan': plan.name.toLowerCase(),
       'activationDate': now.toIso8601String(),
       'expiryDate': expiry.toIso8601String(),
-      'addOns': jsonEncode(addOns.map((e) => e.name).toList()), // Using extension name
+      'addOns': jsonEncode(
+          addOns.map((e) => e.name).toList()), // Using extension name
       'isTrial': 0,
       'userLimit': uLimit,
       'branchLimit': bLimit,
@@ -105,7 +117,10 @@ class SubscriptionService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> upgrade({required String shopId, required SubscriptionPlan plan, List<SubscriptionAddOn> addOns = const []}) async {
+  Future<void> upgrade(
+      {required String shopId,
+      required SubscriptionPlan plan,
+      List<SubscriptionAddOn> addOns = const []}) async {
     await activateSubscription(shopId, plan, addOns: addOns);
   }
 
@@ -117,7 +132,7 @@ class SubscriptionService extends ChangeNotifier {
       if (_current!.isExpired) {
         timer.cancel();
       }
-      notifyListeners(); 
+      notifyListeners();
     });
   }
 

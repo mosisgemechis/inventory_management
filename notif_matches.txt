@@ -1,0 +1,105 @@
+﻿
+lib\core\services\database_se
+rvice.dart:559:  /// Backend 
+can use it to deliver remote 
+push notifications to this 
+device.
+lib\core\services\database_se
+rvice.dart:971:  
+Future<void> 
+addNotification(Map<String, 
+dynamic> data) async {
+lib\core\services\database_se
+rvice.dart:980:    // 
+Dedupe: prevent spamming 
+identical unread 
+notifications in a short 
+window.
+lib\core\services\database_se
+rvice.dart:983:      final q 
+= 
+_db.select(_db.notifications)
+lib\core\services\database_se
+rvice.dart:1004:    final 
+entry = NotificationsCompanio
+n.insert(
+lib\core\services\database_se
+rvice.dart:1021:    await _db
+.into(_db.notifications).inse
+rt(entry, mode: 
+InsertMode.insertOrReplace);
+lib\core\services\database_se
+rvice.dart:1022:    
+debugPrint('[DRIFT 
+NOTIFICATION] 
+${data['title']}: 
+${data['message'] ?? ''}');
+lib\core\services\database_se
+rvice.dart:1027:      table: 
+'notifications',
+lib\core\services\database_se
+rvice.dart:1070:  
+Stream<List<Map<String, 
+dynamic>>> 
+watchNotifications(String 
+shopId) {
+lib\core\services\database_se
+rvice.dart:1071:    return (_
+db.select(_db.notifications).
+.where((t) => 
+t.shopId.equals(shopId) & 
+t.isRead.equals(false))
+lib\core\services\database_se
+rvice.dart:1090:  
+Future<void> markNotification
+AsRead(String id) async {
+lib\core\services\database_se
+rvice.dart:1091:    await (_d
+b.update(_db.notifications)..
+where((t) => 
+t.id.equals(id)))
+lib\core\services\database_se
+rvice.dart:1092:        
+.write(const NotificationsCom
+panion(isRead: Value(true)));
+lib\core\services\database_se
+rvice.dart:1095:  
+Future<void> clearProductNoti
+fications(String shopId, 
+String productId, String 
+type) async {
+lib\core\services\database_se
+rvice.dart:1096:    await (_d
+b.update(_db.notifications)
+lib\core\services\database_se
+rvice.dart:1098:        
+.write(const NotificationsCom
+panion(isRead: Value(true)));
+lib\core\services\database_se
+rvice.dart:1101:  
+Future<void> markAllNotificat
+ionsAsRead(String shopId) 
+async {
+lib\core\services\database_se
+rvice.dart:1102:    await (_d
+b.update(_db.notifications)..
+where((t) => 
+t.shopId.equals(shopId)))
+lib\core\services\database_se
+rvice.dart:1103:        
+.write(const NotificationsCom
+panion(isRead: Value(true)));
+lib\core\services\database_se
+rvice.dart:1107:     await 
+addNotification({
+lib\core\services\database_se
+rvice.dart:1109:       
+'title': 'System 
+Notification',
+lib\core\services\database_se
+rvice.dart:1224:    await (_d
+b.delete(_db.notifications)..
+where((t) => t.shopId.equals(
+shopId))).go();
+
+

@@ -1,0 +1,14 @@
+L5058|              const Divider(height: 1),
+L5059|              ListTile(
+L5060|                const Divider(height: 1),
+L5061|                ListTile(
+L5062|                  leading: const Icon(Icons.delete_forever_rounded,
+L5063|                      color: AppColors.danger),
+L5064|                  title: const Text("Factory Reset",
+L5065|                      style: TextStyle(
+L5066|                          color: AppColors.danger, fontWeight: FontWeight.bold)),
+L5067|                  subtitle: const Text("Clear all inventory, sales, and logs",
+L5068|                      style: TextStyle(color: AppColors.danger)),
+L5069|                  onTap: !isAdmin
+L5070|                      ? null
+L5071|                      : () async {

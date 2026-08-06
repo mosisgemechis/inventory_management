@@ -28,7 +28,14 @@ class LoadingOverlay {
 
   static void hide(BuildContext context) {
     if (_isVisible) {
-      Navigator.of(context, rootNavigator: true).pop();
+      try {
+        final navigator = Navigator.of(context, rootNavigator: true);
+        if (navigator.canPop()) {
+          navigator.pop();
+        }
+      } catch (e) {
+        debugPrint("LoadingOverlay hide error: $e");
+      }
       _isVisible = false;
     }
   }

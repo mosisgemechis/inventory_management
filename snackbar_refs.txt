@@ -1,0 +1,335 @@
+﻿
+lib\features\admin\admin_dash
+board_screen.dart:53:  void 
+_showSnackBar(String 
+message, {bool isError = 
+false}) {
+lib\features\admin\admin_dash
+board_screen.dart:56:    Scaf
+foldMessenger.of(context).sho
+wSnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:310:      
+_showSnackBar("Quick Sale 
+Success!");
+lib\features\admin\admin_dash
+board_screen.dart:313:      
+_showSnackBar(e.toString(), 
+isError: true);
+lib\features\admin\admin_dash
+board_screen.dart:805:       
+ScaffoldMessenger.of(context)
+.showSnackBar(SnackBar(conten
+t: Text("Transfer Details: 
+${req['message']}")));
+lib\features\admin\admin_dash
+board_screen.dart:844:       
+ _showSnackBar('All 
+notifications marked as 
+read.');
+lib\features\admin\admin_dash
+board_screen.dart:1685:      
+                  if 
+(mounted) ScaffoldMessenger.o
+f(context).showSnackBar(const
+ SnackBar(content: 
+Text('Account updated!'), 
+backgroundColor: 
+AppColors.success));
+lib\features\admin\admin_dash
+board_screen.dart:1688:      
+                  if 
+(mounted) ScaffoldMessenger.o
+f(context).showSnackBar(Snack
+Bar(content: Text('Error: 
+$e'), backgroundColor: 
+AppColors.danger));
+lib\features\admin\admin_dash
+board_screen.dart:1721:      
+            ScaffoldMessenger
+.of(context).showSnackBar(Sna
+ckBar(
+lib\features\admin\admin_dash
+board_screen.dart:1726:      
+            ScaffoldMessenger
+.of(context).showSnackBar(Sna
+ckBar(
+lib\features\admin\admin_dash
+board_screen.dart:2135:      
+                   ScaffoldMe
+ssenger.of(context).showSnack
+Bar(const SnackBar(content: 
+Text("Please fill all 
+required fields")));
+lib\features\admin\admin_dash
+board_screen.dart:2172:      
+                    ScaffoldM
+essenger.of(context).showSnac
+kBar(
+lib\features\admin\admin_dash
+board_screen.dart:2178:      
+                    ScaffoldM
+essenger.of(context).showSnac
+kBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:2671:      
+              ScaffoldMesseng
+er.of(context).showSnackBar(c
+onst SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:2675:      
+              ScaffoldMesseng
+er.of(context).showSnackBar(S
+nackBar(
+lib\features\admin\admin_dash
+board_screen.dart:2797:      
+              ScaffoldMesseng
+er.of(context).showSnackBar(c
+onst SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:2804:      
+              ScaffoldMesseng
+er.of(context).showSnackBar(S
+nackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3009:      
+          ScaffoldMessenger.o
+f(context).showSnackBar(const
+ SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3089:      
+            ScaffoldMessenger
+.of(context).showSnackBar(con
+st SnackBar(content: 
+Text("Please enter a valid 
+quantity")));
+lib\features\admin\admin_dash
+board_screen.dart:3107:      
+               ScaffoldMessen
+ger.of(context).showSnackBar(
+const SnackBar(content: 
+Text("Stock Updated 
+Successfully!"), 
+backgroundColor: 
+AppColors.success));
+lib\features\admin\admin_dash
+board_screen.dart:3110:      
+            ScaffoldMessenger
+.of(context).showSnackBar(Sna
+ckBar(content: 
+Text(e.toString()), 
+backgroundColor: 
+AppColors.danger));
+lib\features\admin\admin_dash
+board_screen.dart:3360:      
+                  ScaffoldMes
+senger.of(context).showSnackB
+ar(
+lib\features\admin\admin_dash
+board_screen.dart:3399:      
+                    ScaffoldM
+essenger.of(context).showSnac
+kBar(const SnackBar(content: 
+Text('Purchase recorded 
+successfully!'), 
+backgroundColor: 
+AppColors.success));
+lib\features\admin\admin_dash
+board_screen.dart:3402:      
+                  if 
+(ctx.mounted) ScaffoldMesseng
+er.of(context).showSnackBar(S
+nackBar(content: 
+Text(e.toString()), 
+backgroundColor: 
+AppColors.danger));
+lib\features\admin\admin_dash
+board_screen.dart:3527:      
+                        Scaff
+oldMessenger.of(context).show
+SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3639:      
+                      Scaffol
+dMessenger.of(context).showSn
+ackBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3649:      
+                      Scaffol
+dMessenger.of(context).showSn
+ackBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3846:      
+                      Scaffol
+dMessenger.of(context).showSn
+ackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3856:      
+                    ScaffoldM
+essenger.of(context).showSnac
+kBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:3861:      
+                    ScaffoldM
+essenger.of(context).showSnac
+kBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:4408:      
+               if (mounted) S
+caffoldMessenger.of(context).
+showSnackBar(const 
+SnackBar(content: 
+Text('Stock transferred 
+successfully!'), 
+backgroundColor: 
+AppColors.success));
+lib\features\admin\admin_dash
+board_screen.dart:4410:      
+               if (mounted) S
+caffoldMessenger.of(context).
+showSnackBar(SnackBar(content
+: Text('Transfer Failed: 
+$e'), backgroundColor: 
+AppColors.danger));
+lib\features\admin\admin_dash
+board_screen.dart:4464:      
+               if (mounted) S
+caffoldMessenger.of(context).
+showSnackBar(const 
+SnackBar(content: 
+Text('Refund processed 
+successfully!'), 
+backgroundColor: 
+AppColors.success));
+lib\features\admin\admin_dash
+board_screen.dart:4466:      
+               if (mounted) S
+caffoldMessenger.of(context).
+showSnackBar(SnackBar(content
+: Text('Refund Failed: $e'), 
+backgroundColor: 
+AppColors.danger));
+lib\features\admin\admin_dash
+board_screen.dart:4800:      
+                    ScaffoldM
+essenger.of(context).showSnac
+kBar(
+lib\features\admin\admin_dash
+board_screen.dart:4847:      
+                        Scaff
+oldMessenger.of(context).show
+SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:4896:      
+ScaffoldMessenger.of(context)
+.showSnackBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:5244:      
+                  ScaffoldMes
+senger.of(context).showSnackB
+ar(
+lib\features\admin\admin_dash
+board_screen.dart:5321:      
+                    
+_showSnackBar('Product Added 
+Instantly!');
+lib\features\admin\admin_dash
+board_screen.dart:5326:      
+                  
+_showSnackBar(e.toString(), 
+isError: true);
+lib\features\admin\admin_dash
+board_screen.dart:5425:      
+  ScaffoldMessenger.of(contex
+t).showSnackBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:5920:      
+                        if 
+(mounted) ScaffoldMessenger.o
+f(context).showSnackBar(const
+ SnackBar(content: Text("All 
+marked as paid!"), duration: 
+Duration(seconds: 2)));
+lib\features\admin\admin_dash
+board_screen.dart:5922:      
+                        if 
+(mounted) ScaffoldMessenger.o
+f(context).showSnackBar(Snack
+Bar(content: Text("Error: 
+$e"), duration: const 
+Duration(seconds: 2)));
+lib\features\admin\admin_dash
+board_screen.dart:6203:      
+    ScaffoldMessenger.of(cont
+ext).showSnackBar(const 
+SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:6233:      
+      ScaffoldMessenger.of(co
+ntext).showSnackBar(const 
+SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:6240:      
+      ScaffoldMessenger.of(co
+ntext).showSnackBar(SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:6288:      
+            ScaffoldMessenger
+.of(context).showSnackBar(con
+st SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:6294:      
+            ScaffoldMessenger
+.of(context).showSnackBar(Sna
+ckBar(
+lib\features\admin\admin_dash
+board_screen.dart:6551:      
+            ScaffoldMessenger
+.of(context).showSnackBar(con
+st SnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:6556:      
+            ScaffoldMessenger
+.of(context).showSnackBar(Sna
+ckBar(
+lib\features\admin\admin_dash
+board_screen.dart:6618:  
+void _showSnackBar(String 
+message, {bool isError = 
+false}) {
+lib\features\admin\admin_dash
+board_screen.dart:6621:    Sc
+affoldMessenger.of(context).s
+howSnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:7245:      
+  if (mounted) 
+_showSnackBar("Bulk deletion 
+success!");
+lib\features\admin\admin_dash
+board_screen.dart:7247:      
+  if (mounted) 
+_showSnackBar("Error: $e", 
+isError: true);
+lib\features\admin\admin_dash
+board_screen.dart:7489:  
+void _showSnackBar(String 
+message, {bool isError = 
+false}) {
+lib\features\admin\admin_dash
+board_screen.dart:7492:    Sc
+affoldMessenger.of(context).s
+howSnackBar(
+lib\features\admin\admin_dash
+board_screen.dart:7611:      
+        _showSnackBar('Staff 
+account created!');
+lib\features\admin\admin_dash
+board_screen.dart:7613:      
+        ScaffoldMessenger.of(
+context).showSnackBar(SnackBa
+r(content: Text('Error: 
+$e'), backgroundColor: 
+AppColors.danger));
+
+

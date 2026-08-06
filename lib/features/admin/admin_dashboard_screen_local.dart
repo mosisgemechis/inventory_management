@@ -8,6 +8,10 @@ import '../../core/services/auth_service.dart';
 import '../../core/services/database_service.dart';
 import '../../core/services/import_service.dart';
 import '../../core/services/bulk_import/import_models.dart';
+import '../../core/widgets/bulk_import_landing_dialog.dart';
+import '../../core/widgets/import_validation_summary_dialog.dart';
+import '../../core/widgets/import_progress_dialog.dart';
+import '../../core/widgets/import_duplicate_resolver.dart';
 import '../../core/widgets/import_error_report.dart';
 import '../../core/widgets/loading_overlay.dart';
 
@@ -185,54 +189,118 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _handleImport(AppUser user) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => BulkImportLandingDialog(
+        onSelectFile: () => _processFileSelection(user),
+      ),
+    );
+  }
+
+  Future<void> _processFileSelection(AppUser user) async {
     LoadingOverlay.show(context);
     try {
-      final parsed = await _importService.pickAndParse(user);
-      if (parsed.validCompanions.isEmpty) {
-        if (!mounted) return;
-        LoadingOverlay.hide(context);
-        showDialog(
-          context: context,
-          builder: (_) => ImportErrorReport(
-            errors: parsed.errors,
-            successCount: 0,
-          ),
-        );
+      final parseResult = await _importService.pickAndParse(user);
+      if (!mounted) return;
+      LoadingOverlay.hide(context);
+
+      if (parseResult.totalRows == 0 && parseResult.errors.isNotEmpty) {
+        _showImportErrorSummary(parseResult.errors);
         return;
       }
 
-      // Default duplicate strategy: restock existing items (safe offline-first behavior).
-      final resolutions = <String, dynamic>{};
-      for (final d in parsed.duplicates) {
-        final id = d.existingData['id']?.toString();
-        if (id == null || id.isEmpty) continue;
-        resolutions[id] = ImportResolutionStrategy.restock;
-      }
-
-      final finalized = await _importService.finalizeImport(
-        user,
-        parsed,
-        Map<String, ImportResolutionStrategy>.from(resolutions),
-      );
-      if (!mounted) return;
-      LoadingOverlay.hide(context);
-      showDialog(
-        context: context,
-        builder: (_) => ImportErrorReport(
-          errors: parsed.errors,
-          successCount: finalized.importedCount,
-        ),
-      );
+      _showValidationSummary(user, parseResult);
     } catch (e) {
       if (!mounted) return;
       LoadingOverlay.hide(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Import Engine Error: $e'),
+          content: Text("Import Processing Error: $e"),
           backgroundColor: AppColors.danger,
         ),
       );
     }
+  }
+
+  Future<void> _showValidationSummary(AppUser user, ImportResult parseResult) async {
+    final summary = _importService.getValidationSummary(parseResult);
+    Map<String, ImportResolutionStrategy> resolutions = {};
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => ImportValidationSummaryDialog(
+        parseResult: parseResult,
+        summary: summary,
+        onResolveDuplicates: () async {
+          final res = await showDialog<Map<String, ImportResolutionStrategy>>(
+            context: context,
+            barrierDismissible: false,
+            builder: (c) => ImportDuplicateResolver(duplicates: parseResult.duplicates),
+          );
+          if (res != null) {
+            resolutions = res;
+          }
+        },
+        onStartImport: () {
+          _startImportExecution(user, parseResult, resolutions);
+        },
+      ),
+    );
+  }
+
+  Future<void> _startImportExecution(
+    AppUser user, 
+    ImportResult parseResult, 
+    Map<String, ImportResolutionStrategy> resolutions,
+  ) async {
+    if (!mounted) return;
+
+    final token = ImportCancellationToken();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => ImportProgressDialog(
+        cancellationToken: token,
+        onStart: (onProgress) async {
+          final finalResult = await _importService.finalizeImport(
+            user, 
+            parseResult, 
+            resolutions,
+            onProgress: onProgress,
+            cancellationToken: token,
+          );
+          if (mounted) {
+            Navigator.pop(c);
+            _showImportSuccess(finalResult);
+            setState(() {});
+          }
+        },
+      ),
+    );
+  }
+
+  void _showImportErrorSummary(List<ImportErrorRow> errors, {int successCount = 0}) {
+    showDialog(
+      context: context,
+      builder: (c) => ImportErrorReport(errors: errors, successCount: successCount),
+    );
+  }
+
+  void _showImportSuccess(ImportFinalizeResult report) {
+    showDialog(
+      context: context,
+      builder: (ctx) => ImportErrorReport(
+        errors: report.errorDetails,
+        successCount: report.importedCount,
+        updatedCount: report.updatedCount,
+        skippedCount: report.skippedCount,
+        totalRows: report.totalRows,
+        cancelledCount: report.cancelledCount,
+        wasCancelled: report.wasCancelled,
+      ),
+    );
   }
 }
 

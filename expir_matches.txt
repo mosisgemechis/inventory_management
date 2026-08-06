@@ -1,0 +1,184 @@
+﻿
+lib\core\services\database_se
+rvice.dart:166:        // 
+Dynamic Expiry filtering 
+(matches both 'exp' and 
+'expiry_date')
+lib\core\services\database_se
+rvice.dart:167:        if 
+(where != null && 
+(where.contains('exp = ?') 
+|| 
+where.contains('expiry_date 
+= ?'))) {
+lib\core\services\database_se
+rvice.dart:168:           
+final expIdx = where.contains
+('expiry_date') ? 
+where.indexOf('expiry_date') 
+: where.indexOf('exp');
+lib\core\services\database_se
+rvice.dart:175:              
+    expr = expr & t.expiryDat
+e.equals(DateTime.utc(dt.year
+, dt.month, dt.day));
+lib\core\services\database_se
+rvice.dart:181:        if 
+(where != null && 
+where.contains('expiry_date 
+IS NULL')) {
+lib\core\services\database_se
+rvice.dart:182:           
+expr = expr & 
+t.expiryDate.isNull();
+lib\core\services\database_se
+rvice.dart:237:        
+'expiryDate': r.expiryDate.to
+Iso8601String(),
+lib\core\services\database_se
+rvice.dart:406:      
+expiryDate: 
+Value(parseDT(data['expiry'] 
+?? data['expiryDate'] ?? 
+data['exp'])),
+lib\core\services\database_se
+rvice.dart:649:      
+'expiry': row.expiryDate?.toI
+so8601String(),
+lib\core\services\database_se
+rvice.dart:650:      
+'expiryDate': row.expiryDate?
+.toIso8601String(), // alias 
+for compatibility
+lib\core\services\database_se
+rvice.dart:693:      
+'expiry': row.expiryDate?.toI
+so8601String(),
+lib\core\services\database_se
+rvice.dart:699:    final 
+expiryIso = row.expiryDate?.t
+oIso8601String();
+lib\core\services\database_se
+rvice.dart:707:      
+'expiry': expiryIso,
+lib\core\services\database_se
+rvice.dart:708:      'exp': 
+expiryIso,
+lib\core\services\database_se
+rvice.dart:731:        
+(SELECT MIN(b.expiry_date) 
+FROM batches b 
+lib\core\services\database_se
+rvice.dart:734:          AND 
+b.quantity > 0) AS 
+branch_expiry
+lib\core\services\database_se
+rvice.dart:742:        
+(SELECT MIN(b.expiry_date) 
+FROM batches b 
+lib\core\services\database_se
+rvice.dart:745:          AND 
+b.quantity > 0) AS 
+branch_expiry
+lib\core\services\database_se
+rvice.dart:780:          
+final rawExp = 
+m['branch_expiry'] ?? 
+m['exp'] ?? m['expiry_date'] 
+?? m['expiryDate'];
+lib\core\services\database_se
+rvice.dart:798:            
+'expiry': expVal,
+lib\core\services\database_se
+rvice.dart:800:            
+'expiryDate': expVal,
+lib\core\services\database_se
+rvice.dart:1120:        
+final expiryVal = 
+parseDT(data['expiry'] ?? 
+data['expiryDate'] ?? 
+data['exp']);
+lib\core\services\database_se
+rvice.dart:1130:          
+expiryDate: 
+(data.containsKey('expiry') 
+|| data.containsKey('expiryDa
+te') || 
+data.containsKey('exp'))
+lib\core\services\database_se
+rvice.dart:1131:             
+ ? Value(expiryVal)
+lib\core\services\database_se
+rvice.dart:1150:      final 
+expiryVal = 
+parseDT(data['expiry'] ?? 
+data['expiryDate'] ?? 
+data['exp']);
+lib\core\services\database_se
+rvice.dart:1155:        
+expiryDate: 
+(data.containsKey('expiry') 
+|| data.containsKey('expiryDa
+te') || 
+data.containsKey('exp'))
+lib\core\services\database_se
+rvice.dart:1156:            
+? Value(expiryVal)
+lib\core\services\database_se
+rvice.dart:1233:      
+expiryDate: DateTime.parse(da
+ta['expiryDate']),
+lib\core\services\database_se
+rvice.dart:1281:      final 
+rawExp = data['expiry'] ?? 
+data['exp'] ?? 
+data['expiryDate'];
+lib\core\services\database_se
+rvice.dart:1282:      
+DateTime? expiry;
+lib\core\services\database_se
+rvice.dart:1283:      if 
+(rawExp is DateTime) expiry 
+= rawExp;
+lib\core\services\database_se
+rvice.dart:1284:      else 
+if (rawExp != null) expiry = 
+parseDT(rawExp);
+lib\core\services\database_se
+rvice.dart:1286:      if 
+(expiry != null) {
+lib\core\services\database_se
+rvice.dart:1287:        
+expiry = 
+DateTime.utc(expiry.year, 
+expiry.month, expiry.day);
+lib\core\services\database_se
+rvice.dart:1297:        
+expiryDate: Value(expiry),
+lib\core\services\database_se
+rvice.dart:1319:          
+'expiryDate': expiry?.toUtc()
+.toIso8601String(),
+lib\core\services\database_se
+rvice.dart:1331:      final 
+rawExp = data['expiryDate'];
+lib\core\services\database_se
+rvice.dart:1332:      
+DateTime? expiry;
+lib\core\services\database_se
+rvice.dart:1333:      if 
+(rawExp is DateTime) expiry 
+= rawExp;
+lib\core\services\database_se
+rvice.dart:1334:      else 
+if (rawExp is String) expiry 
+= DateTime.tryParse(rawExp);
+lib\core\services\database_se
+rvice.dart:1346:        
+expiryDate: Value(expiry),
+lib\core\services\database_se
+rvice.dart:1365:          
+'expiryDate': expiry?.toUtc()
+.toIso8601String(),
+
+
