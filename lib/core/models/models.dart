@@ -107,8 +107,18 @@ class AppUser {
       permissions: perms,
       currency: map['currency']?.toString() ?? 'USD',
       country: map['country']?.toString(),
-      isActive: map['isActive'] == true || map['isActive'] == 1,
+      isActive: _parseIsActiveBool(map['isActive'] ?? map['is_active']),
     );
+  }
+
+  static bool _parseIsActiveBool(dynamic val) {
+    if (val == null) return true;
+    if (val == true || val == 1) return true;
+    if (val == false || val == 0) return false;
+    final s = val.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1') return true;
+    if (s == 'false' || s == '0') return false;
+    return true;
   }
 
   static String? _sanitizeBranchName(dynamic val) {

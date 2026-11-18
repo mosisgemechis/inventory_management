@@ -10,6 +10,10 @@ import '../constants/colors.dart';
 import '../models/models.dart';
 import '../models/subscription_models.dart';
 import '../../features/subscription/subscription_screen.dart';
+import '../../main.dart';
+import 'account_security_dialog.dart';
+import 'change_password_dialog.dart';
+import '../config/navigation.dart';
 
 class AccountDropdown extends StatelessWidget {
   const AccountDropdown({super.key});
@@ -83,19 +87,22 @@ class _AccountPanelContent extends StatelessWidget {
     final theme = Provider.of<ThemeService>(context);
     final l10n = Provider.of<LocalizationService>(context);
 
-    return Container(
-      width: 330,
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 10)),
-        ],
-        border: Border.all(color: AppColors.border.withOpacity(0.5)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+    return SafeArea(
+      child: Container(
+        width: 330,
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 10)),
+          ],
+          border: Border.all(color: AppColors.border.withOpacity(0.5)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
           // Header Section
           Padding(
             padding: const EdgeInsets.all(18),
@@ -115,13 +122,13 @@ class _AccountPanelContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user.fullName.isNotEmpty ? user.fullName : user.username,
+                        '@${user.username}',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        user.email.isNotEmpty ? user.email : '@${user.username}',
+                        user.fullName.isNotEmpty ? user.fullName : user.email,
                         style: const TextStyle(fontSize: 12, color: Colors.grey),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -181,7 +188,7 @@ class _AccountPanelContent extends StatelessWidget {
             label: "Terms of Use",
             onTap: () {
               Navigator.pop(context);
-              _showInfoDialog(context, "Terms of Use", "By using this application, you agree to maintain the confidentiality of your account credentials. GM Inventory ERP is provided 'as-is' without warranties of any kind.");
+              _showInfoDialog(context, "Terms of Use", "By using this application, you agree to maintain the confidentiality of your account credentials. GM Inventory Everywhere is provided 'as-is' without warranties of any kind.");
             },
           ),
 
@@ -229,6 +236,8 @@ class _AccountPanelContent extends StatelessWidget {
           const SizedBox(height: 8),
         ],
       ),
+    ),
+    ),
     );
   }
 
@@ -356,13 +365,14 @@ class _ProfileDialogState extends State<ProfileDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 440,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: SingleChildScrollView(
+        child: Container(
+          width: 440,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Header Profile Card
             Row(
               children: [
@@ -380,11 +390,14 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user.fullName.isNotEmpty ? user.fullName : user.username,
+                        '@${user.username}',
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 2),
-                      Text('@${user.username}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      Text(
+                        user.fullName.isNotEmpty ? user.fullName : user.email,
+                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -407,6 +420,8 @@ class _ProfileDialogState extends State<ProfileDialog> {
             const SizedBox(height: 16),
 
             // Profile Info Fields
+            _buildProfileRow(Icons.alternate_email_rounded, "Username", '@${user.username}'),
+            const SizedBox(height: 12),
             _buildProfileRow(Icons.email_outlined, "Email", user.email.isNotEmpty ? user.email : "Not specified"),
             const SizedBox(height: 12),
             _buildProfileRow(Icons.phone_outlined, "Phone Number", "N/A"),
@@ -415,6 +430,29 @@ class _ProfileDialogState extends State<ProfileDialog> {
             const SizedBox(height: 12),
             _buildProfileRow(Icons.access_time_rounded, "Last Login", DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())),
             const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.security_rounded, size: 18),
+                label: const Text("Account Security"),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  final navContext =
+                      Navigator.of(context, rootNavigator: true).context;
+                  Navigator.of(context, rootNavigator: true).pop();
+                  showDialog(
+                    context: navContext,
+                    builder: (_) => const AccountSecurityDialog(),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Actions
             Row(
@@ -430,9 +468,11 @@ class _ProfileDialogState extends State<ProfileDialog> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () {
-                    Navigator.pop(context);
+                    final navContext =
+                        Navigator.of(context, rootNavigator: true).context;
+                    Navigator.of(context, rootNavigator: true).pop();
                     showDialog(
-                      context: context,
+                      context: navContext,
                       builder: (ctx) => const ChangePasswordDialog(),
                     );
                   },
@@ -452,6 +492,7 @@ class _ProfileDialogState extends State<ProfileDialog> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -572,254 +613,6 @@ class _ProfileDialogState extends State<ProfileDialog> {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CHANGE PASSWORD DIALOG (Current User)
-// ─────────────────────────────────────────────────────────────────────────────
-class ChangePasswordDialog extends StatefulWidget {
-  const ChangePasswordDialog({super.key});
-
-  @override
-  State<ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _currentC = TextEditingController();
-  final _newC = TextEditingController();
-  final _confirmC = TextEditingController();
-
-  bool _showCurrent = false;
-  bool _showNew = false;
-  bool _showConfirm = false;
-
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  @override
-  void dispose() {
-    _currentC.dispose();
-    _newC.dispose();
-    _confirmC.dispose();
-    super.dispose();
-  }
-
-  bool _hasLength(String p) => p.trim().length >= 8;
-  bool _hasUpper(String p) => RegExp(r'[A-Z]').hasMatch(p.trim());
-  bool _hasDigit(String p) => RegExp(r'[0-9]').hasMatch(p.trim());
-  bool _hasSpecial(String p) => RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(p.trim());
-
-  Future<void> _submitChange() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    final auth = Provider.of<AuthService>(context, listen: false);
-
-    try {
-      await auth.changeCurrentPassword(
-        currentPassword: _currentC.text,
-        newPassword: _newC.text,
-        confirmPassword: _confirmC.text,
-      );
-
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Password updated successfully. Please log in with your new password."),
-          backgroundColor: AppColors.success,
-          duration: Duration(seconds: 4),
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final newPass = _newC.text;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 420,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.lock_reset_rounded, color: AppColors.primary, size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Change Password", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text("Update your account security credentials", style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              if (_errorMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline_rounded, color: Colors.red, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-              ],
-
-              // Current Password
-              TextFormField(
-                controller: _currentC,
-                obscureText: !_showCurrent,
-                decoration: InputDecoration(
-                  labelText: "Current Password",
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(_showCurrent ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showCurrent = !_showCurrent),
-                  ),
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? "Please enter your current password" : null,
-              ),
-              const SizedBox(height: 14),
-
-              // New Password
-              TextFormField(
-                controller: _newC,
-                obscureText: !_showNew,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: "New Password",
-                  prefixIcon: const Icon(Icons.lock_clock_outlined),
-                  suffixIcon: IconButton(
-                    icon: Icon(_showNew ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showNew = !_showNew),
-                  ),
-                ),
-                validator: (v) => AuthService.validatePasswordRequirements(v ?? ''),
-              ),
-              const SizedBox(height: 14),
-
-              // Confirm Password
-              TextFormField(
-                controller: _confirmC,
-                obscureText: !_showConfirm,
-                decoration: InputDecoration(
-                  labelText: "Confirm New Password",
-                  prefixIcon: const Icon(Icons.lock_clock_outlined),
-                  suffixIcon: IconButton(
-                    icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                  ),
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return "Please confirm your new password";
-                  if (v.trim() != _newC.text.trim()) return "Passwords do not match";
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Real-time Requirements Checklist
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Password Requirements:", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 6),
-                    _reqItem("At least 8 characters", _hasLength(newPass)),
-                    _reqItem("At least 1 uppercase letter (A-Z)", _hasUpper(newPass)),
-                    _reqItem("At least 1 digit (0-9)", _hasDigit(newPass)),
-                    _reqItem("At least 1 special character (!@#\$%^&*)", _hasSpecial(newPass)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Submit & Cancel
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: _isLoading ? null : () => Navigator.pop(context),
-                    child: const Text("Cancel"),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: _isLoading ? null : _submitChange,
-                    child: _isLoading
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text("Update Password"),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _reqItem(String text, bool met) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(met ? Icons.check_circle_rounded : Icons.circle_outlined, size: 14, color: met ? AppColors.success : Colors.grey),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(fontSize: 11, color: met ? AppColors.success : Colors.grey)),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN RESET PASSWORD DIALOG
 // ─────────────────────────────────────────────────────────────────────────────
 class AdminResetPasswordDialog extends StatefulWidget {
@@ -901,16 +694,21 @@ class _AdminResetPasswordDialogState extends State<AdminResetPasswordDialog> {
     final newPass = _newC.text;
 
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: 420,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        constraints: BoxConstraints(
+          maxWidth: 420,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Row(
                 children: [
                   Container(
@@ -1041,6 +839,7 @@ class _AdminResetPasswordDialogState extends State<AdminResetPasswordDialog> {
           ),
         ),
       ),
+    ),
     );
   }
 

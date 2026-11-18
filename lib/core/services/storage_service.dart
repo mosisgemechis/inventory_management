@@ -6,7 +6,7 @@ class StorageService {
 
   Future<String?> uploadProductImage(String shopId, String productId, dynamic fileData) async {
     // In standalone mode, we could implement local file system storage,
-    // but for now we simply return null to avoid Firebase errors.
+    // but for now we simply return null.
     debugPrint("OFFLINE MODE: StorageService.uploadProductImage bypassed.");
     return null;
   }

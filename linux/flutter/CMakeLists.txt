@@ -21,10 +21,12 @@ endfunction()
 
 # === Flutter Library ===
 # System-level dependencies.
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
-pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)
-pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0)
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+  pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
+  pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0)
+  pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0)
+endif()
 
 set(FLUTTER_LIBRARY "${EPHEMERAL_DIR}/libflutter_linux_gtk.so")
 
@@ -62,11 +64,13 @@ target_include_directories(flutter INTERFACE
   "${EPHEMERAL_DIR}"
 )
 target_link_libraries(flutter INTERFACE "${FLUTTER_LIBRARY}")
-target_link_libraries(flutter INTERFACE
-  PkgConfig::GTK
-  PkgConfig::GLIB
-  PkgConfig::GIO
-)
+if(PkgConfig_FOUND)
+  target_link_libraries(flutter INTERFACE
+    PkgConfig::GTK
+    PkgConfig::GLIB
+    PkgConfig::GIO
+  )
+endif()
 add_dependencies(flutter flutter_assemble)
 
 # === Flutter tool backend ===

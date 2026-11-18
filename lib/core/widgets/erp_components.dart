@@ -6,6 +6,8 @@ import '../constants/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 
+export 'package:flutter/material.dart';
+
 extension StringCasingExtension on String {
   String toTitleCase() => isNotEmpty ? (this[0].toUpperCase() + substring(1)) : this;
 }
@@ -93,27 +95,52 @@ class ERPSidebar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                      color: AppColors.secondary,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                            color: AppColors.secondary.withOpacity(0.3),
-                            blurRadius: 15,
-                            spreadRadius: -2)
-                      ]),
-                  child: const Icon(Icons.barcode_reader, color: Colors.white, size: 24),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    'assets/brand/logo_mark.png',
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.inventory, color: Colors.white, size: 22),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Core Inventory',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.white,
-                      letterSpacing: -0.5),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'GM INVENTORY',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white,
+                            letterSpacing: -0.5),
+                      ),
+                      SizedBox(height: 1),
+                      Text(
+                        'EVERYWHERE',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 9,
+                            color: Color(0xFF9CC3FF),
+                            letterSpacing: 2.0),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

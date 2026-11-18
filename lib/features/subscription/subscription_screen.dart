@@ -3,19 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventory_manager/core/models/subscription_models.dart';
+import 'package:inventory_manager/core/services/subscription_change.dart';
 import 'package:inventory_manager/core/services/subscription_service.dart';
 import 'package:inventory_manager/core/services/auth_service.dart';
-import 'package:inventory_manager/core/services/database_service.dart';
-import 'package:inventory_manager/core/widgets/loading_overlay.dart';
 import 'package:inventory_manager/core/utils/currency_formatter.dart';
+import '../../core/widgets/account_security_dialog.dart';
+import 'checkout_flow.dart';
+import 'plan_colors.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-
-const Color _navyPrimary = Color(0xFF0F172A);
-const Color _accentBlue = Color(0xFF2563EB);
-const Color _borderGray = Color(0xFFE2E8F0);
-const Color _bgWhite = Color(0xFFFFFFFF);
-const Color _textDark = Color(0xFF1E293B);
-const Color _textLight = Color(0xFF64748B);
 
 enum _PaymentMethod { telebirr, card }
 
@@ -26,158 +21,235 @@ class SubscriptionScreen extends StatefulWidget {
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
 
-class _SubscriptionScreenState extends State<SubscriptionScreen> {
+class _SubscriptionScreenState extends State<SubscriptionScreen>
+    with SingleTickerProviderStateMixin {
   final GlobalKey _plansSectionKey = GlobalKey();
   final Map<SubscriptionPlan, _PlanCustomization> _customizations = {};
   SubscriptionPlan? _selectedPlan;
-  _PaymentMethod _paymentMethod = _PaymentMethod.telebirr;
+  BillingCycle _cycle = BillingCycle.monthly;
+  final _PaymentMethod _paymentMethod = _PaymentMethod.telebirr;
+
+  late final AnimationController _sheetController;
 
   SubscriptionService get _subscriptionService =>
       Provider.of<SubscriptionService>(context, listen: false);
 
   @override
+  void initState() {
+    super.initState();
+    // Drives the add-ons sheet, so it glides up with the same easing as the
+    // rest of the billing flow instead of the default linear slide.
+    _sheetController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shopId = context.read<AuthService>().user?.shopId;
+      if (shopId != null) {
+        subscriptionService.initialize(shopId).catchError((Object e) {
+          debugPrint('[SUBSCRIPTION] init failed: $e');
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
     final subscription = context.watch<SubscriptionService>().current;
+    final pendingChange = context.watch<SubscriptionService>().pendingChange;
     final authUser = context.read<AuthService>().user;
-    final activePlan = subscription?.plan ?? SubscriptionPlan.business;
-    final selectedPlan = _selectedPlan ?? activePlan;
-    final selectedCustomization = _customizationFor(selectedPlan);
-    final selectedTotal = _planTotal(selectedPlan, selectedCustomization);
+    final activePlan = subscription?.plan;
+    final selectedPlan = _selectedPlan ??
+        (activePlan == null ||
+                activePlan == SubscriptionPlan.trial ||
+                activePlan == SubscriptionPlan.free ||
+                activePlan == SubscriptionPlan.none
+            ? SubscriptionPlan.business
+            : activePlan);
     final isDesktop = MediaQuery.sizeOf(context).width > 1100;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: _bgWhite,
-        foregroundColor: _navyPrimary,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text(
-          "Plans & Billing",
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
-              onPressed: () {},
-              style: TextButton.styleFrom(
-                foregroundColor: _navyPrimary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: _borderGray),
+      backgroundColor: c.page,
+      // No app bar: the controls sit directly on the page background.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 1280),
+                padding: EdgeInsets.fromLTRB(
+                    isDesktop ? 24 : 8, 8, isDesktop ? 24 : 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: "Back",
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      color: c.navy,
+                      onPressed: () => Navigator.maybePop(context),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => _showBillingHelp(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: c.navy,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 12),
+                      ),
+                      icon: Icon(Icons.help_outline_rounded,
+                          size: 18, color: c.accent),
+                      label: isDesktop
+                          ? const Text(
+                              "Need Help?",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 13),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    const SizedBox(width: 8),
+                    _ProfileBubble(
+                      label:
+                          authUser?.username ?? authUser?.fullName ?? "GM",
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => const AccountSecurityDialog(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              icon: const Icon(Icons.help_outline_rounded,
-                  size: 18, color: _accentBlue),
-              label: const Text(
-                "Need Help?",
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 20),
-            child: _ProfileBubble(
-              label: authUser?.username ?? authUser?.fullName ?? "GM",
-              onTap: () {},
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: _borderGray, height: 1),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 1280),
-            padding: EdgeInsets.symmetric(
-              horizontal: isDesktop ? 32 : 18,
-              vertical: 24,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _CurrentSubscriptionCard(
-                  subscription: subscription,
-                  shopId: authUser?.shopId ?? subscription?.shopId ?? '',
-                  onUpgrade: _handleUpgradePressed,
-                  onDowngrade: _handleDowngradePressed,
-                  onCancel: _confirmCancelSubscription,
+            Expanded(
+              child: SingleChildScrollView(
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1280),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 32 : 18,
+                      vertical: 12,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                if (pendingChange != null) ...[
+                  _PendingChangeBanner(
+                    pending: pendingChange,
+                    onCancel: () async {
+                      await _subscriptionService
+                          .cancelPendingChange(authUser?.shopId ?? '');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  "Scheduled plan change cancelled. Your current plan continues.")),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                if (_isPaidActive(subscription))
+                  _SubscriptionActionBar(
+                    subscription: subscription!,
+                    onUpgrade: () => _handleUpgradePressed(activePlan),
+                    onDowngrade: () => _handleDowngradePressed(activePlan),
+                    onCancel: _confirmCancelSubscription,
+                  )
+                      .animate()
+                      .fadeIn(duration: 320.ms)
+                      .slideY(begin: 0.04, curve: Curves.easeOut)
+                else
+                  _TrialModeBanner(subscription: subscription)
+                      .animate()
+                      .fadeIn(duration: 320.ms)
+                      .slideY(begin: 0.04, curve: Curves.easeOut),
+                const SizedBox(height: 14),
+                _SectionHeading(
+                  eyebrow: "PLANS",
+                  title: "Pick your plan",
+                  subtitle:
+                      "Start with the plan that fits your shop. Add-ons are optional and come next.",
                 )
                     .animate()
-                    .fadeIn(duration: 320.ms)
-                    .slideY(begin: 0.06, curve: Curves.easeOut),
-                const SizedBox(height: 28),
-                const _SectionHeading(
-                  title: "Choose a Plan",
-                  subtitle:
-                      "Select a plan and customize it to fit your business needs",
+                    .fadeIn(duration: 320.ms, delay: 60.ms)
+                    .slideY(begin: 0.03, curve: Curves.easeOut),
+                const SizedBox(height: 18),
+                _BillingCycleToggle(
+                  cycle: _cycle,
+                  onChanged: (value) => setState(() => _cycle = value),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 KeyedSubtree(
                   key: _plansSectionKey,
                   child: _PlanGrid(
                     selectedPlan: selectedPlan,
                     currentPlan: subscription?.plan,
-                    customizations: _customizations,
-                    onSelectPlan: (plan) {
-                      setState(() => _selectedPlan = plan);
-                    },
-                    onChangeExtraUsers: (plan, delta) {
-                      setState(() => _customizationFor(plan).extraUsers =
-                          (_customizationFor(plan).extraUsers + delta)
-                              .clamp(0, 99)
-                              .toInt());
-                    },
-                    onChangeExtraBranches: (plan, delta) {
-                      setState(() => _customizationFor(plan).extraBranches =
-                          (_customizationFor(plan).extraBranches + delta)
-                              .clamp(0, 99)
-                              .toInt());
-                    },
-                    onToggleAnalytics: (plan, value) {
-                      setState(() => _customizationFor(plan)
-                          .advancedAnalyticsPack = value);
-                    },
-                    onToggleAudit: (plan, value) {
-                      setState(
-                          () => _customizationFor(plan).auditLogsPack = value);
-                    },
-                    onCheckout: _handleCheckout,
+                    cycle: _cycle,
+                    onSelectPlan: (plan) => setState(() => _selectedPlan = plan),
+                    onContinue: _openAddOns,
                   ),
                 ),
-                const SizedBox(height: 24),
-                _BillingReviewSection(
-                  selectedPlan: selectedPlan,
-                  customization: selectedCustomization,
-                  total: selectedTotal,
-                  paymentMethod: _paymentMethod,
-                  onPaymentMethodChanged: (method) =>
-                      setState(() => _paymentMethod = method),
-                  onConfirm: () =>
-                      _handleCheckout(selectedPlan, selectedCustomization),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Center(
                   child: Text(
                     "You can change or cancel your subscription anytime.",
                     style: TextStyle(
-                        color: _textLight.withOpacity(0.95), fontSize: 13),
+                        color: c.muted.withOpacity(0.95), fontSize: 13),
                   ),
                 ),
-              ],
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _showBillingHelp() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Plans & billing help"),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("• Yearly plans save 15% and are billed once for 12 months.",
+                style: TextStyle(height: 1.5)),
+            Text("• Add-ons are billed monthly or ×12 on yearly plans.",
+                style: TextStyle(height: 1.5)),
+            Text("• Upgrades apply immediately at the full new plan price.",
+                style: TextStyle(height: 1.5)),
+            Text("• Downgrades also apply immediately, at no extra charge.",
+                style: TextStyle(height: 1.5)),
+            Text("• Cancelling keeps your data and returns you to a trial.",
+                style: TextStyle(height: 1.5)),
+            SizedBox(height: 10),
+            Text("Change a plan from this screen at any time.",
+                style: TextStyle(height: 1.5)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Got it"),
+          ),
+        ],
       ),
     );
   }
@@ -186,39 +258,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return _customizations.putIfAbsent(plan, _PlanCustomization.new);
   }
 
-  double _planTotal(SubscriptionPlan plan, _PlanCustomization customization) {
-    double total = plan.price;
-    total += customization.extraUsers *
-        _addonUnitPrice(plan, SubscriptionAddOn.extraUser);
-    total += customization.extraBranches *
-        _addonUnitPrice(plan, SubscriptionAddOn.extraBranch);
-    if (customization.advancedAnalyticsPack) {
-      total += _addonUnitPrice(plan, SubscriptionAddOn.advancedAnalyticsPack);
-    }
-    if (customization.auditLogsPack) {
-      total += _addonUnitPrice(plan, SubscriptionAddOn.auditLogsPack);
-    }
-    return total;
-  }
-
-  double _addonUnitPrice(SubscriptionPlan plan, SubscriptionAddOn addOn) {
-    return addOn.getPrice(plan);
-  }
-
   List<SubscriptionAddOn> _buildSelectedAddOns(
       _PlanCustomization customization) {
-    final addOns = <SubscriptionAddOn>[];
-    addOns.addAll(List<SubscriptionAddOn>.filled(
-        customization.extraUsers, SubscriptionAddOn.extraUser));
-    addOns.addAll(List<SubscriptionAddOn>.filled(
-        customization.extraBranches, SubscriptionAddOn.extraBranch));
-    if (customization.advancedAnalyticsPack) {
-      addOns.add(SubscriptionAddOn.advancedAnalyticsPack);
-    }
-    if (customization.auditLogsPack) {
-      addOns.add(SubscriptionAddOn.auditLogsPack);
-    }
-    return addOns;
+    return customization.selections();
   }
 
   void _handleUpgradePressed(SubscriptionPlan? currentPlan) {
@@ -226,6 +268,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (nextPlan == null) return;
     setState(() => _selectedPlan = nextPlan);
     _scrollToPlans();
+  }
+
+  void _scrollToPlans() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = _plansSectionKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(context,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+            alignment: 0.05);
+      }
+    });
   }
 
   void _handleDowngradePressed(SubscriptionPlan? currentPlan) {
@@ -266,74 +320,153 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  void _scrollToPlans() {
-    final context = _plansSectionKey.currentContext;
-    if (context == null) return;
-    Scrollable.ensureVisible(
-      context,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      alignment: 0.08,
-    );
+  /// True only for a live paid plan; trials, expired plans and empty shops
+  /// get the trial strip instead of the change actions.
+  bool _isPaidActive(ActiveSubscription? subscription) {
+    if (subscription == null) return false;
+    if (subscription.isTrial || subscription.isExpired) return false;
+    return subscription.plan == SubscriptionPlan.starter ||
+        subscription.plan == SubscriptionPlan.business ||
+        subscription.plan == SubscriptionPlan.enterprise;
   }
 
-  void _handleCheckout(
+  /// Step 2: the optional add-ons sheet. It pops up from the bottom, and
+  /// finishing it (with or without extras) goes straight to payment.
+  Future<void> _openAddOns(SubscriptionPlan plan) async {
+    final customization = _customizationFor(plan);
+    setState(() => _selectedPlan = plan);
+
+    final result = await showModalBottomSheet<_PlanCustomization>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.42),
+      transitionAnimationController: _sheetController,
+      builder: (sheetContext) => _AddOnsSheet(
+        plan: plan,
+        cycle: _cycle,
+        customization: customization,
+        onContinue: () => Navigator.pop(sheetContext, customization),
+        onDismiss: () => Navigator.pop(sheetContext),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+    await _handleCheckout(plan, result);
+  }
+
+  Future<void> _handleCheckout(
       SubscriptionPlan plan, _PlanCustomization customization) async {
     final user = context.read<AuthService>().user;
     if (user == null) return;
 
     final addOns = _buildSelectedAddOns(customization);
-    final total = _planTotal(plan, customization);
-    final paymentLabel = _paymentMethod == _PaymentMethod.telebirr
-        ? "Telebirr"
-        : "Credit/Debit Card";
+    final total = customization.termTotal(plan, _cycle);
+    final quote = _subscriptionService.quoteChange(plan: plan, addOns: addOns);
 
+    if (quote.kind == PlanChangeKind.downgrade) {
+      await _applyDowngradeNow(plan, addOns, quote, user.shopId);
+      return;
+    }
+
+    final note = _cycle.isYearly
+        ? "Annual plan: one payment covers 12 months and saves 15% on the plan price. Add-ons are charged at their monthly rate × 12."
+        : switch (quote.kind) {
+            PlanChangeKind.upgrade =>
+              "Upgrade applies immediately. You pay the full new plan price "
+                  "today — never a prorated slice — and your renewal date "
+                  "stays the same.",
+            PlanChangeKind.newSubscription => "First month is billed today.",
+            PlanChangeKind.lateral =>
+              "Your plan is updated immediately. No extra charge for the rest "
+                  "of this period.",
+            PlanChangeKind.downgrade => null,
+          };
+
+    final paid = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CheckoutFlow(
+        plan: plan,
+        addOns: addOns,
+        total: total,
+        billingCycle: _cycle,
+        amountDueToday: _cycle.isYearly ? total : quote.amountDueToday,
+        changeNote: note,
+        initialCardMethod: _paymentMethod == _PaymentMethod.card,
+        onPay: () async {
+          await _subscriptionService.changePlan(
+            shopId: user.shopId,
+            plan: plan,
+            addOns: addOns,
+            cycle: _cycle,
+          );
+        },
+      ),
+    );
+
+    if (paid == true && mounted) {
+      _showSuccessDialog(plan, total);
+    }
+  }
+
+  /// Downgrades are not scheduled any more: the shop moves to the smaller plan
+  /// immediately and nothing extra is charged today.
+  Future<void> _applyDowngradeNow(SubscriptionPlan plan,
+      List<SubscriptionAddOn> addOns, PlanChangeQuote quote, String shopId) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text("Confirm subscription"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Switch to ${plan.name} now?"),
         content: Text(
-          "Continue with $paymentLabel for ${plan.name} at ${CurrencyFormatter.simple(total, 'USD')} per month?",
+          "Your plan changes immediately — no waiting for the renewal date, and "
+          "nothing extra is charged today. From now on the shop has "
+          "${quote.userLimit} user${quote.userLimit == 1 ? '' : 's'} and "
+          "${quote.branchLimit} branch${quote.branchLimit == 1 ? '' : 'es'}. "
+          "Your billing date stays the same.",
           style: const TextStyle(height: 1.5),
         ),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text("Cancel"),
+            child: const Text("Keep current plan"),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _accentBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: const Text("Continue"),
+            child: Text("Switch now",
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(dialogContext).colorScheme.primary)),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
 
-    if (confirmed != true) return;
-
-    if (!mounted) return;
-    LoadingOverlay.show(context);
     try {
-      await _subscriptionService.upgrade(
-        shopId: user.shopId,
-        plan: plan,
-        addOns: addOns,
-      );
+      await _subscriptionService
+          .changePlan(shopId: shopId, plan: plan, addOns: addOns);
       if (!mounted) return;
-      LoadingOverlay.hide(context);
-      _showSuccessDialog(plan, total);
-    } catch (_) {
-      if (mounted) LoadingOverlay.hide(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("You're now on ${plan.name}.")),
+      );
+    } on PlanChangeException catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text("Can't change plan yet"),
+          content: Text(e.message, style: const TextStyle(height: 1.5)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -368,7 +501,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
 
     if (confirmed != true) return;
-    _subscriptionService.clear();
+    if (!mounted) return;
+    final shopId = context.read<AuthService>().user?.shopId;
+    if (shopId != null) {
+      await _subscriptionService.cancelPendingChange(shopId);
+      await _subscriptionService.cancelSubscription(shopId);
+    } else {
+      _subscriptionService.clear();
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Subscription cancelled.")),
@@ -376,6 +516,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   void _showSuccessDialog(SubscriptionPlan plan, double total) {
+    final c = PlanColors.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -393,20 +534,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 ),
                 child: const Icon(Icons.check_circle_rounded,
                     color: Color(0xFF10B981), size: 48),
-              ),
+              )
+                  .animate()
+                  .scale(
+                      begin: const Offset(0.4, 0.4),
+                      curve: Curves.elasticOut,
+                      duration: 550.ms),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 "Subscription Active",
                 style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: _navyPrimary),
+                    color: c.navy),
               ),
               const SizedBox(height: 12),
               Text(
-                "Your ${plan.name} workspace is fully active at ${CurrencyFormatter.simple(total, 'USD')} per month.",
+                "Your ${plan.name} workspace is fully active at ${CurrencyFormatter.simple(total, 'USD')} per ${_cycle.perLabel}.",
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: _textLight, height: 1.5),
+                style: TextStyle(color: c.muted, height: 1.5),
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -418,8 +564,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     if (mounted) Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _navyPrimary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: c.button,
+                    foregroundColor: c.onButton,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
@@ -436,1363 +582,1802 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 }
 
-class _CurrentSubscriptionCard extends StatelessWidget {
-  final ActiveSubscription? subscription;
-  final String shopId;
-  final ValueChanged<SubscriptionPlan?> onUpgrade;
-  final ValueChanged<SubscriptionPlan?> onDowngrade;
-  final Future<void> Function() onCancel;
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing-cycle switch
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _CurrentSubscriptionCard({
-    required this.subscription,
-    required this.shopId,
-    required this.onUpgrade,
-    required this.onDowngrade,
-    required this.onCancel,
-  });
+class _BillingCycleToggle extends StatelessWidget {
+  const _BillingCycleToggle({required this.cycle, required this.onChanged});
+
+  final BillingCycle cycle;
+  final ValueChanged<BillingCycle> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final currentPlan = subscription?.plan;
-    final planName = subscription == null
-        ? "No active subscription"
-        : subscription!.plan.name;
-    final status = _statusFor(subscription);
-    final statusColor = _statusColorFor(subscription);
-    final nextBilling = subscription?.expiryDate;
-    final userLimit = subscription?.userLimit ?? 3;
-    final branchLimit = subscription?.branchLimit ?? 1;
+    final c = PlanColors.of(context);
+    final yearly = cycle.isYearly;
 
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: _bgWhite,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _borderGray),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 24,
-              offset: const Offset(0, 10)),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 860;
-          final body = isWide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    _CurrentPlanBadge(
-                      planName: planName,
-                      status: status,
-                      statusColor: statusColor,
-                      subscription: subscription,
-                    ),
-                    const SizedBox(width: 24),
-                    Container(width: 1, height: 96, color: _borderGray),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: _CurrentMetrics(
-                        shopId: shopId,
-                        userLimit: userLimit,
-                        branchLimit: branchLimit,
-                        nextBilling: nextBilling,
+    return Column(
+      children: [
+        Center(
+          child: LayoutBuilder(builder: (context, constraints) {
+            final width = constraints.maxWidth.clamp(0.0, 340.0);
+            return SizedBox(
+              width: width,
+              child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: c.subtle,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: c.border),
+            ),
+            child: Stack(
+              children: [
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment:
+                      yearly ? Alignment.centerRight : Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.5,
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 24),
-                    _CurrentActions(
-                      currentPlan: currentPlan,
-                      onUpgrade: onUpgrade,
-                      onDowngrade: onDowngrade,
-                      onCancel: onCancel,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _cycleOption(
+                        context,
+                        c,
+                        label: "Monthly",
+                        selected: !yearly,
+                        onTap: () => onChanged(BillingCycle.monthly),
+                      ),
+                    ),
+                    Expanded(
+                      child: _cycleOption(
+                        context,
+                        c,
+                        label: "Yearly",
+                        selected: yearly,
+                        badge: "−15%",
+                        onTap: () => onChanged(BillingCycle.yearly),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 10),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: yearly
+              ? Row(
+                  key: const ValueKey('yearly-note'),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.auto_awesome_rounded,
+                        size: 14, color: c.accent),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        "Annual billing saves 15% on every plan — add-ons stay the same.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: c.accent),
+                      ),
                     ),
                   ],
                 )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _CurrentPlanBadge(
-                      planName: planName,
-                      status: status,
-                      statusColor: statusColor,
-                      subscription: subscription,
-                    ),
-                    const SizedBox(height: 20),
-                    _CurrentMetrics(
-                      shopId: shopId,
-                      userLimit: userLimit,
-                      branchLimit: branchLimit,
-                      nextBilling: nextBilling,
-                    ),
-                    const SizedBox(height: 20),
-                    _CurrentActions(
-                      currentPlan: currentPlan,
-                      onUpgrade: onUpgrade,
-                      onDowngrade: onDowngrade,
-                      onCancel: onCancel,
-                    ),
-                  ],
-                );
-          return body;
-        },
-      ),
-    );
-  }
-
-  String _statusFor(ActiveSubscription? subscription) {
-    if (subscription == null) return "Inactive";
-    if (subscription.isExpired) return "Expired";
-    if (subscription.isTrial) return "Trial";
-    return "Active";
-  }
-
-  Color _statusColorFor(ActiveSubscription? subscription) {
-    if (subscription == null) return const Color(0xFF64748B);
-    if (subscription.isExpired) return const Color(0xFFDC2626);
-    if (subscription.isTrial) return const Color(0xFFF59E0B);
-    return const Color(0xFF16A34A);
-  }
-}
-
-class _CurrentPlanBadge extends StatelessWidget {
-  final String planName;
-  final String status;
-  final Color statusColor;
-  final ActiveSubscription? subscription;
-
-  const _CurrentPlanBadge({
-    required this.planName,
-    required this.status,
-    required this.statusColor,
-    required this.subscription,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final price = subscription?.plan.price ?? SubscriptionPlan.business.price;
-    final expiryLabel = subscription == null
-        ? "Next billing date: —"
-        : "Next billing date: ${MaterialLocalizations.of(context).formatMediumDate(subscription!.expiryDate)}";
-
-    return Row(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: _accentBlue,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(Icons.work_outline_rounded,
-              color: Colors.white, size: 38),
-        ),
-        const SizedBox(width: 18),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Current Plan",
-                style: TextStyle(
-                    color: _textLight,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(planName,
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: _navyPrimary)),
-                const SizedBox(width: 10),
-                _StatusPill(label: status, color: statusColor),
-              ],
-            ),
-            const SizedBox(height: 8),
-            RichText(
-              text: TextSpan(
-                style: const TextStyle(color: _navyPrimary),
-                children: [
-                  TextSpan(
-                    text: CurrencyFormatter.simple(price, 'USD'),
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w800),
-                  ),
-                  const TextSpan(
-                    text: " / month",
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: _textLight),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(expiryLabel,
-                style: const TextStyle(
-                    color: _navyPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500)),
-          ],
+              : Text(
+                  key: const ValueKey('monthly-note'),
+                  "Switch to yearly and pay for 10.2 months instead of 12.",
+                  style: TextStyle(fontSize: 12.5, color: c.muted),
+                ),
         ),
       ],
     );
   }
+
+  Widget _cycleOption(
+    BuildContext context,
+    PlanColors c, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    String? badge,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.center,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected ? c.navy : c.muted,
+              ),
+            ),
+            if (badge != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? c.accent.withOpacity(0.12)
+                      : const Color(0xFF16A34A).withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  badge,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? c.accent : const Color(0xFF15803D),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        ),
+      ),
+    );
+  }
 }
 
-class _CurrentMetrics extends StatelessWidget {
-  final String shopId;
-  final int userLimit;
-  final int branchLimit;
-  final DateTime? nextBilling;
+// ─────────────────────────────────────────────────────────────────────────────
+// Plans
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _CurrentMetrics({
-    required this.shopId,
-    required this.userLimit,
-    required this.branchLimit,
-    required this.nextBilling,
+class _PlanGrid extends StatelessWidget {
+  const _PlanGrid({
+    required this.selectedPlan,
+    required this.currentPlan,
+    required this.cycle,
+    required this.onSelectPlan,
+    required this.onContinue,
   });
+
+  final SubscriptionPlan selectedPlan;
+  final SubscriptionPlan? currentPlan;
+  final BillingCycle cycle;
+  final ValueChanged<SubscriptionPlan> onSelectPlan;
+  final ValueChanged<SubscriptionPlan> onContinue;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: shopId.isEmpty ? null : DatabaseService().watchUsers(shopId),
-      builder: (context, usersSnapshot) {
-        final userCount = usersSnapshot.data?.length ?? 0;
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream:
-              shopId.isEmpty ? null : DatabaseService().watchBranches(shopId),
-          builder: (context, branchesSnapshot) {
-            final branchCount = branchesSnapshot.data?.length ?? 0;
-            return Wrap(
-              spacing: 28,
-              runSpacing: 18,
-              children: [
-                _MetricChip(
-                  icon: Icons.groups_rounded,
-                  label: "Total Users",
-                  value: "$userCount / $userLimit",
-                ),
-                _MetricChip(
-                  icon: Icons.apartment_rounded,
-                  label: "Total Branches",
-                  value: "$branchCount / $branchLimit",
-                ),
-                _MetricChip(
-                  icon: Icons.calendar_month_rounded,
-                  label: "Billing Cycle",
-                  value: "Monthly",
-                ),
-                if (nextBilling != null)
-                  _MetricChip(
-                    icon: Icons.event_available_rounded,
-                    label: "Next Billing",
-                    value: MaterialLocalizations.of(context)
-                        .formatMediumDate(nextBilling!),
-                  ),
+    const plans = [
+      SubscriptionPlan.starter,
+      SubscriptionPlan.business,
+      SubscriptionPlan.enterprise,
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth > 1000;
+        final cards = plans.map((plan) {
+          return _PlanCard(
+            plan: plan,
+            cycle: cycle,
+            isSelected: selectedPlan == plan,
+            isCurrent: currentPlan == plan,
+            onSelect: () => onSelectPlan(plan),
+            onContinue: () => onContinue(plan),
+          );
+        }).toList();
+
+        if (isDesktop) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                Expanded(child: cards[i]),
+                if (i < cards.length - 1) const SizedBox(width: 18),
               ],
-            );
-          },
+            ],
+          );
+        }
+        return Column(
+          children: [
+            for (final card in cards) ...[
+              card,
+              const SizedBox(height: 16),
+            ],
+          ],
         );
       },
     );
   }
 }
 
-class _CurrentActions extends StatelessWidget {
-  final SubscriptionPlan? currentPlan;
-  final ValueChanged<SubscriptionPlan?> onUpgrade;
-  final ValueChanged<SubscriptionPlan?> onDowngrade;
-  final Future<void> Function() onCancel;
-
-  const _CurrentActions({
-    required this.currentPlan,
-    required this.onUpgrade,
-    required this.onDowngrade,
-    required this.onCancel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final canUpgrade = currentPlan == null ||
-        currentPlan == SubscriptionPlan.starter ||
-        currentPlan == SubscriptionPlan.business ||
-        currentPlan == SubscriptionPlan.trial ||
-        currentPlan == SubscriptionPlan.free ||
-        currentPlan == SubscriptionPlan.none;
-    final canDowngrade = currentPlan == SubscriptionPlan.enterprise ||
-        currentPlan == SubscriptionPlan.business;
-
-    return SizedBox(
-      width: 210,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ElevatedButton(
-            onPressed: canUpgrade ? () => onUpgrade(currentPlan) : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _accentBlue,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Upgrade Plan",
-                style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: canDowngrade ? () => onDowngrade(currentPlan) : null,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _accentBlue,
-              side: const BorderSide(color: _accentBlue),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Downgrade Plan",
-                style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => onCancel(),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFEF4444),
-              side: const BorderSide(color: Color(0xFFFCA5A5)),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Cancel Subscription",
-                style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlanGrid extends StatelessWidget {
-  final SubscriptionPlan selectedPlan;
-  final SubscriptionPlan? currentPlan;
-  final Map<SubscriptionPlan, _PlanCustomization> customizations;
-  final ValueChanged<SubscriptionPlan> onSelectPlan;
-  final void Function(SubscriptionPlan plan, int delta) onChangeExtraUsers;
-  final void Function(SubscriptionPlan plan, int delta) onChangeExtraBranches;
-  final void Function(SubscriptionPlan plan, bool value) onToggleAnalytics;
-  final void Function(SubscriptionPlan plan, bool value) onToggleAudit;
-  final void Function(SubscriptionPlan plan, _PlanCustomization customization)
-      onCheckout;
-
-  const _PlanGrid({
-    required this.selectedPlan,
-    required this.currentPlan,
-    required this.customizations,
-    required this.onSelectPlan,
-    required this.onChangeExtraUsers,
-    required this.onChangeExtraBranches,
-    required this.onToggleAnalytics,
-    required this.onToggleAudit,
-    required this.onCheckout,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final plans = [
-      SubscriptionPlan.starter,
-      SubscriptionPlan.business,
-      SubscriptionPlan.enterprise
-    ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 900;
-        final children = plans.asMap().entries.map((entry) {
-          final index = entry.key;
-          final plan = entry.value;
-          final customization = customizations[plan] ?? _PlanCustomization();
-          final isSelected = selectedPlan == plan;
-          final isCurrent = currentPlan == plan;
-          final total = _planTotal(plan, customization);
-          return Padding(
-            padding: EdgeInsets.only(
-              right: isDesktop && index < plans.length - 1 ? 20 : 0,
-              bottom: isDesktop ? 0 : 18,
-            ),
-            child: _PlanCard(
-              plan: plan,
-              customization: customization,
-              isSelected: isSelected,
-              isCurrent: isCurrent,
-              total: total,
-              onSelect: () => onSelectPlan(plan),
-              onChangeExtraUsers: (delta) => onChangeExtraUsers(plan, delta),
-              onChangeExtraBranches: (delta) =>
-                  onChangeExtraBranches(plan, delta),
-              onToggleAnalytics: (value) => onToggleAnalytics(plan, value),
-              onToggleAudit: (value) => onToggleAudit(plan, value),
-              onCheckout: () => onCheckout(plan, customization),
-            ),
-          );
-        }).toList();
-
-        if (isDesktop) {
-          return Row(
-              children:
-                  children.map((child) => Expanded(child: child)).toList());
-        }
-        return Column(children: children);
-      },
-    );
-  }
-
-  double _planTotal(SubscriptionPlan plan, _PlanCustomization customization) {
-    double total = plan.price;
-    total += customization.extraUsers *
-        SubscriptionAddOn.extraUser.getPrice(plan);
-    total += customization.extraBranches *
-        SubscriptionAddOn.extraBranch.getPrice(plan);
-    if (customization.advancedAnalyticsPack) {
-      total += SubscriptionAddOn.advancedAnalyticsPack.getPrice(plan);
-    }
-    if (customization.auditLogsPack) {
-      total += SubscriptionAddOn.auditLogsPack.getPrice(plan);
-    }
-    return total;
-  }
-}
-
 class _PlanCard extends StatefulWidget {
-  final SubscriptionPlan plan;
-  final _PlanCustomization customization;
-  final bool isSelected;
-  final bool isCurrent;
-  final double total;
-  final VoidCallback onSelect;
-  final ValueChanged<int> onChangeExtraUsers;
-  final ValueChanged<int> onChangeExtraBranches;
-  final ValueChanged<bool> onToggleAnalytics;
-  final ValueChanged<bool> onToggleAudit;
-  final VoidCallback onCheckout;
-
   const _PlanCard({
     required this.plan,
-    required this.customization,
+    required this.cycle,
     required this.isSelected,
     required this.isCurrent,
-    required this.total,
     required this.onSelect,
-    required this.onChangeExtraUsers,
-    required this.onChangeExtraBranches,
-    required this.onToggleAnalytics,
-    required this.onToggleAudit,
-    required this.onCheckout,
+    required this.onContinue,
   });
+
+  final SubscriptionPlan plan;
+  final BillingCycle cycle;
+  final bool isSelected;
+  final bool isCurrent;
+  final VoidCallback onSelect;
+  final VoidCallback onContinue;
 
   @override
   State<_PlanCard> createState() => _PlanCardState();
 }
 
 class _PlanCardState extends State<_PlanCard> {
-  bool _isHovering = false;
+  bool _hovering = false;
+  bool _showAllFeatures = false;
 
   @override
   Widget build(BuildContext context) {
-    final availableAddOns = _availableAddOns(widget.plan);
-    final totalLabel = CurrencyFormatter.simple(widget.total, 'USD');
+    final c = PlanColors.of(context);
+    final spec = _specFor(widget.plan);
+    final yearly = widget.cycle.isYearly;
+    final price = planPriceFor(widget.plan, widget.cycle);
+    final monthlyEquivalent = annualMonthlyEquivalentFor(widget.plan);
+    final savings = annualSavingsFor(widget.plan);
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        transform: Matrix4.translationValues(
-            0, _isHovering || widget.isSelected ? -6 : 0, 0),
-        decoration: BoxDecoration(
-          color: _bgWhite,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: widget.isSelected ? _accentBlue : _borderGray,
-            width: widget.isSelected ? 2 : 1,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onTap: widget.onSelect,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.translationValues(
+              0, (_hovering || widget.isSelected) ? -4 : 0, 0),
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(
+              color: widget.isSelected ? c.accent : c.border,
+              width: widget.isSelected ? 2 : 1,
+            ),
+            boxShadow: [
+              if (_hovering || widget.isSelected)
+                BoxShadow(
+                  color: widget.isSelected
+                      ? c.accent.withOpacity(0.12)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: 30,
+                  offset: const Offset(0, 14),
+                ),
+            ],
           ),
-          boxShadow: [
-            if (_isHovering || widget.isSelected)
-              BoxShadow(
-                color: widget.isSelected
-                    ? _accentBlue.withOpacity(0.10)
-                    : Colors.black.withOpacity(0.05),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (widget.plan == SubscriptionPlan.business)
-              Container(
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: const BoxDecoration(
-                  color: _accentBlue,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-                ),
-                child: const Text(
-                  "MOST POPULAR",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.plan.name,
-                          style: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                              color: _navyPrimary),
-                        ),
-                      ),
-                      if (widget.isCurrent)
-                        const _StatusPill(
-                            label: "Current", color: Color(0xFF16A34A)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    child: RichText(
-                      key: ValueKey(totalLabel),
-                      text: TextSpan(
-                        style: const TextStyle(color: _navyPrimary),
-                        children: [
-                          TextSpan(
-                            text: totalLabel,
-                            style: const TextStyle(
-                                fontSize: 42,
-                                fontWeight: FontWeight.w800,
-                                height: 1),
-                          ),
-                          const TextSpan(
-                            text: " / month",
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                                color: _textLight),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  ..._planFeatures(widget.plan).map((feature) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.check_circle_rounded,
-                              color: _accentBlue, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              feature,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  color: _textLight,
-                                  height: 1.45),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                  if (widget.isSelected) ...[
-                    const SizedBox(height: 8),
-                    const Divider(height: 32, color: _borderGray),
-                    const Text(
-                      "ADD-ONS",
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: _textDark,
-                          letterSpacing: 1.1),
-                    ),
-                    const SizedBox(height: 16),
-                    ...availableAddOns
-                        .map((addOn) => _buildAddonRow(context, addOn)),
-                  ],
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: widget.isCurrent
-                          ? null
-                          : (widget.isSelected
-                              ? widget.onCheckout
-                              : widget.onSelect),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: widget.isCurrent
-                            ? _accentBlue
-                            : widget.isSelected
-                                ? _navyPrimary
-                                : _bgWhite,
-                        foregroundColor: widget.isCurrent || widget.isSelected
-                            ? Colors.white
-                            : _navyPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        side: widget.isCurrent || widget.isSelected
-                            ? BorderSide.none
-                            : const BorderSide(color: _accentBlue),
-                      ),
-                      child: Text(
-                        widget.isCurrent
-                            ? "Current Plan"
-                            : widget.isSelected
-                                ? "Continue with ${widget.plan.name}"
-                                : "Choose Plan",
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddonRow(BuildContext context, SubscriptionAddOn addOn) {
-    if (addOn == SubscriptionAddOn.extraUser) {
-      return _QuantityAddonRow(
-        title: "Extra Users",
-        description: "Add more seats to your account.",
-        unitPriceLabel: CurrencyFormatter.simple(
-            _addonUnitPrice(widget.plan, addOn), 'USD'),
-        quantity: widget.customization.extraUsers,
-        onDecrease: () => widget.onChangeExtraUsers(-1),
-        onIncrease: () => widget.onChangeExtraUsers(1),
-      );
-    }
-
-    if (addOn == SubscriptionAddOn.extraBranch) {
-      return _QuantityAddonRow(
-        title: "Extra Branches",
-        description: "Add more branch locations.",
-        unitPriceLabel: CurrencyFormatter.simple(
-            _addonUnitPrice(widget.plan, addOn), 'USD'),
-        quantity: widget.customization.extraBranches,
-        onDecrease: () => widget.onChangeExtraBranches(-1),
-        onIncrease: () => widget.onChangeExtraBranches(1),
-      );
-    }
-
-    final isAnalytics = addOn == SubscriptionAddOn.advancedAnalyticsPack;
-    final isSelected = isAnalytics
-        ? widget.customization.advancedAnalyticsPack
-        : widget.customization.auditLogsPack;
-    final title = isAnalytics ? "Advanced Analytics Pack" : "Audit Logs Pack";
-    final description = isAnalytics
-        ? "Unlock advanced analytics and insights."
-        : "Extended audit logs and security tracking.";
-    final unitPrice =
-        CurrencyFormatter.simple(_addonUnitPrice(widget.plan, addOn), 'USD');
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? _accentBlue.withOpacity(0.04)
-              : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: isSelected ? _accentBlue.withOpacity(0.35) : _borderGray),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: _accentBlue.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                  isAnalytics
-                      ? Icons.analytics_rounded
-                      : Icons.verified_user_rounded,
-                  color: _accentBlue,
-                  size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: _navyPrimary,
-                          fontSize: 13)),
-                  const SizedBox(height: 3),
-                  Text(description,
-                      style: const TextStyle(
-                          fontSize: 12, color: _textLight, height: 1.35)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text("+$unitPrice / month",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: _navyPrimary,
-                        fontSize: 13)),
-                const SizedBox(height: 8),
-                Switch.adaptive(
-                  value: isSelected,
-                  onChanged: isAnalytics
-                      ? widget.onToggleAnalytics
-                      : widget.onToggleAudit,
-                  activeColor: _accentBlue,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<String> _planFeatures(SubscriptionPlan plan) {
-    switch (plan) {
-      case SubscriptionPlan.starter:
-        return [
-          "Up to 3 Users",
-          "1 Supported Branch",
-          "Basic Inventory Tracking",
-          "Core POS & Sales Billing",
-        ];
-      case SubscriptionPlan.business:
-        return [
-          "Up to 10 Users",
-          "5 Supported Branches",
-          "FEFO + Batch Tracking",
-          "Expiry Tracking",
-          "Advanced Reports & Analytics",
-          "Full Audit Trail & Logs",
-          "Custom Staff Roles & Permissions",
-        ];
-      case SubscriptionPlan.enterprise:
-        return [
-          "Up to 100 Users",
-          "70 Supported Branches",
-          "Everything in Business",
-          "Advanced Analytics Pack",
-          "Audit Logs Pack",
-          "Advanced Monitoring",
-        ];
-      default:
-        return [];
-    }
-  }
-
-  List<SubscriptionAddOn> _availableAddOns(SubscriptionPlan plan) {
-    return [
-      SubscriptionAddOn.extraUser,
-      SubscriptionAddOn.extraBranch,
-      SubscriptionAddOn.advancedAnalyticsPack,
-      SubscriptionAddOn.auditLogsPack,
-    ].where((addOn) => _addonUnitPrice(plan, addOn) > 0).toList();
-  }
-
-  double _addonUnitPrice(SubscriptionPlan plan, SubscriptionAddOn addOn) {
-    return addOn.getPrice(plan);
-  }
-}
-
-class _QuantityAddonRow extends StatelessWidget {
-  final String title;
-  final String description;
-  final String unitPriceLabel;
-  final int quantity;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
-
-  const _QuantityAddonRow({
-    required this.title,
-    required this.description,
-    required this.unitPriceLabel,
-    required this.quantity,
-    required this.onDecrease,
-    required this.onIncrease,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _borderGray),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: _accentBlue.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.person_add_alt_1_rounded,
-                  color: _accentBlue, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: _navyPrimary,
-                          fontSize: 13)),
-                  const SizedBox(height: 3),
-                  Text(description,
-                      style: const TextStyle(
-                          fontSize: 12, color: _textLight, height: 1.35)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _borderGray),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed: quantity > 0 ? onDecrease : null,
-                        icon: const Icon(Icons.remove_rounded),
-                        splashRadius: 18,
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: SizedBox(
-                          width: 26,
-                          key: ValueKey(quantity),
-                          child: Text(
-                            quantity.toString(),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: _navyPrimary),
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: onIncrease,
-                        icon: const Icon(Icons.add_rounded),
-                        splashRadius: 18,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text("+$unitPriceLabel / user",
-                    style: const TextStyle(fontSize: 12, color: _textLight)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BillingReviewSection extends StatelessWidget {
-  final SubscriptionPlan selectedPlan;
-  final _PlanCustomization customization;
-  final double total;
-  final _PaymentMethod paymentMethod;
-  final ValueChanged<_PaymentMethod> onPaymentMethodChanged;
-  final VoidCallback onConfirm;
-
-  const _BillingReviewSection({
-    required this.selectedPlan,
-    required this.customization,
-    required this.total,
-    required this.paymentMethod,
-    required this.onPaymentMethodChanged,
-    required this.onConfirm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width > 980;
-    final summaryCard = SizedBox(
-      width: isWide ? 360 : double.infinity,
-      child: _OrderSummaryCard(
-        selectedPlan: selectedPlan,
-        customization: customization,
-        total: total,
-      ),
-    );
-
-    final paymentCard = Expanded(
-      child: _PaymentMethodsCard(
-        paymentMethod: paymentMethod,
-        total: total,
-        onPaymentMethodChanged: onPaymentMethodChanged,
-        onConfirm: onConfirm,
-      ),
-    );
-
-    return isWide
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              paymentCard,
-              const SizedBox(width: 22),
-              summaryCard,
-            ],
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              summaryCard,
-              const SizedBox(height: 20),
-              _PaymentMethodsCard(
-                paymentMethod: paymentMethod,
-                total: total,
-                onPaymentMethodChanged: onPaymentMethodChanged,
-                onConfirm: onConfirm,
-              ),
-            ],
-          );
-  }
-}
-
-class _OrderSummaryCard extends StatelessWidget {
-  final SubscriptionPlan selectedPlan;
-  final _PlanCustomization customization;
-  final double total;
-
-  const _OrderSummaryCard({
-    required this.selectedPlan,
-    required this.customization,
-    required this.total,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final totalLabel = CurrencyFormatter.simple(total, 'USD');
-    final baseLabel = CurrencyFormatter.simple(selectedPlan.price, 'USD');
-    return Container(
-      decoration: BoxDecoration(
-        color: _bgWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _borderGray),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 24,
-              offset: const Offset(0, 10)),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text("Order Summary",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: _navyPrimary)),
-            const SizedBox(height: 18),
-            _SummaryLine(label: "${selectedPlan.name} Plan", amount: baseLabel),
-            if (customization.extraUsers > 0)
-              _SummaryLine(
-                label:
-                    "Extra Users (${customization.extraUsers} × ${CurrencyFormatter.simple(SubscriptionAddOn.extraUser.getPrice(selectedPlan), 'USD')})",
-                amount: CurrencyFormatter.simple(
-                    customization.extraUsers *
-                        SubscriptionAddOn.extraUser.getPrice(selectedPlan),
-                    'USD'),
-              ),
-            if (customization.extraBranches > 0)
-              _SummaryLine(
-                label:
-                    "Extra Branches (${customization.extraBranches} × ${CurrencyFormatter.simple(SubscriptionAddOn.extraBranch.getPrice(selectedPlan), 'USD')})",
-                amount: CurrencyFormatter.simple(
-                    customization.extraBranches *
-                        SubscriptionAddOn.extraBranch.getPrice(selectedPlan),
-                    'USD'),
-              ),
-            if (customization.advancedAnalyticsPack)
-              _SummaryLine(
-                label: "Advanced Analytics Pack",
-                amount: CurrencyFormatter.simple(
-                    SubscriptionAddOn.advancedAnalyticsPack
-                        .getPrice(selectedPlan),
-                    'USD'),
-              ),
-            if (customization.auditLogsPack)
-              _SummaryLine(
-                label: "Audit Logs Pack",
-                amount: CurrencyFormatter.simple(
-                    SubscriptionAddOn.auditLogsPack.getPrice(selectedPlan),
-                    'USD'),
-              ),
-            const Divider(height: 30, color: _borderGray),
-            _SummaryLine(
-              label: "Total (per month)",
-              amount: totalLabel,
-              bold: true,
-              amountColor: _accentBlue,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PaymentMethodsCard extends StatelessWidget {
-  final _PaymentMethod paymentMethod;
-  final double total;
-  final ValueChanged<_PaymentMethod> onPaymentMethodChanged;
-  final VoidCallback onConfirm;
-
-  const _PaymentMethodsCard({
-    required this.paymentMethod,
-    required this.total,
-    required this.onPaymentMethodChanged,
-    required this.onConfirm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final totalLabel = CurrencyFormatter.simple(total, 'USD');
-    return Container(
-      decoration: BoxDecoration(
-        color: _bgWhite,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _borderGray),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 24,
-              offset: const Offset(0, 10)),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text("Payment Method",
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: _navyPrimary)),
-            const SizedBox(height: 8),
-            const Text("Choose your preferred payment method",
-                style: TextStyle(fontSize: 13, color: _textLight)),
-            const SizedBox(height: 16),
-            _PaymentChoiceTile(
-              selected: paymentMethod == _PaymentMethod.telebirr,
-              icon: Icons.account_balance_wallet_rounded,
-              label: "Telebirr",
-              onTap: () => onPaymentMethodChanged(_PaymentMethod.telebirr),
-            ),
-            const SizedBox(height: 10),
-            _PaymentChoiceTile(
-              selected: paymentMethod == _PaymentMethod.card,
-              icon: Icons.credit_card_rounded,
-              label: "Credit / Debit Card",
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text("VISA",
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: _accentBlue)),
-                  SizedBox(width: 10),
-                  Text("MC",
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.redAccent)),
-                ],
-              ),
-              onTap: () => onPaymentMethodChanged(_PaymentMethod.card),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: _borderGray),
-              ),
-              child: Row(
-                children: [
+                if (widget.plan == SubscriptionPlan.business)
                   Container(
-                    width: 42,
-                    height: 42,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: _accentBlue.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.lock_rounded,
-                        color: _accentBlue, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                        color: c.accent,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(24))),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("Secure Payment",
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: _navyPrimary)),
-                        SizedBox(height: 4),
+                        Icon(Icons.local_fire_department_rounded,
+                            size: 14, color: c.onAccent),
+                        const SizedBox(width: 6),
                         Text(
-                            "Your payment information is encrypted and secure.",
-                            style: TextStyle(
-                                fontSize: 12, color: _textLight, height: 1.35)),
+                          "MOST POPULAR",
+                          style: TextStyle(
+                              color: c.onAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2),
+                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: total, end: total),
-              duration: const Duration(milliseconds: 220),
-              builder: (context, value, child) {
-                return SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: onConfirm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _accentBlue,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: Text(
-                      "Confirm & Continue to Payment • $totalLabel",
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 14),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: c.accent.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(spec.icon, color: c.accent, size: 21),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.plan.name,
+                                  style: TextStyle(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w800,
+                                      color: c.navy),
+                                ),
+                                Text(
+                                  spec.tagline,
+                                  style: TextStyle(
+                                      fontSize: 11.5, color: c.muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (widget.isCurrent)
+                            const _StatusPill(
+                                label: "Current", color: Color(0xFF16A34A)),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 240),
+                        transitionBuilder: (child, animation) =>
+                            FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.15),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                          key: ValueKey(
+                              '${widget.plan.name}-${widget.cycle.name}'),
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              CurrencyFormatter.simple(price, 'USD'),
+                              style: TextStyle(
+                                  fontSize: 38,
+                                  height: 1,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1,
+                                  color: c.navy),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: Text(
+                                " / ${widget.cycle.perLabel}",
+                                style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: c.muted),
+                              ),
+                            ),
+                          ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 20,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: yearly
+                              ? Wrap(
+                                  key: const ValueKey('year-price'),
+                                  spacing: 8,
+                                  runSpacing: 3,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      "≈ ${CurrencyFormatter.simple(monthlyEquivalent, 'USD')}/mo",
+                                      style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: c.accent),
+                                    ),
+                                    Text(
+                                      CurrencyFormatter.simple(
+                                              widget.plan.price, 'USD') +
+                                          "/mo",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: c.muted,
+                                        decoration:
+                                            TextDecoration.lineThrough,
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF16A34A)
+                                            .withOpacity(0.10),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        "Save ${CurrencyFormatter.simple(savings, 'USD')}",
+                                        style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF15803D)),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  key: const ValueKey('month-price'),
+                                  "Billed monthly · cancel anytime",
+                                  style: TextStyle(
+                                      fontSize: 12.5, color: c.muted),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Divider(height: 1, color: c.border),
+                      const SizedBox(height: 16),
+                      ...spec.highlights.map((highlight) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: BoxDecoration(
+                                    color: c.accent.withOpacity(0.09),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(highlight.icon,
+                                      size: 12, color: c.accent),
+                                ),
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Text(
+                                    highlight.label,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: c.heading,
+                                        height: 1.35),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                      InkWell(
+                        onTap: () => setState(
+                            () => _showAllFeatures = !_showAllFeatures),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _showAllFeatures
+                                      ? "Hide full feature list"
+                                      : "See everything included",
+                                  style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: c.accent),
+                                ),
+                              ),
+                              AnimatedRotation(
+                                turns: _showAllFeatures ? 0.5 : 0,
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(Icons.keyboard_arrow_down_rounded,
+                                    size: 18, color: c.accent),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: _showAllFeatures
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: spec.everything
+                                    .map((feature) => Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 6),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.check_rounded,
+                                                size: 14,
+                                                color: c.muted,
+                                              ),
+                                              const SizedBox(width: 7),
+                                              Expanded(
+                                                child: Text(
+                                                  feature,
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: c.muted,
+                                                      height: 1.4),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ))
+                                    .toList(),
+                              )
+                            : const SizedBox(width: double.infinity),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: widget.onContinue,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                widget.isSelected ? c.accent : c.button,
+                            foregroundColor: widget.isSelected
+                                ? c.onAccent
+                                : c.onButton,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13)),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.isCurrent
+                                      ? "Manage add-ons"
+                                      : "Continue with ${widget.plan.name}",
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.arrow_forward_rounded,
+                                    size: 17),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _PaymentChoiceTile extends StatelessWidget {
-  final bool selected;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Widget? trailing;
+/// Slim strip shown while the workspace is on a trial: Enterprise features are
+/// open, only seats and branches are capped. Deliberately not a card, so the
+/// plans sit right below it.
+class _TrialModeBanner extends StatelessWidget {
+  const _TrialModeBanner({required this.subscription});
 
-  const _PaymentChoiceTile({
-    required this.selected,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.trailing,
-  });
+  final ActiveSubscription? subscription;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? _accentBlue.withOpacity(0.04) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: selected ? _accentBlue : _borderGray,
-              width: selected ? 1.5 : 1),
-        ),
-        child: Row(
-          children: [
-            Radio<bool>(
-              value: true,
-              groupValue: selected,
-              onChanged: (_) => onTap(),
-              activeColor: _accentBlue,
-            ),
-            const SizedBox(width: 6),
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: _accentBlue.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: _accentBlue, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, color: _navyPrimary)),
-            ),
-            if (trailing != null) trailing!,
-          ],
-        ),
+    final sub = subscription;
+    final isTrial = sub != null && sub.isTrial && !sub.isExpired;
+    final endsOn = isTrial
+        ? MaterialLocalizations.of(context).formatMediumDate(sub.expiryDate)
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.45)),
       ),
-    );
-  }
-}
-
-class _SummaryLine extends StatelessWidget {
-  final String label;
-  final String amount;
-  final bool bold;
-  final Color amountColor;
-
-  const _SummaryLine({
-    required this.label,
-    required this.amount,
-    this.bold = false,
-    this.amountColor = _navyPrimary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textStyle = TextStyle(
-      color: bold ? _navyPrimary : _textLight,
-      fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-      fontSize: bold ? 15 : 13,
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label, style: textStyle)),
-          const SizedBox(width: 12),
-          Text(amount, style: textStyle.copyWith(color: amountColor)),
+          const Icon(Icons.warning_amber_rounded,
+              size: 13, color: Color(0xFFD97706)),
+          const SizedBox(width: 6),
+          const Text(
+            "TRIAL MODE",
+            style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.9,
+                color: Color(0xFFD97706)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              endsOn == null
+                  ? "Enterprise features · 3 users · 1 branch"
+                  : "Ends $endsOn · Enterprise features · 3 users · 1 branch",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF92400E)),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _SectionHeading extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const _SectionHeading({
-    required this.title,
-    required this.subtitle,
+/// Compact bar with the three subscription actions. Only shown once a paid
+/// plan is active.
+class _SubscriptionActionBar extends StatelessWidget {
+  const _SubscriptionActionBar({
+    required this.subscription,
+    required this.onUpgrade,
+    required this.onDowngrade,
+    required this.onCancel,
   });
+
+  final ActiveSubscription subscription;
+  final VoidCallback onUpgrade;
+  final VoidCallback onDowngrade;
+  final Future<void> Function() onCancel;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final c = PlanColors.of(context);
+    final canUpgrade = subscription.plan != SubscriptionPlan.enterprise;
+    final renews = MaterialLocalizations.of(context)
+        .formatMediumDate(subscription.expiryDate);
+    final compact = MediaQuery.sizeOf(context).width < 760;
+
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _ActionChipButton(
+          label: "Upgrade",
+          icon: Icons.arrow_upward_rounded,
+          filled: true,
+          onPressed: canUpgrade ? onUpgrade : null,
+        ),
+        _ActionChipButton(
+          label: "Downgrade",
+          icon: Icons.arrow_downward_rounded,
+          onPressed: onDowngrade,
+        ),
+        _ActionChipButton(
+          label: "Cancel",
+          icon: Icons.close_rounded,
+          danger: true,
+          onPressed: () => onCancel(),
+        ),
+      ],
+    );
+
+    final info = Row(
+      children: [
+        const _StatusPill(label: "Active", color: Color(0xFF16A34A)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            "${subscription.plan.name} · renews $renews",
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: c.navy),
+          ),
+        ),
+      ],
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.border),
+      ),
+      child: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                info,
+                const SizedBox(height: 10),
+                Align(alignment: Alignment.centerLeft, child: actions),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: info),
+                const SizedBox(width: 16),
+                actions,
+              ],
+            ),
+    );
+  }
+}
+
+class _ActionChipButton extends StatelessWidget {
+  const _ActionChipButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+    this.danger = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool filled;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    final fg = danger
+        ? const Color(0xFFDC2626)
+        : (filled ? c.onAccent : c.accent);
+    final radius = BorderRadius.circular(11);
+    final style = TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5);
+
+    return SizedBox(
+      height: 40,
+      child: filled
+          ? ElevatedButton.icon(
+              onPressed: onPressed,
+              icon: Icon(icon, size: 16),
+              label: Text(label, style: style),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: c.accent,
+                foregroundColor: fg,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
+            )
+          : OutlinedButton.icon(
+              onPressed: onPressed,
+              icon: Icon(icon, size: 16),
+              label: Text(label, style: style),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: fg,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                side: BorderSide(
+                    color: danger
+                        ? const Color(0xFFFCA5A5)
+                        : c.border),
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
+            ),
+    );
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// Add-ons step
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AddOnsSheet extends StatefulWidget {
+  const _AddOnsSheet({
+    required this.plan,
+    required this.cycle,
+    required this.customization,
+    required this.onContinue,
+    required this.onDismiss,
+  });
+
+  final SubscriptionPlan plan;
+  final BillingCycle cycle;
+  final _PlanCustomization customization;
+  final VoidCallback onContinue;
+  final VoidCallback onDismiss;
+
+  @override
+  State<_AddOnsSheet> createState() => _AddOnsSheetState();
+}
+
+class _AddOnsSheetState extends State<_AddOnsSheet> {
+  _PlanCustomization get _customization => widget.customization;
+
+  void _update(VoidCallback change) => setState(change);
+
+  void _skip() {
+    setState(_customization.clear);
+    widget.onContinue();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    final plan = widget.plan;
+    final cycle = widget.cycle;
+    final addOns = _availableAddOnsFor(plan);
+    final featureAddOns = addOns
+        .where((a) =>
+            a != SubscriptionAddOn.extraUser &&
+            a != SubscriptionAddOn.extraBranch)
+        .toList();
+    final includedUsers = userLimitFor(plan, const []);
+    final includedBranches = branchLimitFor(plan, const []);
+    final anySelected = _customization.selections().isNotEmpty;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 780,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.94,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: c.page,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.16),
+                blurRadius: 40,
+                offset: const Offset(0, -10),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 46,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: c.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: c.accent.withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                "STEP 2 OF 2 · OPTIONAL",
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.1,
+                                    color: c.accent),
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: widget.onDismiss,
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              color: c.muted,
+                              tooltip: "Close",
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Make ${plan.name} yours",
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: c.navy),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Add only what your shop needs — everything here is "
+                          "optional. Only extras your plan does not already "
+                          "include are shown.",
+                          style: TextStyle(
+                              fontSize: 13, height: 1.5, color: c.muted),
+                        ),
+                        const SizedBox(height: 18),
+                        _AddOnSectionLabel(
+                          title: "Team & locations",
+                          subtitle:
+                              "$includedUsers users · $includedBranches "
+                              "branch${includedBranches == 1 ? '' : 'es'} included",
+                        ),
+                        const SizedBox(height: 10),
+                        _QuantityAddonRow(
+                          icon: Icons.groups_2_rounded,
+                          title: "Extra users",
+                          description:
+                              "Add more staff accounts with their own permissions.",
+                          unitPriceLabel: CurrencyFormatter.simple(
+                              addOnPriceFor(
+                                  plan, SubscriptionAddOn.extraUser, cycle),
+                              'USD'),
+                          priceSuffix: cycle.perLabel,
+                          quantity: _customization.extraUsers,
+                          onDecrease: () => _update(() =>
+                              _customization.extraUsers =
+                                  (_customization.extraUsers - 1)
+                                      .clamp(0, 99)
+                                      .toInt()),
+                          onIncrease: () => _update(() =>
+                              _customization.extraUsers =
+                                  (_customization.extraUsers + 1)
+                                      .clamp(0, 99)
+                                      .toInt()),
+                          selected: _customization.extraUsers > 0,
+                        ),
+                        _QuantityAddonRow(
+                          icon: Icons.store_mall_directory_rounded,
+                          title: "Extra branches",
+                          description:
+                              "Run another location on the same workspace.",
+                          unitPriceLabel: CurrencyFormatter.simple(
+                              addOnPriceFor(
+                                  plan, SubscriptionAddOn.extraBranch, cycle),
+                              'USD'),
+                          priceSuffix: cycle.perLabel,
+                          quantity: _customization.extraBranches,
+                          onDecrease: () => _update(() =>
+                              _customization.extraBranches =
+                                  (_customization.extraBranches - 1)
+                                      .clamp(0, 99)
+                                      .toInt()),
+                          onIncrease: () => _update(() =>
+                              _customization.extraBranches =
+                                  (_customization.extraBranches + 1)
+                                      .clamp(0, 99)
+                                      .toInt()),
+                          selected: _customization.extraBranches > 0,
+                        ),
+                        if (featureAddOns.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          _AddOnSectionLabel(
+                              title: "Power-ups",
+                              subtitle:
+                                  "Switch on only what your shop needs"),
+                          const SizedBox(height: 10),
+                          ...featureAddOns.map((addOn) => _FeatureAddOnTile(
+                                addOn: addOn,
+                                plan: plan,
+                                cycle: cycle,
+                                selected: _customization.isSelected(addOn),
+                                onChanged: (value) => _update(
+                                    () => _customization.toggle(addOn, value)),
+                              )),
+                        ],
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: c.subtle,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: c.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  size: 15, color: c.muted),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  cycle.isYearly
+                                      ? "Add-ons are charged for 12 months at their monthly rate — the 15% discount applies to the plan only."
+                                      : "Add-ons renew monthly and can be removed anytime.",
+                                  style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: c.muted,
+                                      height: 1.4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _SheetSummary(
+                          plan: plan,
+                          cycle: cycle,
+                          customization: _customization,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                _SheetFooter(
+                  plan: plan,
+                  cycle: cycle,
+                  total: _customization.termTotal(plan, cycle),
+                  skipLabel: anySelected ? "Clear add-ons" : "Skip add-ons",
+                  onContinue: widget.onContinue,
+                  onSkip: _skip,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetSummary extends StatelessWidget {
+  const _SheetSummary({
+    required this.plan,
+    required this.cycle,
+    required this.customization,
+  });
+
+  final SubscriptionPlan plan;
+  final BillingCycle cycle;
+  final _PlanCustomization customization;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    final yearly = cycle.isYearly;
+    final planPrice = planPriceFor(plan, cycle);
+    final total = customization.termTotal(plan, cycle);
+    final counts = <SubscriptionAddOn, int>{};
+    for (final addOn in customization.selections()) {
+      counts[addOn] = (counts[addOn] ?? 0) + 1;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 17, color: c.accent),
+              const SizedBox(width: 8),
+              Text(
+                "Your order",
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: c.navy),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: c.subtle,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: c.border),
+                ),
+                child: Text(
+                  cycle.label,
+                  style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: c.muted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _SummaryLine(
+            label: "${plan.name} plan",
+            amount: CurrencyFormatter.simple(planPrice, 'USD'),
+          ),
+          if (yearly)
+            _SummaryLine(
+              label: "Annual discount (15%)",
+              amount: "− ${CurrencyFormatter.simple(annualSavingsFor(plan), 'USD')}",
+              amountColor: const Color(0xFF16A34A),
+            ),
+          for (final entry in counts.entries)
+            _SummaryLine(
+              label: entry.value > 1
+                  ? "${entry.key.name} × ${entry.value}"
+                  : entry.key.name,
+              amount: CurrencyFormatter.simple(
+                  addOnPriceFor(plan, entry.key, cycle) * entry.value, 'USD'),
+            ),
+          Divider(height: 24, color: c.border),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  "Due today",
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: c.heading),
+                ),
+              ),
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: total, end: total),
+                duration: const Duration(milliseconds: 320),
+                builder: (context, value, _) => Text(
+                  CurrencyFormatter.simple(value, 'USD'),
+                  style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.6,
+                      color: c.accent),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            yearly
+                ? "One payment covers 12 months. Renews yearly."
+                : "Billed monthly. Cancel anytime.",
+            style: TextStyle(fontSize: 11.5, color: c.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetFooter extends StatelessWidget {
+  const _SheetFooter({
+    required this.plan,
+    required this.cycle,
+    required this.total,
+    required this.skipLabel,
+    required this.onContinue,
+    required this.onSkip,
+  });
+
+  final SubscriptionPlan plan;
+  final BillingCycle cycle;
+  final double total;
+  final String skipLabel;
+  final VoidCallback onContinue;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(top: BorderSide(color: c.border)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  plan.name,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: c.muted),
+                ),
+              ),
+              Text(
+                "${CurrencyFormatter.simple(total, 'USD')} / ${cycle.perLabel}",
+                style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    color: c.navy),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              TextButton(
+                onPressed: onSkip,
+                style: TextButton.styleFrom(
+                  foregroundColor: c.muted,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: c.border),
+                  ),
+                ),
+                child: Text(skipLabel,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 13)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: onContinue,
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                    label: const Text("Continue to payment",
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 14)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: c.button,
+                      foregroundColor: c.onButton,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+class _AddOnSectionLabel extends StatelessWidget {
+  const _AddOnSectionLabel({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
           title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontSize: 26, fontWeight: FontWeight.w800, color: _navyPrimary),
+          style: TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w800, color: c.navy),
         ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 14, color: _textLight, height: 1.5),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            subtitle,
+            style: TextStyle(fontSize: 11.5, color: c.muted),
+          ),
         ),
       ],
     );
   }
 }
 
-class _MetricChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _MetricChip({
-    required this.icon,
-    required this.label,
-    required this.value,
+class _FeatureAddOnTile extends StatelessWidget {
+  const _FeatureAddOnTile({
+    required this.addOn,
+    required this.plan,
+    required this.cycle,
+    required this.selected,
+    required this.onChanged,
   });
+
+  final SubscriptionAddOn addOn;
+  final SubscriptionPlan plan;
+  final BillingCycle cycle;
+  final bool selected;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: _navyPrimary.withOpacity(0.7), size: 22),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final c = PlanColors.of(context);
+    final price =
+        CurrencyFormatter.simple(addOnPriceFor(plan, addOn, cycle), 'USD');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => onChanged(!selected),
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: selected ? c.accent.withOpacity(0.06) : c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: selected ? c.accent : c.border,
+                width: selected ? 1.6 : 1),
+          ),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? c.accent.withOpacity(0.14)
+                      : c.subtle,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(_addOnIcon(addOn),
+                    color: selected ? c.accent : c.muted, size: 21),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      addOn.name,
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: c.heading),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _addOnDescription(addOn),
+                      style: TextStyle(
+                          fontSize: 12, color: c.muted, height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    "+$price/${cycle.perLabel}",
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: c.navy),
+                  ),
+                  const SizedBox(height: 4),
+                  Switch.adaptive(
+                    value: selected,
+                    onChanged: onChanged,
+                    activeColor: c.accent,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuantityAddonRow extends StatelessWidget {
+  const _QuantityAddonRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.unitPriceLabel,
+    required this.priceSuffix,
+    required this.quantity,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.selected,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final String unitPriceLabel;
+  final String priceSuffix;
+  final int quantity;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: selected ? c.accent.withOpacity(0.06) : c.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: selected ? c.accent : c.border,
+              width: selected ? 1.6 : 1),
+        ),
+        child: Row(
           children: [
-            Text(label,
-                style: const TextStyle(fontSize: 12, color: _textLight)),
-            const SizedBox(height: 4),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _navyPrimary)),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: selected ? c.accent.withOpacity(0.14) : c.subtle,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon,
+                  color: selected ? c.accent : c.muted, size: 21),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: c.heading)),
+                  const SizedBox(height: 3),
+                  Text(description,
+                      style: TextStyle(
+                          fontSize: 12, color: c.muted, height: 1.35)),
+                  const SizedBox(height: 5),
+                  Text("$unitPriceLabel / $priceSuffix each",
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: c.accent)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: c.subtle,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: c.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: quantity > 0 ? onDecrease : null,
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                    splashRadius: 18,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  SizedBox(
+                    width: 22,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 160),
+                      transitionBuilder: (child, animation) => ScaleTransition(
+                          scale: animation, child: child),
+                      child: Text(
+                        "$quantity",
+                        key: ValueKey(quantity),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: c.navy),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onIncrease,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    splashRadius: 18,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Order summary
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SummaryLine extends StatelessWidget {
+  const _SummaryLine({
+    required this.label,
+    required this.amount,
+    this.amountColor,
+  });
+
+  final String label;
+  final String amount;
+  final Color? amountColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 11),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                  color: c.muted,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12.5,
+                  height: 1.35),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            amount,
+            style: TextStyle(
+                color: amountColor ?? c.navy,
+                fontWeight: FontWeight.w600,
+                fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Current subscription
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan content
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PlanHighlight {
+  const _PlanHighlight(this.icon, this.label);
+  final IconData icon;
+  final String label;
+}
+
+class _PlanSpec {
+  const _PlanSpec({
+    required this.tagline,
+    required this.icon,
+    required this.highlights,
+    required this.everything,
+  });
+
+  final String tagline;
+  final IconData icon;
+  final List<_PlanHighlight> highlights;
+  final List<String> everything;
+}
+
+_PlanSpec _specFor(SubscriptionPlan plan) {
+  switch (plan) {
+    case SubscriptionPlan.starter:
+      return const _PlanSpec(
+        tagline: "For a single shop getting organised",
+        icon: Icons.rocket_launch_rounded,
+        highlights: [
+          _PlanHighlight(Icons.groups_rounded, "3 staff accounts"),
+          _PlanHighlight(Icons.storefront_rounded, "1 branch included"),
+          _PlanHighlight(Icons.point_of_sale_rounded, "POS, inventory & sales"),
+          _PlanHighlight(
+              Icons.description_rounded, "Basic reports & profit tracking"),
+          _PlanHighlight(Icons.wifi_off_rounded, "Offline sync"),
+        ],
+        everything: [
+          "Bulk product import and barcode scanning",
+          "Basic reports and profit tracking",
+          "Debt management and low-stock alerts",
+          "Multi-device sync and shop settings",
+          "Custom roles for up to 3 users",
+        ],
+      );
+    case SubscriptionPlan.business:
+      return const _PlanSpec(
+        tagline: "For growing shops with more than one location",
+        icon: Icons.trending_up_rounded,
+        highlights: [
+          _PlanHighlight(Icons.groups_rounded, "10 staff accounts"),
+          _PlanHighlight(Icons.storefront_rounded, "5 branches included"),
+          _PlanHighlight(Icons.layers_rounded, "FEFO, batch & expiry tracking"),
+          _PlanHighlight(Icons.insights_rounded, "Basic reports & analytics"),
+          _PlanHighlight(Icons.admin_panel_settings_rounded,
+              "Custom roles & permissions"),
+        ],
+        everything: [
+          "Everything in Starter",
+          "Purchase tracking and supplier records",
+          "Multi-branch stock and transfers",
+          "Basic reports and the analytics dashboard",
+          "Audit history included",
+        ],
+      );
+    case SubscriptionPlan.enterprise:
+      return const _PlanSpec(
+        tagline: "For multi-branch operations that need control",
+        icon: Icons.domain_rounded,
+        highlights: [
+          _PlanHighlight(Icons.groups_rounded, "15 staff accounts"),
+          _PlanHighlight(Icons.storefront_rounded, "10 branches included"),
+          _PlanHighlight(Icons.space_dashboard_rounded, "Central dashboard"),
+          _PlanHighlight(Icons.analytics_rounded, "Branch-level analytics"),
+          _PlanHighlight(
+              Icons.verified_user_rounded, "Audit history for every branch"),
+        ],
+        everything: [
+          "Everything in Business",
+          "Audit history across every branch",
+          "Branch performance comparisons",
+          "Dedicated onboarding support",
+        ],
+      );
+    default:
+      return const _PlanSpec(
+        tagline: "",
+        icon: Icons.workspace_premium_rounded,
+        highlights: [],
+        everything: [],
+      );
+  }
+}
+
+List<SubscriptionAddOn> _availableAddOnsFor(SubscriptionPlan plan) {
+  final addOns = <SubscriptionAddOn>[
+    SubscriptionAddOn.extraUser,
+    SubscriptionAddOn.extraBranch,
+  ];
+  void addIfMissing(SubscriptionAddOn addOn, Feature feature) {
+    if (!_planIncludesFeature(plan, feature)) addOns.add(addOn);
+  }
+
+  addIfMissing(SubscriptionAddOn.fefoBatchTracking, Feature.fefoTracking);
+  addIfMissing(SubscriptionAddOn.expiryTracking, Feature.expiryTracking);
+  addIfMissing(SubscriptionAddOn.advancedReports, Feature.advancedReports);
+  addIfMissing(SubscriptionAddOn.auditLogs, Feature.auditLogs);
+  return addOns.where((addOn) => addOn.getPrice(plan) > 0).toList();
+}
+
+bool _planIncludesFeature(SubscriptionPlan plan, Feature feature) {
+  final now = DateTime.now();
+  return ActiveSubscription(
+    shopId: 'plan-preview',
+    plan: plan,
+    activationDate: now,
+    expiryDate: now.add(const Duration(days: 1)),
+    addOns: const [],
+    isTrial: false,
+    userLimit: 0,
+    branchLimit: 0,
+  ).hasFeature(feature);
+}
+
+String _addOnDescription(SubscriptionAddOn addOn) {
+  switch (addOn) {
+    case SubscriptionAddOn.fefoBatchTracking:
+      return "Sell first-expired-first-out with batch tracking.";
+    case SubscriptionAddOn.expiryTracking:
+      return "Track expiry dates and get expiry alerts.";
+    case SubscriptionAddOn.advancedReports:
+      return "Deeper sales, profit and stock reporting.";
+    case SubscriptionAddOn.analyticsDashboard:
+      return "Interactive analytics dashboard.";
+    case SubscriptionAddOn.auditLogs:
+      return "Keep a full history of sensitive actions.";
+    case SubscriptionAddOn.auditLogsPack:
+      return "Extended audit logs and security tracking.";
+    case SubscriptionAddOn.prioritySupport:
+      return "Priority help when you need it.";
+    default:
+      return "";
+  }
+}
+
+IconData _addOnIcon(SubscriptionAddOn addOn) {
+  switch (addOn) {
+    case SubscriptionAddOn.fefoBatchTracking:
+      return Icons.layers_rounded;
+    case SubscriptionAddOn.expiryTracking:
+      return Icons.event_busy_rounded;
+    case SubscriptionAddOn.advancedReports:
+    case SubscriptionAddOn.analyticsDashboard:
+      return Icons.insights_rounded;
+    case SubscriptionAddOn.auditLogs:
+    case SubscriptionAddOn.auditLogsPack:
+      return Icons.verified_user_rounded;
+    default:
+      return Icons.add_circle_outline_rounded;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared bits
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({
+    required this.title,
+    required this.subtitle,
+    this.eyebrow,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? eyebrow;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    return Column(
+      children: [
+        if (eyebrow != null) ...[
+          Text(
+            eyebrow!,
+            style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.6,
+                color: c.accent),
+          ),
+          const SizedBox(height: 7),
+        ],
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 26, fontWeight: FontWeight.w900, color: c.navy),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: c.muted, height: 1.5),
         ),
       ],
     );
@@ -1836,13 +2421,14 @@ class _ProfileBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
+          color: c.subtle,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
@@ -1861,13 +2447,13 @@ class _ProfileBubble extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: _navyPrimary,
+                    color: c.navy,
                     fontSize: 13)),
             const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                size: 18, color: _textLight),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 18, color: c.muted),
           ],
         ),
       ),
@@ -1878,6 +2464,119 @@ class _ProfileBubble extends StatelessWidget {
 class _PlanCustomization {
   int extraUsers = 0;
   int extraBranches = 0;
-  bool advancedAnalyticsPack = false;
-  bool auditLogsPack = false;
+  bool fefoBatchTracking = false;
+  bool expiryTracking = false;
+  bool advancedReports = false;
+  bool auditLogs = false;
+
+  bool isSelected(SubscriptionAddOn addOn) {
+    switch (addOn) {
+      case SubscriptionAddOn.fefoBatchTracking:
+        return fefoBatchTracking;
+      case SubscriptionAddOn.expiryTracking:
+        return expiryTracking;
+      case SubscriptionAddOn.advancedReports:
+        return advancedReports;
+      case SubscriptionAddOn.auditLogs:
+        return auditLogs;
+      default:
+        return false;
+    }
+  }
+
+  void toggle(SubscriptionAddOn addOn, bool value) {
+    switch (addOn) {
+      case SubscriptionAddOn.fefoBatchTracking:
+        fefoBatchTracking = value;
+        break;
+      case SubscriptionAddOn.expiryTracking:
+        expiryTracking = value;
+        break;
+      case SubscriptionAddOn.advancedReports:
+        advancedReports = value;
+        break;
+      case SubscriptionAddOn.auditLogs:
+        auditLogs = value;
+        break;
+      default:
+        break;
+    }
+  }
+
+  void clear() {
+    extraUsers = 0;
+    extraBranches = 0;
+    fefoBatchTracking = false;
+    expiryTracking = false;
+    advancedReports = false;
+    auditLogs = false;
+  }
+
+  List<SubscriptionAddOn> selections() {
+    return [
+      ...List<SubscriptionAddOn>.filled(extraUsers, SubscriptionAddOn.extraUser),
+      ...List<SubscriptionAddOn>.filled(
+          extraBranches, SubscriptionAddOn.extraBranch),
+      if (fefoBatchTracking) SubscriptionAddOn.fefoBatchTracking,
+      if (expiryTracking) SubscriptionAddOn.expiryTracking,
+      if (advancedReports) SubscriptionAddOn.advancedReports,
+      if (auditLogs) SubscriptionAddOn.auditLogs,
+    ];
+  }
+
+  double termTotal(SubscriptionPlan plan, BillingCycle cycle) {
+    return termPriceFor(plan, selections(), cycle);
+  }
+}
+
+class _PendingChangeBanner extends StatelessWidget {
+  const _PendingChangeBanner({required this.pending, required this.onCancel});
+
+  final PendingPlanChange pending;
+  final Future<void> Function() onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = PlanColors.of(context);
+    final date =
+        '${pending.effectiveDate.day}/${pending.effectiveDate.month}/${pending.effectiveDate.year}';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: c.accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: c.accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.schedule_rounded, color: c.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Scheduled change to ${pending.plan.name}",
+                  style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: c.heading),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  "Takes effect on $date. Current features stay active until then.",
+                  style: TextStyle(fontSize: 12, color: c.muted),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onCancel,
+            child: Text("Cancel",
+                style: TextStyle(fontWeight: FontWeight.w700, color: c.accent)),
+          ),
+        ],
+      ),
+    );
+  }
 }

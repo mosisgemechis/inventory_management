@@ -82,7 +82,7 @@ class _BulkImportLandingDialogState extends State<BulkImportLandingDialog> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "Import items from real-world Excel spreadsheets (.xlsx, .csv).",
+                        "Upload .xlsx or .csv spreadsheet to import products in bulk.",
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       ),
                     ],
@@ -105,29 +105,6 @@ class _BulkImportLandingDialogState extends State<BulkImportLandingDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Column mapping & intelligent recognition instruction banner
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.info.withOpacity(0.3)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.auto_awesome, color: AppColors.info, size: 22),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              "Intelligent Column Mapping: Headers like 'Price', 'Retail Price', 'Cost', 'Buy Price', 'Qty', 'Stock', 'Threshold', 'Min Stock' are automatically recognized regardless of column order, letter casing, or trailing spaces.",
-                              style: TextStyle(fontSize: 12, height: 1.4),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
                     // Required vs Optional Fields Panel
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,11 +129,11 @@ class _BulkImportLandingDialogState extends State<BulkImportLandingDialog> {
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                _fieldBadge("Product Name", "Product, Item, Name, Item Name"),
-                                _fieldBadge("Selling Price", "Price, Sell Price, Retail Price, SP"),
-                                _fieldBadge("Buying Price", "Cost, Buy Price, Purchase Price, BP"),
-                                _fieldBadge("Quantity", "Qty, Stock, Amount, Balance"),
-                                _fieldBadge("Low Stock Warning Qty", "Threshold, Alert At, Min Stock, Safety Stock"),
+                                _fieldBadge("Product Name", "Name, Item"),
+                                _fieldBadge("Selling Price", "Price, SP"),
+                                _fieldBadge("Buying Price", "Cost, BP"),
+                                _fieldBadge("Quantity", "Qty, Stock"),
+                                _fieldBadge("Low Stock Alert", "Threshold, Min"),
                               ],
                             ),
                           ),
@@ -182,10 +159,10 @@ class _BulkImportLandingDialogState extends State<BulkImportLandingDialog> {
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                _fieldBadge("Barcode", "SKU, Code, UPC, ID (auto-generated if empty)", isOptional: true),
-                                _fieldBadge("Expiry Date", "Exp, Expiry, Expdate, Valid Until", isOptional: true),
-                                _fieldBadge("Branch", "Branch Name, Store, Location", isOptional: true),
-                                _fieldBadge("Supplier / Description", "Vendor, Supplier Name, Brand", isOptional: true),
+                                _fieldBadge("Barcode / SKU", "Auto-generated if blank", isOptional: true),
+                                _fieldBadge("Expiry Date", "YYYY-MM-DD", isOptional: true),
+                                _fieldBadge("Branch", "Current branch", isOptional: true),
+                                _fieldBadge("Supplier", "Optional vendor", isOptional: true),
                               ],
                             ),
                           ),
@@ -194,55 +171,48 @@ class _BulkImportLandingDialogState extends State<BulkImportLandingDialog> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Visual Example Table
+                    // Sample Template Preview
                     const Text(
-                      "Visual Example Structure:",
+                      "Sample Data Preview",
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columnSpacing: 24,
-                          headingRowHeight: 36,
-                          dataRowMinHeight: 32,
-                          dataRowMaxHeight: 36,
-                          headingRowColor: WidgetStateProperty.all(AppColors.secondary.withOpacity(0.08)),
-                          columns: const [
-                            DataColumn(label: Text("Product Name *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Selling Price *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Buying Price *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Quantity *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Low Stock Qty *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("Barcode", style: TextStyle(fontSize: 11))),
-                            DataColumn(label: Text("Expiry Date", style: TextStyle(fontSize: 11))),
-                          ],
-                          rows: const [
-                            DataRow(cells: [
-                              DataCell(Text("Paracetamol 500mg", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("15.00", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("10.00", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("100", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("10", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("690123456789", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("2026-12-31", style: TextStyle(fontSize: 11))),
-                            ]),
-                            DataRow(cells: [
-                              DataCell(Text("Coca Cola 500ml", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("35.00", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("25.00", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("50", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("5", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("5449000000996", style: TextStyle(fontSize: 11))),
-                              DataCell(Text("-", style: TextStyle(fontSize: 11))),
-                            ]),
-                          ],
-                        ),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowHeight: 32,
+                        dataRowMinHeight: 28,
+                        dataRowMaxHeight: 36,
+                        columnSpacing: 16,
+                        columns: const [
+                          DataColumn(label: Text("Product Name *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("Selling Price *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("Buying Price *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("Quantity *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("Low Stock Qty *", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("Barcode", style: TextStyle(fontSize: 11))),
+                          DataColumn(label: Text("Expiry Date", style: TextStyle(fontSize: 11))),
+                        ],
+                        rows: const [
+                          DataRow(cells: [
+                            DataCell(Text("Paracetamol 500mg", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("15.00", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("10.00", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("100", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("10", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("690123456789", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("2026-12-31", style: TextStyle(fontSize: 11))),
+                          ]),
+                          DataRow(cells: [
+                            DataCell(Text("Coca Cola 500ml", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("35.00", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("25.00", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("50", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("5", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("5449000000996", style: TextStyle(fontSize: 11))),
+                            DataCell(Text("-", style: TextStyle(fontSize: 11))),
+                          ]),
+                        ],
                       ),
                     ),
                   ],

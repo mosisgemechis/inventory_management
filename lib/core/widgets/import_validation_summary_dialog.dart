@@ -90,56 +90,6 @@ class ImportValidationSummaryDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
 
-                    // ── Header Detection Preview ─────────────────────────
-                    if (hasColumnMapping) ...[
-                      _sectionLabel("Detected Column Mapping", Icons.table_chart_rounded, AppColors.info),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.info.withOpacity(0.25)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (hasHeaderInfo)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.pin, size: 14, color: AppColors.info),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      "Header row found at Row ${summary.detectedHeaderRowNumber}",
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.info),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              children: summary.detectedHeaders.entries.map((e) {
-                                final fieldDisplay = _fieldDisplay(e.key);
-                                final colLetter = summary.detectedColumnLetters[e.key] ?? '';
-                                final isRequired = _isRequired(e.key);
-                                return _mappingChip(
-                                  field: fieldDisplay,
-                                  header: e.value,
-                                  location: colLetter,
-                                  required: isRequired,
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
                     // ── Missing Required Column Alert ────────────────────
                     if (hasMissingColumns) ...[
                       _sectionLabel("Required Columns Not Found", Icons.error_outline_rounded, AppColors.danger),

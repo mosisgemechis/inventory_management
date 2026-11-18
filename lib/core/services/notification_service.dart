@@ -52,7 +52,7 @@ class NotificationService {
     // Windows desktop notifications.
     if (!kIsWeb && Platform.isWindows) {
       try {
-        await localNotifier.setup(appName: 'GM Inventory');
+        await localNotifier.setup(appName: 'GM Inventory Everywhere');
       } catch (_) {}
     }
   }
@@ -61,6 +61,9 @@ class NotificationService {
   /// Call once after login when `shopId` is known.
   Future<void> startForShop(String shopId) async {
     _shopId = shopId;
+    if (!_initialized) {
+      await initialize();
+    }
     await _loadShownIds(shopId);
     _sub?.cancel();
     _sub = _db.watchNotifications(shopId).listen((rows) async {
@@ -112,14 +115,14 @@ class NotificationService {
   }
 
   Future<void> _showOsNotification(Map<String, dynamic> n) async {
-    final title = n['title']?.toString() ?? 'GM Inventory';
+    final title = n['title']?.toString() ?? 'GM Inventory Everywhere';
     final body = n['message']?.toString() ?? '';
     final type = n['type']?.toString() ?? 'info';
 
     // Restrict OS notifications to only essential feedback
     const criticalTypes = [
       'low_stock', 'stock_transfer', 'urgent_alert', 'system_error',
-      'expiry_warning', 'expired_product',
+      'expiry_warning', 'expired_product', 'sync_conflict',
     ];
     if (!criticalTypes.contains(type)) {
       debugPrint('Skipping system notification for routine type: $type');
@@ -141,8 +144,8 @@ class NotificationService {
 
     final android = AndroidNotificationDetails(
       'gm_inventory_channel',
-      'GM Inventory',
-      channelDescription: 'GM Inventory notifications',
+      'GM Inventory Everywhere',
+      channelDescription: 'GM Inventory Everywhere notifications',
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.status,

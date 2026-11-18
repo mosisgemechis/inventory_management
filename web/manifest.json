@@ -1,11 +1,11 @@
 {
-    "name": "pharmacy_inventory_management",
-    "short_name": "pharmacy_inventory_management",
+    "name": "GM Inventory Everywhere",
+    "short_name": "GM Inventory",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#1B8A5A",
-    "theme_color": "#1B8A5A",
-    "description": "A new Flutter project.",
+    "background_color": "#0B4FA8",
+    "theme_color": "#0B4FA8",
+    "description": "GM Inventory Everywhere - manage, track and optimize inventory from anywhere.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

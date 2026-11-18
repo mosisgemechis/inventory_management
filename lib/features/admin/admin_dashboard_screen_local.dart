@@ -65,7 +65,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 16),
-                  Text('GM Inventory',
+                  Text('GM Inventory Everywhere',
                       style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 16),
                   Expanded(

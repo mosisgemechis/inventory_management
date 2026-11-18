@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
 import 'package:drift/native.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 part 'app_database.g.dart';
 
@@ -155,6 +158,9 @@ class Users extends Table {
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   TextColumn get fullName => text().withDefault(const Constant(''))();
   TextColumn get currency => text().withDefault(const Constant('USD'))();
+  TextColumn get cloudUserId => text().nullable()();
+  BoolColumn get syncEnabled => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get lastOnlineLogin => dateTime().nullable()();
   @override
   Set<Column> get primaryKey => {uid};
 }
@@ -197,16 +203,58 @@ class SyncOutbox extends Table {
   TextColumn get userId => text()(); // local uid
   TextColumn get entityTable => text()(); // e.g. 'products'
   TextColumn get recordId => text()(); // local pk
-  TextColumn get operation => text()(); // upsert|delete|stock_delta
+  TextColumn get operation => text()(); // e.g. SALE_CREATED, PRODUCT_CREATED
   TextColumn get payloadJson => text().nullable()();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)(); // UTC
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get lastAttemptAt => dateTime().nullable()();
   IntColumn get attemptCount => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('PENDING'))(); // PENDING, UPLOADING, SYNCED, FAILED, CONFLICT
+  IntColumn get schemaVersion => integer().withDefault(const Constant(1))();
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Durable, acknowledgeable record of every business-data sync conflict.
+/// Separate from [Notifications] so conflicts persist until explicitly acknowledged,
+/// survive app restarts, and carry a full acknowledgement audit trail.
+class SyncConflicts extends Table {
+  /// Stable identifier — derived from event/entity IDs so re-playing the same
+  /// conflict event never creates a duplicate row.
+  TextColumn get conflictId => text()();
+  TextColumn get shopId => text()();
+  TextColumn get branchId => text().withDefault(const Constant('main'))();
+  /// conflict_type: product_dedup | sale_oversell | product_edit_conflict |
+  ///   delete_tombstone | transfer_conflict | batch_conflict | outbox_rejected |
+  ///   purchase_conflict | customer_debt_conflict | stock_snapshot_conflict
+  TextColumn get conflictType => text()();
+  TextColumn get affectedEntityType => text()(); // products | sales | batches ...
+  TextColumn get affectedEntityId => text()();
+  TextColumn get affectedEntityName => text().nullable()();
+  /// high | medium | low
+  TextColumn get severity => text().withDefault(const Constant('medium'))();
+  /// Human-readable explanation: what happened / why / what the system did / what action is needed
+  TextColumn get title => text()();
+  TextColumn get body => text()();
+  TextColumn get whatHappened => text().nullable()();
+  TextColumn get whatSystemDid => text().nullable()();
+  TextColumn get requiredAction => text().nullable()(); // null means no action required
+  BoolColumn get requiresAction => boolean().withDefault(const Constant(false))();
+  /// resolved | unresolved | acknowledged
+  TextColumn get resolutionStatus => text().withDefault(const Constant('unresolved'))();
+  TextColumn get acknowledgedBy => text().nullable()(); // userId
+  TextColumn get acknowledgedByUsername => text().nullable()();
+  DateTimeColumn get acknowledgedAt => dateTime().nullable()();
+  DateTimeColumn get detectedAt => dateTime().withDefault(currentDateAndTime)();
+  /// Original outbox event ID that triggered this conflict (if any)
+  TextColumn get sourceEventId => text().nullable()();
+  /// Serialised extra data (JSON) – e.g. merged product IDs, old/new stock values
+  TextColumn get conflictDataJson => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {conflictId};
 }
 
 // --- DAOs ---
@@ -272,9 +320,16 @@ class SyncOutboxDao extends DatabaseAccessor<AppDatabase>
   SyncOutboxDao(AppDatabase db) : super(db);
 
   Stream<int> watchPendingCount() =>
-      (select(syncOutbox)..where((t) => t.attemptCount.isSmallerThanValue(25)))
+      (select(syncOutbox)..where((t) => t.status.equals('PENDING') | t.status.equals('FAILED')))
           .watch()
           .map((rows) => rows.length);
+
+  Future<int> pendingCount() async {
+    final rows = await (select(syncOutbox)
+          ..where((t) => t.status.equals('PENDING') | t.status.equals('FAILED')))
+        .get();
+    return rows.length;
+  }
 
   Future<void> enqueue({
     required String id,
@@ -298,6 +353,8 @@ class SyncOutboxDao extends DatabaseAccessor<AppDatabase>
         recordId: recordId,
         operation: operation,
         payloadJson: Value(payloadJson),
+        status: const Value('PENDING'),
+        schemaVersion: const Value(1),
       ),
       mode: InsertMode.insertOrReplace,
     );
@@ -344,6 +401,60 @@ class Subscriptions extends Table {
   Set<Column> get primaryKey => {shopId};
 }
 
+@DriftAccessor(tables: [SyncConflicts])
+class SyncConflictsDao extends DatabaseAccessor<AppDatabase>
+    with _$SyncConflictsDaoMixin {
+  SyncConflictsDao(AppDatabase db) : super(db);
+
+  /// All unacknowledged conflicts for this shop.
+  Stream<List<SyncConflict>> watchUnacknowledged(String shopId) =>
+      (select(syncConflicts)
+            ..where((t) =>
+                t.shopId.equals(shopId) &
+                t.acknowledgedAt.isNull())
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.detectedAt, mode: OrderingMode.desc)
+            ]))
+          .watch();
+
+  Future<List<SyncConflict>> getUnacknowledged(String shopId) =>
+      (select(syncConflicts)
+            ..where((t) =>
+                t.shopId.equals(shopId) &
+                t.acknowledgedAt.isNull())
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.detectedAt, mode: OrderingMode.desc)
+            ]))
+          .get();
+
+  Future<SyncConflict?> getByConflictId(String conflictId) =>
+      (select(syncConflicts)..where((t) => t.conflictId.equals(conflictId)))
+          .getSingleOrNull();
+
+  Future<int> upsert(SyncConflictsCompanion entry) =>
+      into(syncConflicts).insertOnConflictUpdate(entry);
+
+  Future<void> acknowledge(
+    String conflictId, {
+    required String userId,
+    required String username,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await (update(syncConflicts)..where((t) => t.conflictId.equals(conflictId)))
+        .write(SyncConflictsCompanion(
+      acknowledgedBy: Value(userId),
+      acknowledgedByUsername: Value(username),
+      acknowledgedAt: Value(now),
+      resolutionStatus: const Value('acknowledged'),
+    ));
+  }
+
+  Future<int> countUnacknowledged(String shopId) async {
+    final rows = await getUnacknowledged(shopId);
+    return rows.length;
+  }
+}
+
 @DriftDatabase(
   tables: [
     Products,
@@ -359,6 +470,7 @@ class Subscriptions extends Table {
     Notifications,
     Subscriptions,
     SyncOutbox,
+    SyncConflicts,
   ],
   daos: [
     ProductsDao,
@@ -369,6 +481,7 @@ class Subscriptions extends Table {
     MovementsDao,
     NotificationsDao,
     SyncOutboxDao,
+    SyncConflictsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -378,8 +491,13 @@ class AppDatabase extends _$AppDatabase {
   /// [DatabaseService]/[AppDatabase] to avoid plugin dependencies in widget tests.
   static bool forceInMemory = false;
 
+  /// Bump this together with a new `if (from < N)` block in [migration].
+  /// A snapshot of the database is taken automatically before an older file
+  /// is upgraded, so a failed migration never destroys local data.
+  static const int currentSchemaVersion = 31;
+
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -503,15 +621,139 @@ class AppDatabase extends _$AppDatabase {
          // Add branchId to notifications for per-branch alert isolation.
          try { await m.addColumn(notifications, notifications.branchId); } catch (_) {}
        }
+       if (from < 29) {
+         try {
+           await m.addColumn(syncOutbox, syncOutbox.status);
+           await m.addColumn(syncOutbox, syncOutbox.schemaVersion);
+         } catch (_) {}
+       }
+       if (from < 30) {
+         try {
+           await m.addColumn(users, users.cloudUserId);
+           await m.addColumn(users, users.syncEnabled);
+           await m.addColumn(users, users.lastOnlineLogin);
+         } catch (_) {}
+       }
+       if (from < 31) {
+          // SyncConflicts: persistent, acknowledgeable business-data conflict records.
+          try { await m.createTable(syncConflicts); } catch (_) {}
+        }
        await m.createAll(); // For any new tables
     },
+    beforeOpen: (details) async {
+      // Secondary indexes for the hot reactive queries. Without these every
+      // drift watch (products, sales, batches, notifications) does a full
+      // table scan each time the table changes, which made the UI stutter on
+      // every sale / stock update.
+      const statements = <String>[
+        'CREATE INDEX IF NOT EXISTS idx_products_shop_branch ON products(shop_id, branch_id)',
+        'CREATE INDEX IF NOT EXISTS idx_products_shop_name ON products(shop_id, name COLLATE NOCASE)',
+        'CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(shop_id, barcode)',
+        'CREATE INDEX IF NOT EXISTS idx_product_stocks_shop_branch ON product_stocks(shop_id, branch_id, product_id)',
+        'CREATE INDEX IF NOT EXISTS idx_batches_shop_item_branch ON batches(shop_id, item_id, branch_id, quantity)',
+        'CREATE INDEX IF NOT EXISTS idx_batches_shop_branch_expiry ON batches(shop_id, branch_id, expiry_date)',
+        'CREATE INDEX IF NOT EXISTS idx_sales_shop_branch_ts ON sales(shop_id, branch_id, timestamp)',
+        'CREATE INDEX IF NOT EXISTS idx_sales_shop_item ON sales(shop_id, item_id)',
+        'CREATE INDEX IF NOT EXISTS idx_purchases_shop_branch_ts ON purchases(shop_id, branch_id, timestamp)',
+        'CREATE INDEX IF NOT EXISTS idx_audit_shop_ts ON audit_logs(shop_id, timestamp)',
+        'CREATE INDEX IF NOT EXISTS idx_notifications_shop_read ON notifications(shop_id, is_read)',
+      ];
+      for (final sql in statements) {
+        try {
+          await customStatement(sql);
+        } catch (_) {
+          // Older/partial schemas may not have the column yet; skip safely.
+        }
+      }
+    },
   );
+
+  /// Copies the live database into `db_backups/` before a schema upgrade.
+  ///
+  /// Uses `VACUUM INTO`, which produces a consistent single-file snapshot
+  /// including rows still sitting in the WAL. The five newest snapshots are
+  /// kept. Any failure is swallowed: a backup problem must never block the
+  /// app from starting.
+  static Future<void> _backupBeforeUpgrade(File file) async {
+    sqlite.Database? db;
+    try {
+      if (!await file.exists()) return;
+      db = sqlite.sqlite3.open(file.path);
+      final rows = db.select('PRAGMA user_version');
+      final fileVersion = rows.isEmpty
+          ? 0
+          : (rows.first.values.first is int
+              ? rows.first.values.first as int
+              : int.tryParse('${rows.first.values.first}') ?? 0);
+      if (fileVersion >= currentSchemaVersion) return;
+
+      final backupDir = Directory(p.join(p.dirname(file.path), 'db_backups'));
+      if (!await backupDir.exists()) {
+        await backupDir.create(recursive: true);
+      }
+      final stamp = DateTime.now()
+          .toUtc()
+          .toIso8601String()
+          .replaceAll(RegExp(r'[:.]'), '-');
+      final target = p.join(
+        backupDir.path,
+        'inventory_db_v${fileVersion}_$stamp.sqlite',
+      );
+      final escaped = target.replaceAll("'", "''");
+      db.execute("VACUUM INTO '$escaped'");
+      // ignore: avoid_print
+      print('[DB] Pre-migration backup written: $target');
+
+      final snapshots = (await backupDir
+              .list()
+              .where((e) => e is File && e.path.endsWith('.sqlite'))
+              .toList())
+          .cast<File>()
+        ..sort((a, b) => b.path.compareTo(a.path));
+      for (final old in snapshots.skip(5)) {
+        try {
+          await old.delete();
+        } catch (_) {}
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('[DB] Pre-migration backup skipped: $e');
+    } finally {
+      db?.dispose();
+    }
+  }
 
   static QueryExecutor _openConnection() {
     // Widget tests run without platform plugins (path_provider). Use in-memory DB there.
     if (forceInMemory) {
-      return NativeDatabase.memory();
+      return NativeDatabase.memory(
+        setup: (db) {
+          db.execute('PRAGMA journal_mode=WAL;');
+          db.execute('PRAGMA busy_timeout=5000;');
+          db.execute('PRAGMA synchronous=NORMAL;');
+        },
+      );
     }
-    return driftDatabase(name: 'inventory_db');
+    return LazyDatabase(() async {
+      final dbFolder = await getApplicationDocumentsDirectory();
+      final file = File(p.join(dbFolder.path, 'inventory_db.sqlite'));
+      // Data-safety: snapshot the DB before drift applies schema migrations.
+      await _backupBeforeUpgrade(file);
+      return NativeDatabase.createInBackground(
+        file,
+        setup: (db) {
+          // 1. Set busy_timeout FIRST on every connection so SQLite waits up to 5s for locks to clear.
+          db.execute('PRAGMA busy_timeout=5000;');
+          // 2. Safely attempt WAL mode (requires exclusive lock if switching modes, safe if already WAL).
+          try {
+            db.execute('PRAGMA journal_mode=WAL;');
+          } catch (_) {}
+          // 3. Faster writes; still crash-safe under WAL.
+          try {
+            db.execute('PRAGMA synchronous=NORMAL;');
+          } catch (_) {}
+        },
+      );
+    });
   }
 }

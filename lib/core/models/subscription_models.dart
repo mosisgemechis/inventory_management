@@ -2,6 +2,16 @@ import 'dart:convert';
 
 enum SubscriptionPlan { starter, business, enterprise, trial, free, none }
 
+/// How a plan term is billed. Yearly plans cost 15% less than 12 monthly
+/// payments; add-ons are always charged at their monthly rate × 12.
+enum BillingCycle { monthly, yearly }
+
+extension BillingCycleExtension on BillingCycle {
+  bool get isYearly => this == BillingCycle.yearly;
+  String get label => isYearly ? "Yearly" : "Monthly";
+  String get perLabel => isYearly ? "year" : "month";
+}
+
 enum SubscriptionAddOn {
   fefoBatchTracking,
   expiryTracking,
@@ -99,28 +109,20 @@ extension SubscriptionAddOnExtension on SubscriptionAddOn {
             return 0;
         }
       case SubscriptionPlan.business:
-        switch (this) {
-          case SubscriptionAddOn.extraUser:
-            return 1;
-          case SubscriptionAddOn.extraBranch:
-            return 2;
-          case SubscriptionAddOn.advancedAnalyticsPack:
-            return 2;
-          case SubscriptionAddOn.auditLogsPack:
-            return 1;
-          default:
-            return 0;
-        }
       case SubscriptionPlan.enterprise:
         switch (this) {
           case SubscriptionAddOn.extraUser:
             return 1;
           case SubscriptionAddOn.extraBranch:
             return 2;
-          case SubscriptionAddOn.advancedAnalyticsPack:
+          case SubscriptionAddOn.fefoBatchTracking:
+            return 5;
+          case SubscriptionAddOn.expiryTracking:
+            return 3;
+          case SubscriptionAddOn.advancedReports:
+            return 4;
+          case SubscriptionAddOn.auditLogs:
             return 2;
-          case SubscriptionAddOn.auditLogsPack:
-            return 1;
           default:
             return 0;
         }
@@ -183,6 +185,13 @@ class ActiveSubscription {
     return DateTime.now().isAfter(expiryDate);
   }
 
+  /// Derived from the term length, so yearly subscriptions survive sync
+  /// without an extra database column.
+  BillingCycle get billingCycle =>
+      expiryDate.difference(activationDate).inDays > 180
+          ? BillingCycle.yearly
+          : BillingCycle.monthly;
+
   Duration get remainingTime {
     final diff = expiryDate.difference(DateTime.now());
     return diff.isNegative ? Duration.zero : diff;
@@ -205,8 +214,11 @@ class ActiveSubscription {
 
   static List<Feature> _getPlanFeatures(SubscriptionPlan plan) {
     switch (plan) {
-      case SubscriptionPlan.starter:
       case SubscriptionPlan.trial:
+        // A trial unlocks the full Enterprise feature set; only the seat and
+        // branch limits stay small (3 users / 1 branch).
+        return _getPlanFeatures(SubscriptionPlan.enterprise);
+      case SubscriptionPlan.starter:
         return [
           Feature.inventoryManagement,
           Feature.bulkImport,
@@ -228,8 +240,8 @@ class ActiveSubscription {
           Feature.fefoTracking,
           Feature.expiryTracking,
           Feature.purchaseTracking,
-          Feature.advancedReports,
           Feature.analyticsDashboard,
+          Feature.auditLogs,
           Feature.customPermissions,
           Feature.multiBranchManagement,
         ];

@@ -7,4 +7,5 @@ void main() {
   // Actually, wait, replacing ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('...')))
   // with a custom overlay is hard via regex. 
   // What if we just fix it using Flutter's native feature:
-  // SnackBars in Scaffold are fixed. 
+  // SnackBars in Scaffold are fixed.
+}

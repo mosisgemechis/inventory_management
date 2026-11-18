@@ -16,8 +16,22 @@ class ReportingService {
     Map<String, double> productQtyMap = {};
 
     for (var m in sales) {
-      final rev = (m['totalPrice'] ?? 0.0).toDouble();
-      final prof = (m['profit'] ?? 0.0).toDouble();
+      final rev_total = (m['totalPrice'] ?? 0.0).toDouble();
+      final prof_total = (m['profit'] ?? 0.0).toDouble();
+      final originalQty = (m['quantity'] ?? 0.0).toDouble();
+      final refundedQty = (m['refundedQuantity'] ?? 0.0).toDouble();
+
+      double rev = rev_total;
+      double prof = prof_total;
+      double netQty = originalQty - refundedQty;
+      if (netQty < 0) netQty = 0;
+      if (refundedQty > 0 && originalQty > 0) {
+        final unitPrice = rev_total / originalQty;
+        final unitProf = prof_total / originalQty;
+        rev -= (unitPrice * refundedQty);
+        prof -= (unitProf * refundedQty);
+      }
+
       totalRev += rev;
       totalProf += prof;
       if (m['isDebt'] == true) {
@@ -25,7 +39,7 @@ class ReportingService {
       }
       final name = m['itemName']?.toString() ?? 'Unknown';
       productRevMap[name] = (productRevMap[name] ?? 0.0) + rev;
-      productQtyMap[name] = (productQtyMap[name] ?? 0.0) + (m['quantity'] ?? 0).toDouble();
+      productQtyMap[name] = (productQtyMap[name] ?? 0.0) + netQty;
     }
 
     final sortedByQty = productQtyMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -103,8 +117,22 @@ Map<String, dynamic> _calculateExcelData(Map<String, dynamic> input) {
     if (tsRaw is DateTime) ts = tsRaw;
     else if (tsRaw is String) ts = DateTime.tryParse(tsRaw);
 
-    final rev = (m['totalPrice'] ?? 0).toDouble();
-    final prof = (m['profit'] ?? 0).toDouble();
+    final rev_total = (m['totalPrice'] ?? 0.0).toDouble();
+    final prof_total = (m['profit'] ?? 0.0).toDouble();
+    final originalQty = (m['quantity'] ?? 0.0).toDouble();
+    final refundedQty = (m['refundedQuantity'] ?? 0.0).toDouble();
+
+    double rev = rev_total;
+    double prof = prof_total;
+    double netQty = originalQty - refundedQty;
+    if (netQty < 0) netQty = 0;
+    if (refundedQty > 0 && originalQty > 0) {
+      final unitPrice = rev_total / originalQty;
+      final unitProf = prof_total / originalQty;
+      rev -= (unitPrice * refundedQty);
+      prof -= (unitProf * refundedQty);
+    }
+
     final name = m['itemName'] ?? 'Unknown';
 
     totalRev += rev;

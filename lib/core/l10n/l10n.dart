@@ -567,11 +567,13 @@ class LocalizationService with ChangeNotifier {
   AppLanguage _currentLanguage = AppLanguage.en;
   AppLanguage get currentLanguage => _currentLanguage;
 
-  LocalizationService() {
-    _loadLanguage();
+  LocalizationService();
+
+  Future<void> initialize() async {
+    await _loadLanguage();
   }
 
-  void _loadLanguage() async {
+  Future<void> _loadLanguage() async {
     final prefs = await SharedPreferences.getInstance();
     final langCode = prefs.getString('language_code') ?? 'en';
     _currentLanguage = AppLanguage.values.firstWhere(

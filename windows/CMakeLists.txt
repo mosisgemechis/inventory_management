@@ -1,17 +1,8 @@
-# Project-level configuration.
 cmake_minimum_required(VERSION 3.10)
 
-# Firebase's bundled CMake projects still declare very old minimum versions.
-# Newer CMake (4.x) removes compatibility with versions < 3.5 unless this is set.
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 
-# Firebase's prebuilt Windows libraries are built with a modern MSVC toolset.
-# Force using the v143 toolset so linking succeeds on newer MSVC runtimes.
 set(CMAKE_VS_PLATFORM_TOOLSET "v143" CACHE STRING "" FORCE)
-
-# Use the local Firebase C++ SDK to avoid repeated downloads
-set(FIREBASE_CPP_SDK_DIR "C:/projects/firebase_cpp_sdk/firebase_cpp_sdk_windows" CACHE PATH "Path to the Firebase C++ SDK" FORCE)
-set(ENV{FIREBASE_CPP_SDK_DIR} "${FIREBASE_CPP_SDK_DIR}")
 
 # Inject local nuget.exe into path for plugins
 set(ENV{PATH} "${CMAKE_CURRENT_SOURCE_DIR};$ENV{PATH}")

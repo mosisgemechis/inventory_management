@@ -1,35 +1,41 @@
 import '../models/subscription_models.dart';
 import 'subscription_service.dart';
 
-/// SUBSCRIPTION ENFORCEMENT IS CURRENTLY DISABLED FOR TESTING.
-/// All feature checks return true and isReadOnly() returns false
-/// so the full app version is accessible.
-/// To re-enable, remove the overrides below and uncomment the real logic.
+/// Subscription plans are enforced. Plans and their limits live in
+/// subscription_models.dart; the active plan is synced with the backend.
 class FeatureGatingService {
 
   // ── TESTING OVERRIDES ──────────────────────────────────────────────────────
   // Set to false to re-enable real subscription enforcement.
-  static const bool _subscriptionDisabled = true;
+  static const bool _subscriptionDisabled = false;
+
+  /// While the subscription is still loading the plan is unknown, so actions
+  /// are allowed rather than blocked. Only a loaded, expired plan blocks.
+  static bool _unknown() =>
+      subscriptionService.current == null && !subscriptionService.isReady;
 
   static bool hasFeature(Feature feature) {
-    if (_subscriptionDisabled) return true; // << TESTING: always granted
+    if (_subscriptionDisabled) return true;
+    if (_unknown()) return true;
     final sub = subscriptionService.current;
     if (sub == null) return false;
-    return sub.hasFeature(feature, ignoreExpiry: true);
+    return sub.hasFeature(feature);
   }
 
   static bool hasAddon(SubscriptionAddOn addon) {
     if (_subscriptionDisabled) return true;
+    if (_unknown()) return true;
     final sub = subscriptionService.current;
     if (sub == null) return false;
     return sub.addOns.contains(addon.name);
   }
 
   static bool isReadOnly() {
-    if (_subscriptionDisabled) return false; // << TESTING: never read-only
+    if (_subscriptionDisabled) return false;
     if (subscriptionService.isInitializing) return false;
     final sub = subscriptionService.current;
-    if (sub == null) return true;
+    // Only read-only once we actually know there is no plan.
+    if (sub == null) return subscriptionService.isReady;
     return sub.isExpired;
   }
 
@@ -40,12 +46,14 @@ class FeatureGatingService {
 
   static int maxUsers() {
     if (_subscriptionDisabled) return 9999;
+    if (_unknown()) return 9999;
     final sub = subscriptionService.current;
     return sub?.userLimit ?? 3;
   }
 
   static int maxBranches() {
     if (_subscriptionDisabled) return 9999;
+    if (_unknown()) return 9999;
     final sub = subscriptionService.current;
     return sub?.branchLimit ?? 1;
   }

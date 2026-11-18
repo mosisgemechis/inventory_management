@@ -1,11 +1,159 @@
-# Basic
+# ============================================================
+# GM Inventory — .gitignore
+# Covers: Flutter frontend + FastAPI Python backend
+# ============================================================
+
+
+# ============================================================
+# 🔐 SECRETS & ENVIRONMENT FILES
+# ============================================================
+# Never commit real .env files. Keep only .env.example files.
+.env
+.env.*
+!.env.example
+
+# Recursive: applies to every subdirectory (e.g. backend/.env)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Explicit secret file patterns
+**/secrets/
+**/*secret*.json
+**/*secrets*.json
+**/*credentials*.json
+
+# Google / Firebase service account files
+google-services.json
+GoogleService-Info.plist
+
+# Private keys, certificates, keystores
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.pfx
+*.crt
+*.cer
+*.der
+*.csr
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# AWS credentials
+.aws/
+
+
+# ============================================================
+# 📦 FLUTTER / DART
+# ============================================================
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 build/
-.env
+*.g.dart.json
+
+# Generated code — keep committed so CI doesn't need build_runner
+# Uncomment the next line if you prefer NOT to commit generated files:
+# **/*.g.dart
+
+# Flutter symbols
+app.so
+
+
+# ============================================================
+# 🐍 PYTHON / FASTAPI BACKEND
+# ============================================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+backend/venv/
+backend/.venv/
+
+# Python packaging
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+*.pytest_cache
+
+# SQLite dev databases (backend local test DBs)
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+inventory_backend.db
+
+
+# ============================================================
+# 🗄️  DATABASE FILES
+# ============================================================
+*.db
+*.sqlite
+*.sqlite3
+
+
+# ============================================================
+# 📋 LOGS, DUMPS & TEMPORARY FILES
+# ============================================================
+*.log
+*.log.*
+*.tmp
+*.bak
+*.swp
+*.orig
+*.rej
+
+# Project-specific debug output files
+analysis_*.txt
+analyze*.txt
+build_*.txt
+build_*.log
+dart_analyze*.txt
+errors*.txt
+run_*.log
+run_*.txt
+test_*.log
+test_*.txt
+nuclear_*.log
+verbose_*.log
+verbose_*.log
+verbose_build*.log
+final_*.txt
+current_*.txt
+rn_*.txt
+output_dart*.txt
+
+
+# ============================================================
+# 🪟 WINDOWS / OS
+# ============================================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
 *.exe
 *.dll
 *.so
@@ -14,19 +162,82 @@ build/
 *.obj
 *.pdb
 
-# Windows
+# Windows platform build ephemeral
 windows/flutter/ephemeral/
 windows/flutter/generated_config.cmake
 windows/x64/
 
-# Android
+
+# ============================================================
+# 🍎 macOS / iOS
+# ============================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+DerivedData/
+*.xcworkspace/xcuserdata/
+ios/Flutter/.last_build_id
+
+
+# ============================================================
+# 🤖 ANDROID
+# ============================================================
 .gradle/
 android/app/build/
 android/app/debug/
 android/app/profile/
 android/app/release/
+local.properties
 
-# iOS/macOS
-ios/Flutter/.last_build_id
-.DS_Store
-DerivedData/
+
+# ============================================================
+# 💡 IDE / EDITOR
+# ============================================================
+
+# VS Code — keep workspace settings but not local user state
+.vscode/settings.json
+.vscode/*.log
+
+# IntelliJ / Android Studio — keep .idea tracked but not caches
+.idea/caches/
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/.gitignore
+
+# Vim
+*.swp
+*.swo
+
+# Emacs
+*~
+\#*\#
+
+
+# ============================================================
+# 📦 NODE / TOOLING
+# ============================================================
+node_modules/
+npm-debug.log
+yarn-error.log
+
+
+# ============================================================
+# 🧪 TEST ARTIFACTS & GENERATED SCRATCH FILES
+# ============================================================
+flutter_0*.png
+*.resolved
+deep_fix_*.py
+final_fix_*.py
+fix_*.dart
+fix_admin_*.py
+patch_*.py
+*_matches.txt
+*_line.txt
+snippet.txt
+grep_results*.txt
+repo_dup_matches.txt
+
+# One-off scratch scripts / dumps
+find_*.py
+backend/pytest_out.txt
+backend/report_b64.txt

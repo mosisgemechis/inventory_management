@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../main.dart';
 import 'package:provider/provider.dart';
@@ -33,9 +34,18 @@ import 'package:inventory_manager/core/widgets/import_progress_dialog.dart';
 import 'package:inventory_manager/core/widgets/import_error_report.dart';
 import 'package:inventory_manager/core/widgets/import_duplicate_resolver.dart';
 import 'package:inventory_manager/core/widgets/account_dropdown.dart';
+import 'package:inventory_manager/features/auth/auth_ui.dart';
 import 'package:inventory_manager/core/utils/perf_logger.dart';
 import 'package:inventory_manager/core/widgets/custom_date_range_picker.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:inventory_manager/core/services/sync/connection_service.dart';
+import '../../core/widgets/delete_account_dialog.dart';
+import '../../core/widgets/ownership_dialogs.dart';
+import '../../core/services/subscription_service.dart';
+import '../../core/models/subscription_models.dart';
+import '../../core/services/feature_gating_service.dart';
+import '../../core/widgets/upgrade_modal.dart';
+import '../subscription/subscription_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -46,12 +56,24 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final DatabaseService _db = DatabaseService();
+
+  /// Shows the upgrade prompt when a plan blocks an action.
+  bool _planGate({required bool allowed, required String title, required String message}) {
+    if (allowed) return true;
+    UpgradeModal.show(context, title: title, message: message);
+    return false;
+  }
   final ValidationService _validator = ValidationService();
   final ImportService _importService = ImportService();
   final ReportingService _reporting = ReportingService();
   final InventoryRepository _repo = InventoryRepository();
   int _selectedIndex = 0;
   String _reportFilter = 'Daily';
+  // Reports read a one-shot snapshot: a live query that never emits can then
+  // never leave the tab spinning, and Refresh pulls a new snapshot.
+  Future<List<Map<String, dynamic>>>? _reportSalesFuture;
+  Future<List<Map<String, dynamic>>>? _reportProductsFuture;
+  String? _reportSnapshotScope;
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 0));
   DateTime _endDate = DateTime.now();
   String _purchaseSupplierFilter = 'All Suppliers';
@@ -86,6 +108,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Stream<List<Map<String, dynamic>>>? _notificationStream;
   Stream<List<Map<String, dynamic>>>? _homeSalesStream;
   Stream<List<Map<String, dynamic>>>? _homeInventoryStream;
+  Stream<List<Map<String, dynamic>>>? _branchesStream;
+  Stream<List<Map<String, dynamic>>>? _manageUsersBranchesStream;
+  Stream<List<Map<String, dynamic>>>? _manageBranchesStream;
+
+  /// Tabs that have been opened at least once. Building every tab eagerly is
+  /// very expensive: each tab owns DB watchers, charts and long lists, so an
+  /// IndexedStack of all of them kept ~10 queries alive and laid out on every
+  /// frame. Tabs are now built on first visit and kept alive afterwards.
+  final Set<String> _activatedTabs = <String>{};
 
   @override
   void initState() {
@@ -112,6 +143,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         });
         // Proactively generate expiry warnings and expired-product notifications
         _db.checkAndNotifyExpiry(user.shopId).catchError((_) {});
+        // Load the plan/trial and reconcile it with the backend.
+        subscriptionService
+            .initialize(user.shopId)
+            .catchError((e) => debugPrint('[SUBSCRIPTION] init failed: $e'));
         PerfLogger.logPerformance('App Startup / Dashboard Init', sw.elapsedMilliseconds);
       }
     });
@@ -239,8 +274,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<CartItem> _posCart = [];
   double _cartTotal = 0;
 
-  // Scanner Logic
-  final MobileScannerController _scannerController = MobileScannerController();
+  // Scanner Logic — created lazily so desktop startup never pays for the
+  // camera plugin until the scanner is actually opened.
+  MobileScannerController? _scannerController;
+  MobileScannerController get _scanner =>
+      _scannerController ??= MobileScannerController();
 
   // Search controllers
   final TextEditingController _searchInventoryC = TextEditingController();
@@ -254,7 +292,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   void dispose() {
-    _scannerController.dispose();
+    _scannerController?.dispose();
     _searchInventoryC.dispose();
     _searchSalesC.dispose();
     _searchPurchasesC.dispose();
@@ -283,6 +321,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _handlePOSCheckout(Map<String, dynamic> params, Map<String, dynamic> doc) async {
+    if (!_planGate(
+      allowed: FeatureGatingService.canSell(),
+      title: 'Selling is locked',
+      message:
+          'Your plan has expired or does not include point of sale. Renew or upgrade to keep selling.',
+    )) return;
     final user = Provider.of<AuthService>(context, listen: false).user;
     if (user == null) return;
     final d = doc;
@@ -379,47 +423,98 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       appBar: desktop ? null : _buildMobileAppBar(user),
       drawer: desktop ? null : Drawer(
         width: 280,
+        backgroundColor: AppColors.primary,
         child: Column(
           children: [
-            DrawerHeader(
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 48, 20, 22),
               decoration: const BoxDecoration(color: AppColors.primary),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.admin_panel_settings_rounded, size: 48, color: Colors.white),
-                    const SizedBox(height: 12),
-                    Text("SmartInventory ERP", style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                  ],
-                ),
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/brand/logo_mark.png',
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.inventory, color: Colors.white, size: 30),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'GM INVENTORY',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
               child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 itemCount: sidebarItems.length,
                 itemBuilder: (context, i) {
                   final item = sidebarItems[i];
-                  return ListTile(
-                    leading: Icon(item.icon, color: _selectedIndex == i ? AppColors.secondary : null),
-                    title: Text(item.label, style: TextStyle(
-                      fontWeight: _selectedIndex == i ? FontWeight.bold : null,
-                      color: _selectedIndex == i ? AppColors.secondary : null,
-                    )),
-                    selected: _selectedIndex == i,
-                    onTap: () {
-                      final sw = Stopwatch()..start();
-                      setState(() => _selectedIndex = i);
-                      Navigator.pop(context);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                         PerfLogger.logPerformance('Open ${item.label}', sw.elapsedMilliseconds);
-                      });
-                    },
+                  final isSelected = _selectedIndex == i;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      selected: isSelected,
+                      selectedTileColor: Colors.white.withOpacity(0.12),
+                      leading: Icon(item.icon, size: 20, color: isSelected ? Colors.white : Colors.white70),
+                      title: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.white70,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      onTap: () {
+                        final sw = Stopwatch()..start();
+                        setState(() => _selectedIndex = i);
+                        Navigator.pop(context);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          PerfLogger.logPerformance('Open ${item.label}', sw.elapsedMilliseconds);
+                        });
+                      },
+                    ),
                   );
                 },
               ),
             ),
-            const Divider(),
-            _buildLogoutButton(),
+            const Divider(color: Colors.white24, height: 1),
+            SafeArea(
+              top: false,
+              child: ListTile(
+                leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onTap: () async {
+                  await Provider.of<AuthService>(context, listen: false).signOut();
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
           ],
         ),
       ),
@@ -528,7 +623,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           label: 'Transactions'));
     }
 
-    if (user.hasPermission(AppUser.pCreatePurchase)) {
+    if (user.hasPermission(AppUser.pCreatePurchase) &&
+        FeatureGatingService.hasFeature(Feature.purchaseTracking)) {
       items.add(SidebarItem(
           uid: 'purchases',
           icon: Icons.receipt_long_outlined,
@@ -549,14 +645,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (user.hasPermission(AppUser.pManageUsers) || user.hasRole(UserRole.admin)) {
         items.add(SidebarItem(uid: 'users', icon: Icons.group_outlined, label: 'Manage Users'));
       }
-      if (user.hasPermission(AppUser.pManageBranches) || user.hasRole(UserRole.admin)) {
-        items.add(SidebarItem(uid: 'branches', icon: Icons.lan_outlined, label: 'Manage Branches'));
+      if ((user.hasPermission(AppUser.pManageBranches) ||
+              user.hasRole(UserRole.admin)) &&
+          FeatureGatingService.hasFeature(Feature.multiBranchManagement)) {
+        items.add(SidebarItem(
+            uid: 'branches',
+            icon: Icons.lan_outlined,
+            label: 'Manage Branches'));
       }
     }
 
-    if (user.hasPermission(AppUser.pViewAuditLogs)) {
+    if (user.hasPermission(AppUser.pViewAuditLogs) &&
+        FeatureGatingService.hasFeature(Feature.auditLogs)) {
       items.add(SidebarItem(
-          uid: 'audit', icon: Icons.history_rounded, label: 'audit_history'.tr(context)));
+          uid: 'audit',
+          icon: Icons.history_rounded,
+          label: 'audit_history'.tr(context)));
     }
 
     items.add(SidebarItem(
@@ -624,11 +728,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Flexible(
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -637,6 +748,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const SizedBox(width: 8),
                         Text(DateFormat('MMM d, yyyy').format(DateTime.now()),
                             style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 10),
+                        const _ConnectionBlinkerDot(),
                       ],
                     ),
                   ),
@@ -658,7 +771,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildBranchSelector(AppUser user) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _db.watchBranches(user.shopId).toMainThread(),
+      // Cached: creating a watcher inside build leaked a new DB query and
+      // ReceivePort on every single rebuild.
+      stream: _branchesStream ??= _db.watchBranches(user.shopId).toMainThread(),
       builder: (ctx, branchSnap) {
         final branches = (branchSnap.data ?? []).where((b) => b['id'] != 'all').toList();
         final allBranchIds = branches.map((b) => b['id'].toString()).toList();
@@ -667,9 +782,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         // Filter branch details to only those allowed
         final allowedBranches = branches.where((b) => allowedBranchIds.contains(b['id'])).toList();
 
+        // A single real branch: never offer "All Branches" or a dropdown.
+        final realBranches = allowedBranchIds.contains('all')
+            ? branches
+            : allowedBranches;
+
         // 1. Single Branch
-        if (allowedBranchIds.length == 1 || (allowedBranchIds.length == 2 && !allowedBranchIds.contains('all') && allowedBranches.length == 1)) {
-          final branch = allowedBranches.isNotEmpty ? allowedBranches.first : {'id': user.branchId, 'name': user.branchName ?? 'Main Branch'};
+        if (realBranches.length <= 1) {
+          final branch = realBranches.isNotEmpty
+              ? realBranches.first
+              : {'id': user.branchId, 'name': user.branchName ?? 'Main Branch'};
           final branchName = branch['name'] ?? 'Main Branch';
           
           // Auto select if not already
@@ -684,9 +806,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border.withOpacity(0.5)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -704,8 +832,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
         // 2. Multiple or All Branches
         final options = <Map<String, dynamic>>[];
-        if (allowedBranchIds.contains('all')) {
+        if (allowedBranchIds.contains('all') && branches.length >= 2) {
           options.add({'id': 'all', 'name': 'All Branches'});
+          options.addAll(branches);
+        } else if (allowedBranchIds.contains('all')) {
           options.addAll(branches);
         } else {
           options.addAll(allowedBranches);
@@ -723,14 +853,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           }));
         }
 
+        final singleBranch = options.length == 1;
+        final branchLabel = singleBranch ? options.first['name'] : null;
+
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          child: DropdownButtonHideUnderline(
+          child: singleBranch
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.store_rounded,
+                          size: 14, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      Text(
+                        branchLabel.toString(),
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                )
+              : DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: validId,
               isDense: true,
@@ -885,29 +1041,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         final req = notifications[i];
                         final id = req['id']?.toString() ?? '';
                         final isRead = (req['isRead'] ?? false) == true;
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: isRead
-                                ? AppColors.border.withOpacity(0.4)
-                                : AppColors.secondary.withOpacity(0.15),
-                            child: Icon(
-                              Icons.notifications_rounded,
-                              color: isRead ? AppColors.textSecondary : AppColors.secondary,
-                              size: 18,
+                        return Dismissible(
+                          key: ValueKey('notif_$id'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('Marked as read', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 13)),
+                                SizedBox(width: 8),
+                                Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 20),
+                              ],
                             ),
                           ),
-                          title: Text(req['title']?.toString() ?? 'Notification', style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
-                          subtitle: Text(req['message']?.toString() ?? ''),
-                          onTap: () => _handleNotificationTap(user, req),
-                          trailing: (!isRead && id.isNotEmpty)
-                              ? IconButton(
-                                  tooltip: 'Mark as read',
-                                  icon: const Icon(Icons.done_rounded, color: AppColors.success),
-                                  onPressed: () async {
-                                    await _db.markNotificationAsRead(id);
-                                  },
-                                )
-                              : null,
+                          onDismissed: (_) async {
+                            if (id.isNotEmpty) {
+                              await _db.markNotificationAsRead(id);
+                            }
+                          },
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: isRead
+                                  ? AppColors.border.withOpacity(0.4)
+                                  : AppColors.secondary.withOpacity(0.15),
+                              child: Icon(
+                                Icons.notifications_rounded,
+                                color: isRead ? AppColors.textSecondary : AppColors.secondary,
+                                size: 18,
+                              ),
+                            ),
+                            title: Text(req['title']?.toString() ?? 'Notification', style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
+                            subtitle: Text(req['message']?.toString() ?? ''),
+                            onTap: () => _handleNotificationTap(user, req),
+                            trailing: (!isRead && id.isNotEmpty)
+                                ? IconButton(
+                                    tooltip: 'Mark as read',
+                                    icon: const Icon(Icons.done_rounded, color: AppColors.success),
+                                    onPressed: () async {
+                                      await _db.markNotificationAsRead(id);
+                                    },
+                                  )
+                                : null,
+                          ),
                         );
                       }),
             ),
@@ -920,26 +1101,116 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildBody(AppUser user) {
     final items = _getSidebarItems(user);
     final safeIndex = _selectedIndex < items.length ? _selectedIndex : 0;
+    _activatedTabs.add(items[safeIndex].uid);
 
     return IndexedStack(
       index: safeIndex,
-      children: items.map((it) {
-        switch (it.uid) {
-          case 'overview': return _buildHomeTab(user, items);
-          case 'inventory': return _buildInventoryTab(user);
-          case 'sales': return _buildSalesTab(user);
-          case 'transactions': return _buildTransactionsTab(user);
-          case 'purchases': return _buildSupplierTab(user);
-          case 'debt': return _buildDebtTab(user);
-          case 'reports': return _buildReportsTab(user, items);
-          case 'users': return _buildManageUsersTab(user);
-          case 'branches': return _buildManageBranchesTab(user);
-          case 'audit': return _buildAuditLogTab(user);
-          case 'settings': return _buildSettingsTab(user);
-          default: return const Center(child: Text("Coming Soon"));
+      children: List.generate(items.length, (i) {
+        final item = items[i];
+        // Never built: keep a zero-cost placeholder until the tab is opened.
+        if (!_activatedTabs.contains(item.uid)) {
+          return const SizedBox.shrink();
         }
-      }).toList(),
+        return TickerMode(
+          enabled: i == safeIndex,
+          child: RepaintBoundary(
+            child: _buildTabContent(user, items, item.uid),
+          ),
+        );
+      }),
     );
+  }
+
+  /// Cache of DB watchers keyed by call site + scope.
+  ///
+  /// StreamBuilder must receive the *same* stream instance across rebuilds.
+  /// Creating `db.watchX(...)` inside build meant every keystroke in a search
+  /// field tore down and re-ran a full SQL query (plus a new ReceivePort on
+  /// desktop). Keys include the active branch so scope changes still refresh.
+  final Map<String, Stream<List<Map<String, dynamic>>>> _cachedWatchers =
+      <String, Stream<List<Map<String, dynamic>>>>{};
+
+  Stream<List<Map<String, dynamic>>> _cachedWatch(
+    String key,
+    Stream<List<Map<String, dynamic>>> Function() create,
+  ) {
+    return _cachedWatchers.putIfAbsent(key, () => create().toMainThread());
+  }
+
+  /// Preferred live first emission, with a plain query as the guaranteed
+  /// fallback so the report always resolves.
+  Future<List<Map<String, dynamic>>> _reportSnapshot(
+    Stream<List<Map<String, dynamic>>> Function() live,
+    Future<List<Map<String, dynamic>>> Function() fallback,
+  ) async {
+    try {
+      // timeout() lives on the stream, so a silent watcher is cancelled rather
+      // than left subscribed when the fallback answers instead.
+      return await live().timeout(const Duration(seconds: 6)).first;
+    } catch (_) {
+      return fallback();
+    }
+  }
+
+  void _ensureReportSnapshots(AppUser user) {
+    if (_reportSnapshotScope == _selectedBranchId &&
+        _reportSalesFuture != null &&
+        _reportProductsFuture != null) {
+      return;
+    }
+    _reportSnapshotScope = _selectedBranchId;
+    final branchId = _selectedBranchId == 'all' ? null : _selectedBranchId;
+    _reportSalesFuture = _reportSnapshot(
+      () => _db.watchSales(user.shopId, branchId: branchId),
+      () => _db.query('sales', where: 'shopId = ?', whereArgs: [user.shopId]),
+    );
+    _reportProductsFuture = _reportSnapshot(
+      () => _db.watchProducts(user.shopId, branchId: branchId),
+      () => _db.getAllProducts(user.shopId),
+    );
+  }
+
+  void _refreshReportSnapshot() {
+    setState(() {
+      _reportSnapshotScope = null;
+      _reportSalesFuture = null;
+      _reportProductsFuture = null;
+    });
+  }
+
+  /// Feature a tab needs, or null when the tab is part of every plan.
+  Feature? _requiredFeatureForTab(String uid) {
+    switch (uid) {
+      case 'purchases':
+        return Feature.purchaseTracking;
+      case 'branches':
+        return Feature.multiBranchManagement;
+      case 'audit':
+        return Feature.auditLogs;
+      default:
+        return null;
+    }
+  }
+
+  Widget _buildTabContent(AppUser user, List<SidebarItem> items, String uid) {
+    final required = _requiredFeatureForTab(uid);
+    if (required != null && !FeatureGatingService.hasFeature(required)) {
+      return _PlanLockedView(feature: required);
+    }
+    switch (uid) {
+      case 'overview': return _buildHomeTab(user, items);
+      case 'inventory': return _buildInventoryTab(user);
+      case 'sales': return _buildSalesTab(user);
+      case 'transactions': return _buildTransactionsTab(user);
+      case 'purchases': return _buildSupplierTab(user);
+      case 'debt': return _buildDebtTab(user);
+      case 'reports': return _buildReportsTab(user, items);
+      case 'users': return _buildManageUsersTab(user);
+      case 'branches': return _buildManageBranchesTab(user);
+      case 'audit': return _buildAuditLogTab(user);
+      case 'settings': return _buildSettingsTab(user);
+      default: return const Center(child: Text("Coming Soon"));
+    }
   }
 
   Widget _buildHomeTab(AppUser user, List<SidebarItem> sidebarItems) {
@@ -1415,7 +1686,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _db.watchUsers(adminUser.shopId).toMainThread(),
+          stream: _cachedWatch(
+            'users_${adminUser.shopId}',
+            () => _db.watchUsers(adminUser.shopId),
+          ),
           builder: (c, snap) {
             if (!snap.hasData) return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
             final users = snap.data ?? [];
@@ -1448,21 +1722,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                            child: Icon(isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_outline_rounded,
                                color: isAdmin ? AppColors.warning : AppColors.secondary, size: 20),
                          ),
-                         title: Row(
+                         title: Text(
+                           username,
+                           maxLines: 1,
+                           overflow: TextOverflow.ellipsis,
+                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                         ),
+                         subtitle: Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           mainAxisSize: MainAxisSize.min,
                            children: [
-                             Text(username, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                             const SizedBox(width: 8),
-                              const SizedBox.shrink(),
+                             Text(
+                               (d['email'] ?? '').toString(),
+                               maxLines: 1,
+                               overflow: TextOverflow.ellipsis,
+                               style: const TextStyle(fontSize: 11),
+                             ),
+                             const SizedBox(height: 6),
+                             PastelBadge(
+                               label: displayRole.toUpperCase(),
+                               baseColor: isAdmin ? AppColors.warning : AppColors.secondary,
+                             ),
                            ],
                          ),
-                         subtitle: Text(d['email'] ?? '', style: const TextStyle(fontSize: 11)),
                          trailing: Row(
                            mainAxisSize: MainAxisSize.min,
                            children: [
-                             PastelBadge(label: displayRole.toUpperCase(), baseColor: isAdmin ? AppColors.warning : AppColors.secondary),
-                            const SizedBox(width: 8),
                              if (!isAdmin) ...[
                                IconButton(
+                                 visualDensity: VisualDensity.compact,
+                                 padding: const EdgeInsets.all(4),
+                                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                                  icon: const Icon(Icons.lock_reset_rounded, size: 18, color: AppColors.warning),
                                  tooltip: 'Reset Password',
                                  onPressed: () {
@@ -1476,10 +1766,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                  },
                                ),
                                IconButton(
+                                 visualDensity: VisualDensity.compact,
+                                 padding: const EdgeInsets.all(4),
+                                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                                  icon: const Icon(Icons.edit_outlined, size: 18),
                                  onPressed: () => _showEditUserDialog(d['uid'], d),
                                ),
                                IconButton(
+                                 visualDensity: VisualDensity.compact,
+                                 padding: const EdgeInsets.all(4),
+                                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.danger),
                                  onPressed: () => _confirmDeleteUser(d['uid'], d['username'] ?? ''),
                                ),
@@ -1561,7 +1857,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                          const SizedBox(height: 16),
 
                          StreamBuilder<List<Map<String, dynamic>>>(
-                           stream: _db.watchBranches(user.shopId).toMainThread(),
+                           stream: _manageUsersBranchesStream ??=
+                               _db.watchBranches(user.shopId).toMainThread(),
                            builder: (c, snap) {
                              final branches = (snap.data ?? []).where((element) => element['id'] != 'all').toList();
                              if (branches.isEmpty) {
@@ -1814,7 +2111,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _db.watchBranches(user.shopId).toMainThread(),
+          stream: _manageBranchesStream ??=
+              _db.watchBranches(user.shopId).toMainThread(),
           builder: (c, snap) {
             if (!snap.hasData) return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
             final branches = snap.data!;
@@ -1874,7 +2172,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  void _showAddBranchDialog(String shopId) {
+  void _showAddBranchDialog(String shopId) async {
+    if (!_planGate(
+      allowed: FeatureGatingService.canManageBranches(),
+      title: 'Branches are locked',
+      message:
+          'Creating branches needs a plan with multi-branch management.',
+    )) return;
+    try {
+      final branches =
+          await _db.query('branches', where: 'shopId = ?', whereArgs: [shopId]);
+      final limit = FeatureGatingService.maxBranches();
+      if (branches.length >= limit) {
+        if (!mounted) return;
+        _planGate(
+          allowed: false,
+          title: 'Branch limit reached',
+          message:
+              'Your plan allows up to $limit branch${limit == 1 ? '' : 'es'}. Upgrade to add more.',
+        );
+        return;
+      }
+    } catch (_) {
+      // A failed count should not stop the admin from creating a branch.
+    }
      final nameC = TextEditingController();
      showDialog(
        context: context,
@@ -1953,303 +2274,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  void _showCreateUserDialog(AppUser adminUser) {
-    final nameC = TextEditingController();
-    final emailC = TextEditingController();
-    final passC = TextEditingController();
-    String selectedRole = 'inventoryStaff';
-    String? assignedBranchId = adminUser.branchId;
-    String branchAccessType = 'single'; // 'single', 'multiple', 'all'
-    Map<String, bool> userPerms = {};
-    Map<String, bool> checkedBranches = {};
-
-    void updatePermsForRole(String role, Map<String, bool> targetMap) {
-      targetMap.clear();
-      for (var p in AppUser.allPermissions) {
-        targetMap[p] = false;
+  void _showCreateUserDialog(AppUser adminUser) async {
+    if (!_planGate(
+      allowed: FeatureGatingService.canAddUsers(),
+      title: 'Staff accounts are locked',
+      message:
+          'Adding staff needs a plan with staff management. Upgrade to continue.',
+    )) return;
+    try {
+      final users = await _db
+          .query('users', where: 'shopId = ?', whereArgs: [adminUser.shopId]);
+      final limit = FeatureGatingService.maxUsers();
+      if (users.length >= limit) {
+        if (!mounted) return;
+        _planGate(
+          allowed: false,
+          title: 'User limit reached',
+          message:
+              'Your plan allows up to $limit user${limit == 1 ? '' : 's'}. Upgrade to add more.',
+        );
+        return;
       }
-      if (role == 'admin') {
-        for (var p in AppUser.allPermissions) targetMap[p] = true;
-      } else if (role == 'manager') {
-        targetMap[AppUser.pManageInventory] = true;
-        targetMap[AppUser.pManageSales] = true;
-        targetMap[AppUser.pManagePurchases] = true;
-        targetMap[AppUser.pManageCustomers] = true;
-        targetMap[AppUser.pManageStockTransfers] = true;
-        targetMap[AppUser.pViewReports] = true;
-        targetMap[AppUser.pViewFinancialData] = true;
-        targetMap[AppUser.pManageSettings] = true;
-        targetMap[AppUser.pManageBranches] = true;
-        targetMap[AppUser.pViewNotifications] = true;
-      } else if (role == 'cashier') {
-        targetMap[AppUser.pManageSales] = true;
-        targetMap[AppUser.pManageCustomers] = true;
-      } else if (role == 'inventoryStaff') {
-        targetMap[AppUser.pManageInventory] = true;
-        targetMap[AppUser.pManageStockTransfers] = true;
-      }
+    } catch (_) {
+      // If the count fails, still let the admin open the wizard.
     }
-
-    updatePermsForRole(selectedRole, userPerms);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setS) => AlertDialog(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                title: const Text("Add New Staff Account"),
-                content: SizedBox(
-                  width: 500,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(
-                            controller: nameC,
-                            decoration: const InputDecoration(
-                                labelText: "Username*",
-                                prefixIcon: Icon(Icons.person))),
-                        const SizedBox(height: 12),
-                        TextField(
-                            controller: emailC,
-                            decoration: const InputDecoration(
-                                labelText: "Email Address*", prefixIcon: Icon(Icons.email))),
-                        const SizedBox(height: 12),
-                        TextField(
-                            controller: passC,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                                labelText: "Password*",
-                                prefixIcon: Icon(Icons.lock))),
-                        const SizedBox(height: 16),
-                        
-                        DropdownButtonFormField<String>(
-                          value: selectedRole,
-                          decoration: const InputDecoration(labelText: "Primary Role"),
-                          items: const [
-                            DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                            DropdownMenuItem(value: 'manager', child: Text('Manager')),
-                            DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
-                            DropdownMenuItem(value: 'inventoryStaff', child: Text('Inventory Staff')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) {
-                              setS(() {
-                                selectedRole = v;
-                                updatePermsForRole(selectedRole, userPerms);
-                              });
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        StreamBuilder<List<Map<String, dynamic>>>(
-                          stream: _db.watchBranches(adminUser.shopId).toMainThread(),
-                          builder: (c, snap) {
-                            final branches = (snap.data ?? []).where((element) => element['id'] != 'all').toList();
-                            if (branches.isEmpty) {
-                              branches.add({'id': 'main', 'name': 'Main Branch'});
-                            }
-                            
-                            // Initialize checked branches if not yet
-                            for (var b in branches) {
-                              checkedBranches.putIfAbsent(b['id'].toString(), () => false);
-                            }
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                DropdownButtonFormField<String>(
-                                  value: branchAccessType,
-                                  decoration: const InputDecoration(labelText: "Branch Access Scope"),
-                                  items: const [
-                                    DropdownMenuItem(value: 'single', child: Text('Single Branch')),
-                                    DropdownMenuItem(value: 'multiple', child: Text('Multiple Branches')),
-                                    DropdownMenuItem(value: 'all', child: Text('All Branches')),
-                                  ],
-                                  onChanged: (v) {
-                                    if (v != null) {
-                                      setS(() {
-                                        branchAccessType = v;
-                                        if (v == 'all') {
-                                          assignedBranchId = 'main';
-                                        }
-                                      });
-                                    }
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                if (branchAccessType == 'single') ...[
-                                  DropdownButtonFormField<String>(
-                                    value: branches.any((b) => b['id'] == assignedBranchId) ? assignedBranchId : branches.first['id'].toString(),
-                                    decoration: const InputDecoration(labelText: "Select Primary Branch"),
-                                    items: branches.map((b) => DropdownMenuItem(
-                                      value: b['id'].toString(),
-                                      child: Text(b['name']),
-                                    )).toList(),
-                                    onChanged: (v) => setS(() => assignedBranchId = v),
-                                  ),
-                                ] else if (branchAccessType == 'multiple') ...[
-                                  const Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text("Select Assigned Branches:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary)),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    constraints: const BoxConstraints(maxHeight: 120),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: AppColors.border),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ListView(
-                                      shrinkWrap: true,
-                                      children: branches.map((b) {
-                                        final bId = b['id'].toString();
-                                        return CheckboxListTile(
-                                          title: Text(b['name'], style: const TextStyle(fontSize: 12)),
-                                          value: checkedBranches[bId] ?? false,
-                                          dense: true,
-                                          onChanged: (v) {
-                                            setS(() {
-                                              checkedBranches[bId] = v ?? false;
-                                              if (v == true && (assignedBranchId == null || assignedBranchId == 'all')) {
-                                                assignedBranchId = bId;
-                                              }
-                                            });
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ] else ...[
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 8),
-                                    child: Text("User will have access to all branches.", style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textSecondary)),
-                                  ),
-                                ],
-                              ],
-                            );
-                          }
-                        ),
-                        
-                        const Divider(height: 32),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text("Granular Permissions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondary)),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                           decoration: BoxDecoration(
-                             border: Border.all(color: AppColors.border),
-                             borderRadius: BorderRadius.circular(12),
-                           ),
-                           child: Column(
-                            children: AppUser.permissionGroups.entries.expand((entry) => [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                                child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.secondary)),
-                              ),
-                              ...entry.value.map((p) => CheckboxListTile(
-                                title: Text(p, style: const TextStyle(fontSize: 12)),
-                                value: userPerms[p] ?? false,
-                                onChanged: (v) => setS(() => userPerms[p] = v ?? false),
-                                dense: true,
-                                controlAffinity: ListTileControlAffinity.leading,
-                              )),
-                              const Divider(height: 1),
-                            ]).toList(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text("Cancel")),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (nameC.text.isEmpty ||
-                          emailC.text.isEmpty ||
-                          passC.text.isEmpty) {
-                         rootScaffoldMessengerKey.currentState!.showSnackBar(const SnackBar(content: Text("Please fill all required fields")));
-                         return;
-                      }
-
-                      // ── Duplicate username guard ─────────────────────────────
-                      final usernameTaken = await _db.isUsernameTaken(nameC.text.trim());
-                      if (usernameTaken) {
-                        rootScaffoldMessengerKey.currentState!.showSnackBar(SnackBar(
-                          content: Text('Username "${nameC.text.trim()}" is already taken. Please choose a different username.'),
-                          backgroundColor: AppColors.warning,
-                          duration: const Duration(milliseconds: 2500),
-                        ));
-                        return;
-                      }
-
-                      final Map<String, bool> finalPerms = { ...userPerms };
-                      if (branchAccessType == 'all') {
-                        finalPerms['branch_access_all'] = true;
-                      } else if (branchAccessType == 'multiple') {
-                        finalPerms['branch_access_all'] = false;
-                        checkedBranches.forEach((bId, value) {
-                          finalPerms['branch_access_$bId'] = value;
-                        });
-                        if (assignedBranchId != null) {
-                          finalPerms['branch_access_$assignedBranchId'] = true;
-                        }
-                      } else {
-                        finalPerms['branch_access_all'] = false;
-                        if (assignedBranchId != null) {
-                          finalPerms['branch_access_$assignedBranchId'] = true;
-                        }
-                      }
-
-                      // Validation: Manage Stock Transfers requires multi-branch access
-                      final hasTransfer = finalPerms[AppUser.pManageStockTransfers] == true;
-                      final isSingleBranch = branchAccessType == 'single';
-                      if (hasTransfer && isSingleBranch) {
-                        rootScaffoldMessengerKey.currentState!.showSnackBar(SnackBar(
-                          content: const Text('⚠️ "Manage Stock Transfers" requires access to multiple branches. Please change the branch scope or remove the transfer permission.'),
-                          backgroundColor: AppColors.warning,
-                          duration: const Duration(milliseconds: 2500),
-                        ));
-                        return;
-                      }
-                      
-                      Navigator.pop(ctx);
-                      LoadingOverlay.show(context);
-                      try {
-                        await Provider.of<AuthService>(context, listen: false).createStaffAccount(
-                          email: emailC.text.trim(),
-                          password: passC.text,
-                          username: nameC.text.trim(),
-                          fullName: nameC.text.trim(),
-                          shopId: adminUser.shopId,
-                          branchId: assignedBranchId ?? 'main',
-                          branchName: 'Assigned Branch',
-                          role: selectedRole,
-                          permissions: finalPerms,
-                        );
-                        if (mounted)
-                          rootScaffoldMessengerKey.currentState!.showSnackBar(
-                              const SnackBar(
-                                  content: Text('Staff account created successfully!'),
-                                  backgroundColor: AppColors.success));
-                      } catch (e) {
-                        if (mounted)
-                          rootScaffoldMessengerKey.currentState!.showSnackBar(SnackBar(
-                              content: Text('Failed to create account: $e'),
-                              backgroundColor: AppColors.danger));
-                      } finally {
-                        if (mounted) LoadingOverlay.hide(context);
-                      }
-                    },
-                    child: const Text("Create Account"),
-                  ),
-                ],
-              )),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _AddStaffWizard(
+          adminUser: adminUser,
+          db: _db,
+          branchesStream: _cachedWatch(
+            'add_staff_branches_${adminUser.shopId}',
+            () => _db.watchBranches(adminUser.shopId),
+          ),
+        ),
+      ),
     );
   }
 
@@ -2397,7 +2456,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         Expanded(
           child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _db.watchProducts(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).toMainThread(),
+            stream: _cachedWatch(
+              'pos_products_$_selectedBranchId',
+              () => _db.watchProducts(user.shopId,
+                  branchId: _selectedBranchId == 'all' ? null : _selectedBranchId),
+            ),
             builder: (context, snapshot) {
               if (snapshot.hasError) return Center(child: Text("Stream Error: ${snapshot.error}"));
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -2635,6 +2698,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _handleBulkCheckout() async {
+    if (!_planGate(
+      allowed: FeatureGatingService.canSell(),
+      title: 'Selling is locked',
+      message:
+          'Your plan has expired or does not include point of sale. Renew or upgrade to keep selling.',
+    )) return;
     if (_posCart.isEmpty) return;
     final user = Provider.of<AuthService>(context, listen: false).user;
     if (user == null) return;
@@ -2955,7 +3024,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _db.watchPurchases(user.shopId, branchId: _selectedBranchId).toMainThread(),
+          stream: _cachedWatch(
+            'purchases_$_selectedBranchId',
+            () => _db.watchPurchases(user.shopId, branchId: _selectedBranchId),
+          ),
           builder: (context, snap) {
             if (!snap.hasData) return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
             final allPurchases = snap.data!;
@@ -3089,7 +3161,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-    void _showQuickRestockDialog(AppUser user, Map<String, dynamic> product) {
+  void _showQuickRestockDialog(AppUser user, Map<String, dynamic> product) {
     final qtyC = TextEditingController();
     final costC = TextEditingController(text: (product['buyingPrice'] ?? '').toString());
     final sellC = TextEditingController(text: (product['sellingPrice'] ?? '').toString());
@@ -3098,100 +3170,298 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     DateTime? expiry = parseDT(product['expiry'] ?? product['exp']);
     // Branch is ALWAYS inherited from the product — never changeable during restock.
     final String productBranchId = product['branchId']?.toString() ?? user.branchId ?? 'main';
+    final double initialStock = (product['quantity'] is num)
+        ? (product['quantity'] as num).toDouble()
+        : (double.tryParse((product['quantity'] ?? 0).toString()) ?? 0.0);
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: Text("Restock: ${product['name']}"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("Current Stock: ${product['quantity'] ?? 0}", style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: qtyC,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: "Quantity to Add*", border: OutlineInputBorder()),
+        builder: (ctx, setS) {
+          final double addedQty = double.tryParse(qtyC.text.trim()) ?? 0.0;
+          final double newTotal = initialStock + addedQty;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            titlePadding: EdgeInsets.zero,
+            title: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, Color(0xFF1E3A8A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(height: 12),
-                Row(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add_shopping_cart_rounded, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Restock: ${product['name']}",
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                "Branch: ${productBranchId.toUpperCase()}",
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                "Current Stock: $initialStock",
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: TextField(controller: costC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Buying Cost", border: OutlineInputBorder()))),
-                    const SizedBox(width: 8),
-                    Expanded(child: TextField(controller: sellC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Selling Price", border: OutlineInputBorder()))),
+                    const SizedBox(height: 4),
+                    const Text("Quantity to Add*", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: qtyC,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      autofocus: true,
+                      onChanged: (_) => setS(() {}),
+                      decoration: InputDecoration(
+                        hintText: "Enter quantity to restock",
+                        prefixIcon: const Icon(Icons.add_box_outlined, color: AppColors.secondary),
+                        suffixIcon: qtyC.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  qtyC.clear();
+                                  setS(() {});
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Quick Increment Interactive Chips
+                    Wrap(
+                      spacing: 8,
+                      children: [5, 10, 25, 50, 100].map((inc) {
+                        return ActionChip(
+                          avatar: const Icon(Icons.add, size: 14, color: AppColors.secondary),
+                          label: Text("+$inc", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                          backgroundColor: AppColors.secondary.withOpacity(0.08),
+                          side: BorderSide(color: AppColors.secondary.withOpacity(0.3)),
+                          onPressed: () {
+                            final cur = double.tryParse(qtyC.text.trim()) ?? 0.0;
+                            final next = cur + inc;
+                            qtyC.text = next == next.roundToDouble() ? next.toInt().toString() : next.toString();
+                            setS(() {});
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    // Live Projected Stock Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.secondary.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.trending_up_rounded, color: AppColors.secondary, size: 20),
+                              const SizedBox(width: 8),
+                              const Text("Projected Stock:", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                          Text(
+                            "$initialStock + $addedQty = $newTotal units",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: addedQty > 0 ? AppColors.success : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: costC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: "Buying Cost",
+                              prefixText: "ETB ",
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: sellC,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: "Selling Price",
+                              prefixText: "ETB ",
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final d = await showDatePicker(
+                                context: context,
+                                initialDate: expiry ?? DateTime.now().add(const Duration(days: 180)),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime(2040),
+                              );
+                              if (d != null) setS(() => expiry = d);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: "Expiry Date",
+                                prefixIcon: Icon(Icons.event_note_rounded, color: AppColors.secondary),
+                              ),
+                              child: Text(
+                                expiry == null ? "Set Expiry" : DateFormat('dd MMM yyyy').format(expiry!),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: expiry == null ? AppColors.textSecondary : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: batchC,
+                            decoration: const InputDecoration(
+                              labelText: "Batch Number",
+                              hintText: "Optional",
+                              prefixIcon: Icon(Icons.tag_rounded, color: AppColors.secondary),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: thresholdC,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Low Stock Alert Threshold",
+                        prefixIcon: Icon(Icons.notifications_active_outlined, color: AppColors.secondary),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(expiry == null ? "Set Expiry" : "Expires: ${DateFormat('dd MMM yyyy').format(expiry!)}"),
-                  leading: const Icon(Icons.event_note_rounded),
-                  onTap: () async {
-                    final d = await showDatePicker(context: context, initialDate: expiry ?? DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime(2040));
-                    if (d != null) setS(() => expiry = d);
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextField(controller: thresholdC, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Low Stock Alert Threshold", border: OutlineInputBorder())),
-                const SizedBox(height: 12),
-                // Branch is locked to the product's branch — cannot be changed during restock.
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.storefront_rounded, size: 20, color: AppColors.secondary),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(productBranchId.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w600))),
-                      const Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
-            ElevatedButton(
-              onPressed: () async {
-                final qty = double.tryParse(qtyC.text) ?? 0;
-                if (qty <= 0) {
-                  rootScaffoldMessengerKey.currentState!.showSnackBar(const SnackBar(content: Text("Please enter a valid quantity")));
-                  return;
-                }
-                try {
-                  LoadingOverlay.show(context);
-                  await _repo.recordRestock(user, {
-                    'itemId': product['id'],
-                    'itemName': product['name'],
-                    'addedQuantity': qty,
-                    'buyingPrice': double.tryParse(costC.text) ?? 0.0,
-                    'sellingPrice': double.tryParse(sellC.text) ?? 0.0,
-                    'lowStockThreshold': int.tryParse(thresholdC.text) ?? 5,
-                    'expiry': expiry,
-                    'batchNumber': batchC.text.trim(),
-                    'branchId': productBranchId, // always use product's own branch
-                  });
-                  if (mounted) {
-                     Navigator.pop(ctx);
-                     rootScaffoldMessengerKey.currentState!.showSnackBar(const SnackBar(content: Text("Stock Updated Successfully!"), backgroundColor: AppColors.success));
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                label: const Text("Update Stock", style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () async {
+                  final qty = double.tryParse(qtyC.text.trim()) ?? 0;
+                  if (qty <= 0) {
+                    rootScaffoldMessengerKey.currentState!.showSnackBar(
+                      const SnackBar(content: Text("Please enter a valid quantity greater than 0")),
+                    );
+                    return;
                   }
-                } catch (e) {
-                  rootScaffoldMessengerKey.currentState!.showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.danger));
-                } finally {
-                  if (mounted) LoadingOverlay.hide(context);
-                }
-              },
-              child: const Text("Update Stock"),
-            ),
-          ],
-        ),
+                  try {
+                    LoadingOverlay.show(context);
+                    await _repo.recordRestock(user, {
+                      'itemId': product['id'],
+                      'itemName': product['name'],
+                      'addedQuantity': qty,
+                      'buyingPrice': double.tryParse(costC.text) ?? 0.0,
+                      'sellingPrice': double.tryParse(sellC.text) ?? 0.0,
+                      'lowStockThreshold': int.tryParse(thresholdC.text) ?? 5,
+                      'expiry': expiry,
+                      'batchNumber': batchC.text.trim(),
+                      'branchId': productBranchId,
+                    });
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      rootScaffoldMessengerKey.currentState!.showSnackBar(
+                        const SnackBar(content: Text("Stock Updated Successfully!"), backgroundColor: AppColors.success),
+                      );
+                    }
+                  } catch (e) {
+                    rootScaffoldMessengerKey.currentState!.showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: AppColors.danger),
+                    );
+                  } finally {
+                    if (mounted) LoadingOverlay.hide(context);
+                  }
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -3202,37 +3472,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setS) => AlertDialog(
-          title: const Text("Restock: Search Inventory"),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: EdgeInsets.zero,
+          title: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, Color(0xFF1E3A8A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add_to_photos_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  isForPurchase ? "Purchase Stock: Search" : "Restock: Search Inventory",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
           content: SizedBox(
             width: 500,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const SizedBox(height: 8),
                 TextField(
                   controller: searchC,
                   autofocus: true,
                   onChanged: (_) => setS(() {}),
                   decoration: InputDecoration(
                     hintText: "Enter Name or Scan Barcode...",
-                    prefixIcon: const Icon(Icons.search),
+                    prefixIcon: const Icon(Icons.search, color: AppColors.secondary),
                     suffixIcon: IconButton(
-                        icon: const Icon(Icons.qr_code_scanner),
-                        onPressed: () => _launchScanner(searchC).then((_) => setS(() {}))),
+                      icon: const Icon(Icons.qr_code_scanner, color: AppColors.secondary),
+                      onPressed: () => _launchScanner(searchC).then((_) => setS(() {})),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 300),
+                  constraints: const BoxConstraints(maxHeight: 320),
                   child: StreamBuilder<List<Map<String, dynamic>>>(
-                    // Filter to only branches accessible by this user
                     stream: _db.watchProducts(
                       user.shopId,
-                      branchId: null, // Watch all branches, then filter in memory
+                      branchId: null,
                     ).toMainThread(),
                     builder: (context, snap) {
-                      if (!snap.hasData) return const LinearProgressIndicator();
-                      final q = searchC.text.toLowerCase();
-                      // Deduplicate by id+branchId so each branch-product appears once
+                      if (!snap.hasData) return const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()));
+                      final q = searchC.text.toLowerCase().trim();
                       final seen = <String>{};
                       final items = snap.data!.where((doc) {
                         final docBranchId = doc['branchId']?.toString() ?? 'main';
@@ -3247,24 +3546,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                       if (items.isEmpty) {
                         return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(q.isEmpty ? "Type to search..." : "No matches found"),
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_rounded, size: 40, color: AppColors.textSecondary.withOpacity(0.5)),
+                              const SizedBox(height: 8),
+                              Text(q.isEmpty ? "Type product name or scan barcode to search..." : "No matching products found",
+                                  style: const TextStyle(color: AppColors.textSecondary)),
+                            ],
+                          ),
                         );
                       }
 
                       return ListView.separated(
                         shrinkWrap: true,
                         itemCount: items.length,
-                        separatorBuilder: (_, __) => const Divider(),
+                        separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (ctx, i) {
                           final doc = items[i];
                           final d = doc;
                           final branchLabel = (d['branchId'] ?? 'main').toString().toUpperCase();
+                          final stock = d['quantity'] ?? 0;
                           return ListTile(
-                            title: Text(d['name'] ?? ''),
-                            subtitle: Text("Stock: ${d['quantity']} | Branch: $branchLabel | ${d['barcode'] ?? '-'}"),
-                            trailing: const Icon(Icons.add_circle_outline, color: AppColors.info),
-                            onTap: () {
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            title: Text(d['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            subtitle: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text("Branch: $branchLabel", style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text("Stock: $stock", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                            trailing: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text("Select", style: TextStyle(fontSize: 12)),
+                              onPressed: () {
                                 Navigator.pop(ctx);
                                 final prefill = Map<String, dynamic>.from(d);
                                 prefill['id'] = doc['id'];
@@ -3274,6 +3604,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   _showQuickRestockDialog(user, prefill);
                                 }
                               },
+                            ),
                           );
                         },
                       );
@@ -3284,15 +3615,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close")),
           ],
         ),
       ),
     );
   }
 
-  void _showAdminPurchaseDialog(AppUser user,
+    void _showAdminPurchaseDialog(AppUser user,
       {Map<String, dynamic>? prefillProduct, bool forceShowSupplier = false}) {
+    if (!_planGate(
+      allowed: FeatureGatingService.canAddPurchases(),
+      title: 'Purchases are locked',
+      message:
+          'Recording purchases needs a plan that includes purchase tracking.',
+    )) return;
     final bool isRestock = prefillProduct != null;
     final bool showSupplierField = !isRestock || forceShowSupplier;
     final nameC = TextEditingController(text: prefillProduct?['name'] ?? '');
@@ -3422,7 +3759,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         )
                       else
                         StreamBuilder<List<Map<String, dynamic>>>(
-                          stream: _db.watchBranches(user.shopId).toMainThread(),
+                          stream: _cachedWatch(
+                            'dialog_branches_${user.shopId}',
+                            () => _db.watchBranches(user.shopId),
+                          ),
                           builder: (c, snap) {
                             final branches = snap.data ?? [];
                             if (branches.isEmpty) return const SizedBox.shrink();
@@ -3522,8 +3862,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  /// Shown on plans without the Advanced Reports add-on.
+  Widget _buildBasicReportsUpsell(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.insights_rounded, color: scheme.primary, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Basic reports',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'You are seeing revenue, profit, debt, orders and stock '
+                  'totals. Charts, product performance and PDF/Excel exports '
+                  'come with the Advanced Reports add-on.',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+            ),
+            child: const Text('Add it'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReportsTab(AppUser user, List<SidebarItem> sidebarItems) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Basic plans get totals only; charts, product performance and exports are
+    // part of the Advanced Reports add-on.
+    final canViewAdvancedReports =
+        FeatureGatingService.hasFeature(Feature.advancedReports);
     final cardDecor = BoxDecoration(
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
@@ -3538,16 +3929,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   offset: const Offset(0, 4))
             ],
     );
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _db.watchSales(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).toMainThread(),
+    _ensureReportSnapshots(user);
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _reportSalesFuture,
       builder: (context, snap) {
+        if (snap.hasError) {
+          return const _StreamLoadFailure(
+              message: 'Could not load sales for reports.');
+        }
         // Show skeleton until first sales data arrives
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _db.watchProducts(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).toMainThread(),
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: _reportProductsFuture,
           builder: (context, invSnap) {
+            if (invSnap.hasError) {
+              return const _StreamLoadFailure(
+                  message: 'Could not load inventory for reports.');
+            }
             // Show skeleton until first inventory data arrives
             if (!invSnap.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -3583,23 +3984,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   runSpacing: 12,
                   children: [
                     SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(
+                      segments: [
+                        const ButtonSegment(
                             value: 'Daily',
                             label: Text('Daily', style: TextStyle(fontSize: 11)),
                             icon: Icon(Icons.today_rounded, size: 16)),
-                        ButtonSegment(
+                        const ButtonSegment(
                             value: 'Weekly',
                             label: Text('Weekly', style: TextStyle(fontSize: 11)),
                             icon: Icon(Icons.date_range_rounded, size: 16)),
-                        ButtonSegment(
+                        const ButtonSegment(
                             value: 'Monthly',
                             label: Text('Monthly', style: TextStyle(fontSize: 11)),
                             icon: Icon(Icons.calendar_month_rounded, size: 16)),
-                        ButtonSegment(
-                            value: 'Custom',
-                            label: Text('Custom'),
-                            icon: Icon(Icons.calendar_month_rounded)),
+                        if (canViewAdvancedReports)
+                          const ButtonSegment(
+                              value: 'Custom',
+                              label: Text('Custom'),
+                              icon: Icon(Icons.calendar_month_rounded)),
                       ],
                       selected: {_reportFilter},
                       onSelectionChanged: (set) async {
@@ -3621,7 +4023,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         }
                       },
                     ),
-                    PopupMenuButton<String>(
+                    IconButton(
+                      onPressed: _refreshReportSnapshot,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      color: AppColors.textSecondary,
+                      tooltip: 'Refresh report',
+                    ),
+                    if (canViewAdvancedReports)
+                      PopupMenuButton<String>(
                       onSelected: (val) async {
                         LoadingOverlay.show(context);
                         try {
@@ -4018,8 +4427,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                   });
                 }),
+                if (!canViewAdvancedReports) ...[
+                  _buildBasicReportsUpsell(context),
+                  const SizedBox(height: 20),
+                ],
                 // Charts row
-                if (user.hasPermission(AppUser.pViewFinancialData)) ...[
+                if (canViewAdvancedReports &&
+                    user.hasPermission(AppUser.pViewFinancialData)) ...[
                   RepaintBoundary(
                     child: LayoutBuilder(builder: (context, constraints) {
                       final bool isMobile = constraints.maxWidth < 750;
@@ -4064,7 +4478,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                   const SizedBox(height: 24),
                 ],
-                Row(
+                if (canViewAdvancedReports)
+                  Row(
                   children: [
                     Expanded(
                         child: _reportCard(
@@ -4104,7 +4519,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                 // NEW ACTIONS SECTIONS
                 const SizedBox(height: 32),
-                Builder(builder: (ctx) {
+                if (canViewAdvancedReports)
+                  Builder(builder: (ctx) {
                   final products = invSnap.data ?? [] ?? [];
                   final outOfStock = products
                       .where((d) => (d['quantity'] ?? 0.0) as num <= 0)
@@ -4238,7 +4654,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _db.watchSales(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).toMainThread(),
+      stream: _cachedWatch(
+        'sales_history_$_selectedBranchId',
+        () => _db.watchSales(user.shopId,
+            branchId: _selectedBranchId == 'all' ? null : _selectedBranchId),
+      ),
       builder: (context, snap) {
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -4247,26 +4667,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final allSales = snap.data ?? [];
 
         return ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           children: [
-            // Page Header
+            // The tab title lives in the app shell header; only actions stay here.
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Billing & Transactions",
-                      style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      "Review details and process customer refunds.",
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
                 PopupMenuButton<String>(
                   icon: Container(
                     padding: const EdgeInsets.all(10),
@@ -4620,198 +5026,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     
   void _showTransferStockDialog(AppUser user) {
+    if (!_planGate(
+      allowed: FeatureGatingService.canTransferStock(),
+      title: 'Transfers are locked',
+      message:
+          'Moving stock between branches needs a plan with multi-branch management.',
+    )) return;
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _db.watchBranches(user.shopId).toMainThread(),
-            builder: (c, branchSnap) {
-              // Permission-filter branches to only what this user can access
-              final rawBranches = branchSnap.data ?? [];
-              final allIds = rawBranches
-                  .where((b) => b['id'] != 'all')
-                  .map((b) => b['id'].toString())
-                  .toSet()
-                  .toList();
-              final allowedIds = user.getAssignedBranchIds(allIds);
-              final branchMap = <String, Map<String, dynamic>>{};
-              for (var b in rawBranches) {
-                final bid = b['id'].toString();
-                if (bid == 'all') continue;
-                if (!allowedIds.contains('all') && !allowedIds.contains(bid)) continue;
-                branchMap.putIfAbsent(bid, () => b);
-              }
-              final branches = branchMap.values.toList();
-
-              // Guard: transfers require at least 2 branches
-              if (branches.length < 2) {
-                return AlertDialog(
-                  title: const Text("Transfer Stock Between Branches"),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 48),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "You currently have access to only one branch. Contact your administrator to enable transfers between branches.",
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
-                );
-              }
-
-              // Local state inside StreamBuilder (re-computed on each rebuild)
-              String? sourceBranchId;
-              String? destBranchId;
-              String? selectedItemId;
-              String? selectedBatchId;
-              double transferQty = 0;
-              final TextEditingController qtyC = TextEditingController();
-
-              if (branches.isNotEmpty && sourceBranchId == null) {
-                sourceBranchId = branches.first['id'].toString();
-              }
-
-              return StatefulBuilder(builder: (ctx2, setLocalState) {
-                return AlertDialog(
-                  title: const Text("Transfer Stock Between Branches"),
-                  content: SizedBox(
-                    width: 500,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Source Branch", style: TextStyle(fontWeight: FontWeight.bold)),
-                          DropdownButtonFormField<String>(
-                            key: ValueKey('source_$sourceBranchId'),
-                            value: sourceBranchId,
-                            items: branches.map((b) => DropdownMenuItem(
-                              value: b['id'].toString(),
-                              child: Text(b['name']),
-                            )).toList(),
-                            onChanged: (v) => setLocalState(() {
-                              sourceBranchId = v;
-                              selectedItemId = null;
-                            }),
-                            decoration: const InputDecoration(hintText: "Select Source"),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text("Destination Branch", style: TextStyle(fontWeight: FontWeight.bold)),
-                          DropdownButtonFormField<String>(
-                            key: ValueKey('dest_$destBranchId'),
-                            value: destBranchId,
-                            items: branches
-                                .where((b) => b['id'].toString() != sourceBranchId)
-                                .map((b) => DropdownMenuItem(
-                                  value: b['id'].toString(),
-                                  child: Text(b['name']),
-                                )).toList(),
-                            onChanged: (v) => setLocalState(() => destBranchId = v),
-                            decoration: const InputDecoration(hintText: "Select Destination"),
-                          ),
-                          const SizedBox(height: 16),
-                          if (sourceBranchId != null) ...[
-                            const Text("Select Product", style: TextStyle(fontWeight: FontWeight.bold)),
-                            StreamBuilder<List<Map<String, dynamic>>>(
-                              stream: _db.watchProducts(user.shopId, branchId: sourceBranchId).toMainThread(),
-                              builder: (c, snap) {
-                                final products = (snap.data ?? []).where((p) => (p['quantity'] ?? 0) > 0).toList();
-                                return DropdownButtonFormField<String>(
-                                  value: selectedItemId,
-                                  items: products.map((p) => DropdownMenuItem(
-                                    value: p['id'].toString(),
-                                    child: Text("${p['name']} (${p['quantity']} avail)"),
-                                  )).toList(),
-                                  onChanged: (v) => setLocalState(() => selectedItemId = v),
-                                  decoration: const InputDecoration(hintText: "Select Product"),
-                                );
-                              },
-                            ),
-                            if (selectedItemId != null) ...[
-                              const SizedBox(height: 16),
-                              const Text("Select Batch (Optional)", style: TextStyle(fontWeight: FontWeight.bold)),
-                              StreamBuilder<List<Map<String, dynamic>>>(
-                                stream: _db.watchBatchesByItem(user.shopId, selectedItemId!, branchId: sourceBranchId).toMainThread(),
-                                builder: (c, snap) {
-                                  final batches = (snap.data ?? []).where((b) => (b['quantity'] ?? 0.0) > 0).toList();
-                                  batches.sort((a, b) {
-                                    final da = parseDT(a['expiry'] ?? a['exp'] ?? a['expiryDate']);
-                                    final db = parseDT(b['expiry'] ?? b['exp'] ?? b['expiryDate']);
-                                    if (da == null && db == null) return 0;
-                                    if (da == null) return 1;
-                                    if (db == null) return -1;
-                                    return da.compareTo(db);
-                                  });
-                                  return DropdownButtonFormField<String>(
-                                    value: selectedBatchId,
-                                    items: [
-                                      const DropdownMenuItem(value: null, child: Text("Auto (FEFO - recommended)")),
-                                      ...batches.map((b) {
-                                        final ed = b['expiry'] ?? b['exp'] ?? b['expiryDate'];
-                                        DateTime? dVal = ed != null ? parseDT(ed) : null;
-                                        final expStr = dVal != null ? DateFormat('dd MMM yy').format(dVal) : 'No Expiry';
-                                        return DropdownMenuItem(
-                                          value: b['id'].toString(),
-                                          child: Text("Exp: $expStr | Qty: ${b['quantity']}"),
-                                        );
-                                      }),
-                                    ],
-                                    onChanged: (v) => setLocalState(() => selectedBatchId = v),
-                                    decoration: const InputDecoration(hintText: "Optionally pick a specific batch"),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              const Text("Transfer Quantity", style: TextStyle(fontWeight: FontWeight.bold)),
-                              TextField(
-                                controller: qtyC,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(hintText: "Enter quantity to move"),
-                                onChanged: (v) => setLocalState(() { transferQty = double.tryParse(v) ?? 0; }),
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx2), child: const Text("Cancel")),
-                    ElevatedButton(
-                      onPressed: (sourceBranchId != null && destBranchId != null && selectedItemId != null && transferQty > 0) ? () async {
-                         Navigator.pop(ctx2);
-                         LoadingOverlay.show(context);
-                         try {
-                           final products = await _db.query('products', where: 'id = ?', whereArgs: [selectedItemId!], limit: 1);
-                           final itemName = products.isNotEmpty ? products.first['name'] : 'Item';
-                           await _repo.transferStock(
-                              admin: user,
-                              itemId: selectedItemId!,
-                              itemName: itemName,
-                              fromBranchId: sourceBranchId!,
-                              toBranchId: destBranchId!,
-                              quantity: transferQty,
-                              batchId: selectedBatchId,
-                           );
-                           if (mounted) rootScaffoldMessengerKey.currentState!.showSnackBar(const SnackBar(content: Text('Stock transferred successfully!'), backgroundColor: AppColors.success, duration: Duration(seconds: 1)));
-                         } catch (e) {
-                           if (mounted) rootScaffoldMessengerKey.currentState!.showSnackBar(SnackBar(content: Text('Transfer Failed: $e'), backgroundColor: AppColors.danger, duration: Duration(seconds: 2)));
-                         } finally {
-                           if (mounted) LoadingOverlay.hide(context);
-                         }
-                      } : null,
-                      child: const Text("Transfer Stock"),
-                    ),
-                  ],
-                );
-              });
-            },
-          );
-        },
+      builder: (ctx) => _InteractiveTransferStockDialog(
+        user: user,
+        db: _db,
+        repo: _repo,
       ),
     );
   }
@@ -5106,11 +5332,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final isAdmin = user.hasRole(UserRole.admin);
     final isAdminOrManager = isAdmin || user.hasRole(UserRole.manager);
     return ListView(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
       children: [
-        const Text("Application Settings",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 24),
         Card(
           child: Column(
             children: [
@@ -5171,11 +5394,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   subtitle: const Text("Permanently delete business data", style: TextStyle(color: AppColors.danger)),
                   trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.danger),
                   onTap: () async {
+                    final shopAuth = Provider.of<AuthService>(context, listen: false);
+                    var googleVerified = false;
+                    String? deletionToken;
+                    try {
+                      final methods = await shopAuth.securityMethods();
+                      final hasGoogle = methods['google_connected'] == true;
+                      final hasPassword =
+                          methods['password_configured'] == true;
+                      if (hasGoogle) {
+                        deletionToken = await showDialog<String>(
+                          context: context,
+                          builder: (c) => _ShopDeleteVerificationDialog(
+                            allowPassword: hasPassword,
+                            auth: shopAuth,
+                          ),
+                        );
+                        googleVerified = deletionToken != null;
+                        if (!googleVerified) return;
+                      }
+                    } catch (_) {
+                      // Offline or unverifiable: keep the existing password check.
+                    }
+
                     final passC = TextEditingController();
-                    final confirm = await showDialog<bool>(
+                    final confirm = googleVerified
+                        ? await showDialog<bool>(
+                            context: context,
+                            builder: (_) => const ConfirmDeleteDialog(
+                              title: 'Delete this shop',
+                              message:
+                                  'The shop and every record in it will be permanently removed.',
+                              consequences: [
+                                'Every member of this shop loses access',
+                                'All member accounts are deactivated',
+                                'Records that have not synced will be lost',
+                              ],
+                              confirmLabel: 'Yes, delete shop',
+                            ),
+                          )
+                        : await showDialog<bool>(
                       context: context,
                       builder: (c) => AlertDialog(
-                        title: const Text("Delete Shop", style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        icon: const Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+                        title: const Text("Delete Shop", style: TextStyle(fontSize: 18, color: AppColors.danger, fontWeight: FontWeight.bold)),
                         content: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -5214,6 +5477,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     
                     if (confirm == true) {
                       LoadingOverlay.show(context);
+                      if (deletionToken != null) {
+                        try {
+                          await shopAuth.deleteBusiness(
+                              deletionToken: deletionToken!);
+                        } catch (e) {
+                          if (mounted) {
+                            LoadingOverlay.hide(context);
+                            rootScaffoldMessengerKey.currentState?.showSnackBar(
+                              SnackBar(
+                                content: Text(e
+                                    .toString()
+                                    .replaceFirst('Exception: ', '')),
+                                backgroundColor: AppColors.danger,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                      }
                       await _repo.recordAuditLog(user.shopId, user.username, 'Shop Deleted', 'User ${user.username} permanently deleted shop at ${DateTime.now().toIso8601String()}', branchId: user.branchId ?? 'main');
                       await _db.deleteShopAndAccount(user.shopId);
                       if (mounted) {
@@ -5223,6 +5505,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     }
                   },
                 ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.person_remove_rounded, color: AppColors.danger),
+                title: const Text("Delete Account", style: TextStyle(color: AppColors.danger)),
+                subtitle: const Text("Permanently deactivate your sign-in account",
+                    style: TextStyle(color: AppColors.danger)),
+                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.danger),
+                onTap: () async {
+                  final auth = Provider.of<AuthService>(context, listen: false);
+                  Map<String, dynamic> methods;
+                  try {
+                    methods = await auth.securityMethods();
+                  } catch (e) {
+                    rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
+                      content: Text(e.toString().replaceFirst('Exception: ', '')),
+                      backgroundColor: AppColors.danger,
+                    ));
+                    return;
+                  }
+                  if (!mounted) return;
+                  final deleted = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => DeleteAccountDialog(
+                      passwordConfigured: methods['password_configured'] == true,
+                      googleConnected: methods['google_connected'] == true,
+                    ),
+                  );
+                  if (deleted == true && mounted) {
+                    await auth.signOut();
+                  }
+                },
+              ),
               if (isAdmin) const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.language_rounded),
@@ -5460,15 +5774,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _showMoreBottomSheet(BuildContext ctx, List<SidebarItem> items) {
     showModalBottomSheet(
       context: ctx,
+      isScrollControlled: true,
       backgroundColor: Theme.of(ctx).colorScheme.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (bCtx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(bCtx).height * 0.75,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const SizedBox(height: 12),
               Container(
                 width: 40, height: 4,
                 decoration: BoxDecoration(
@@ -5479,25 +5797,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const SizedBox(height: 12),
               const Text("More Options", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const Divider(height: 20),
-              ...items.map((item) {
-                final allItems = _getSidebarItems(
-                  Provider.of<AuthService>(context, listen: false).user!,
-                );
-                final itemIndex = allItems.indexWhere((i) => i.uid == item.uid);
-                
-                return ListTile(
-                  leading: Icon(item.icon, color: AppColors.secondary),
-                  title: Text(item.label, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () {
-                    Navigator.pop(bCtx);
-                    if (itemIndex != -1) {
-                      setState(() => _selectedIndex = itemIndex);
-                    }
-                  },
-                );
-              }),
-              const SizedBox(height: 8),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  children: items.map((item) {
+                    final allItems = _getSidebarItems(
+                      Provider.of<AuthService>(context, listen: false).user!,
+                    );
+                    final itemIndex = allItems.indexWhere((i) => i.uid == item.uid);
+
+                    return ListTile(
+                      leading: Icon(item.icon, color: AppColors.secondary),
+                      title: Text(item.label, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () {
+                        Navigator.pop(bCtx);
+                        if (itemIndex != -1) {
+                          setState(() => _selectedIndex = itemIndex);
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
             ],
           ),
         ),
@@ -5628,128 +5951,290 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showAddItemDialog(AppUser u, [Map<String, dynamic>? item, String? id, bool isBatchEdit = false]) {
+    if (!_planGate(
+      allowed: FeatureGatingService.canAddInventory(),
+      title: 'Inventory is locked',
+      message:
+          'Adding or editing products needs an active plan. Renew or upgrade to continue.',
+    )) return;
     final isAdmin = u.roles.contains(UserRole.admin);
     final isManager = u.roles.contains(UserRole.manager);
 
-    // Hard Locks: Manager cannot edit BuyingPrice after creation.
-    // Selling price is allowed for anyone with Manage Inventory (they manage prices).
     final bool lockBuyingPrice = isManager && id != null;
-    final bool lockSellingPrice = false; // Manage Inventory includes selling price management
+    final bool lockSellingPrice = false;
 
     final nameC = TextEditingController(text: item?['name'] ?? '');
-    final sellC =
-        TextEditingController(text: item?['sellingPrice']?.toString() ?? '');
-    final buyC =
-        TextEditingController(text: item?['buyingPrice']?.toString() ?? '');
-    final qtyC =
-        TextEditingController(text: item?['quantity']?.toString() ?? '');
+    final sellC = TextEditingController(text: item?['sellingPrice']?.toString() ?? '');
+    final buyC = TextEditingController(text: item?['buyingPrice']?.toString() ?? '');
+    final qtyC = TextEditingController(text: item?['quantity']?.toString() ?? '');
     final barC = TextEditingController(text: item?['barcode'] ?? '');
     final batchC = TextEditingController(text: item?['batchNumber'] ?? '');
-    final thresholdC = TextEditingController(
-        text: item?['lowStockThreshold']?.toString() ?? '5');
+    final thresholdC = TextEditingController(text: item?['lowStockThreshold']?.toString() ?? '5');
     DateTime? expiryDate = parseDT(item?['expiry'] ?? item?['exp'] ?? item?['expiryDate']);
     String selectedBranchId = item?['branchId']?.toString() ?? 
         (_selectedBranchId != 'all' ? _selectedBranchId : u.branchId);
     bool createAsNew = false;
+    int currentStep = 0; // 0: Basic Info & Branch, 1: Pricing & Stock, 2: Batch & Review
 
     showDialog(
       context: context,
       builder: (c) => StatefulBuilder(
-          builder: (c, setS) => AlertDialog(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                title: Text(id == null ? 'Add Product' : 'Edit Product'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                          controller: nameC,
-                          enabled: !isBatchEdit,
-                          decoration: const InputDecoration(
-                              labelText: "Product Name*",
-                              prefixIcon: Icon(Icons.shopping_bag_outlined))),
-                      const SizedBox(height: 16),
-                      TextField(
-                          controller: barC,
-                          decoration: InputDecoration(
-                            labelText: "Barcode (Optional)",
-                            prefixIcon:
-                                const Icon(Icons.qr_code_scanner_rounded),
-                            suffixIcon: IconButton(
-                                icon: const Icon(Icons.camera_alt_outlined),
-                                onPressed: () => _launchScanner(barC)),
-                          )),
-                      const SizedBox(height: 16),
+        builder: (c, setS) {
+          final double buyVal = double.tryParse(buyC.text.trim()) ?? 0.0;
+          final double sellVal = double.tryParse(sellC.text.trim()) ?? 0.0;
+          final double profit = sellVal - buyVal;
+          final double margin = (sellVal > 0) ? (profit / sellVal * 100) : 0.0;
 
-                      Row(
-                        children: [
-                          Expanded(
-                              child: TextField(
-                                  controller: buyC,
-                                  enabled: !lockBuyingPrice,
-                                  decoration: InputDecoration(
-                                      labelText: "Buying Price*",
-                                      hintText: "ETB",
-                                      suffixIcon: lockBuyingPrice
-                                          ? const Icon(Icons.lock_outline,
-                                              size: 16)
-                                          : null))),
-                          const SizedBox(width: 16),
-                          Expanded(
-                              child: TextField(
-                                  controller: sellC,
-                                  enabled: !lockSellingPrice,
-                                  decoration: InputDecoration(
-                                      labelText: "Selling Price",
-                                      hintText: "ETB",
-                                      suffixIcon: lockSellingPrice
-                                          ? const Icon(Icons.lock_outline,
-                                              size: 16)
-                                          : null))),
-                        ],
+          // Helper to validate and save product
+          Future<void> submitProduct() async {
+            if (nameC.text.trim().isEmpty || buyC.text.trim().isEmpty || qtyC.text.trim().isEmpty) {
+              rootScaffoldMessengerKey.currentState!.showSnackBar(
+                const SnackBar(
+                  content: Text("Please fill all mandatory fields (*)"),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+
+            if (id == null) {
+              final isDup = await _checkDuplicateBranchItem(u.shopId, selectedBranchId, nameC.text, barC.text);
+              if (isDup) {
+                final choice = await _showDuplicateChoiceDialog(nameC.text);
+                if (choice == null) return;
+                createAsNew = choice == "new";
+              }
+            }
+
+            try {
+              LoadingOverlay.show(context);
+              final productMap = {
+                'name': nameC.text.trim(),
+                'barcode': barC.text.trim(),
+                'batchNumber': batchC.text.trim(),
+                'buyingPrice': double.tryParse(buyC.text) ?? 0.0,
+                'sellingPrice': double.tryParse(sellC.text) ?? 0.0,
+                'quantity': double.tryParse(qtyC.text.trim()) ?? 0,
+                'lowStockThreshold': int.tryParse(thresholdC.text) ?? 5,
+                'expiryDate': expiryDate,
+                'shopId': u.shopId,
+                'branchId': selectedBranchId,
+                'lastUpdated': DateTime.now().toIso8601String(),
+              };
+
+              if (id == null) {
+                await _repo.registerItem(u, productMap, forceNew: createAsNew);
+                if (u.roles.contains(UserRole.inventoryStaff)) {
+                  await _db.addNotification({
+                    'shopId': u.shopId,
+                    'title': 'New Medicine Added',
+                    'message': "New medicine '${nameC.text}' added by Staff. Please set buying/selling price.",
+                    'type': 'inventory_alert'
+                  });
+                }
+              } else {
+                if (isBatchEdit && item != null && item.containsKey('id')) {
+                  final batchId = item['id'].toString();
+                  await _db.update('batches', batchId, {
+                    'buyingPrice': double.tryParse(buyC.text) ?? 0.0,
+                    'sellingPrice': double.tryParse(sellC.text) ?? 0.0,
+                    'quantity': double.tryParse(qtyC.text.trim()) ?? 0.0,
+                    'expiry': expiryDate?.toIso8601String(),
+                    'batchNumber': batchC.text.trim(),
+                    'lastUpdated': DateTime.now().toIso8601String(),
+                  });
+                  await _db.update('products', id, {
+                    'name': nameC.text.trim(),
+                    'barcode': barC.text.trim(),
+                    'lowStockThreshold': int.tryParse(thresholdC.text) ?? 5,
+                    'branchId': selectedBranchId,
+                  });
+                  await _repo.forceRecalculate(u.shopId, id);
+                } else {
+                  await _db.update('products', id, productMap);
+                }
+                await _repo.recordAuditLog(u.shopId, u.username, 'EDIT_PRODUCT', 'Updated product: ${nameC.text}');
+              }
+
+              if (c.mounted) {
+                LoadingOverlay.hide(context);
+                _showSnackBar('Product Saved Successfully!');
+                Navigator.pop(c);
+              }
+            } catch (e) {
+              if (c.mounted) LoadingOverlay.hide(context);
+              _showSnackBar(e.toString(), isError: true);
+            }
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            titlePadding: EdgeInsets.zero,
+            title: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, Color(0xFF1E3A8A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          id == null ? Icons.add_box_rounded : Icons.edit_note_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                              child: TextField(
-                                  controller: qtyC,
-                                  decoration: const InputDecoration(
-                                      labelText: "Stock Qty*"))),
-                          const SizedBox(width: 16),
-                          Expanded(
-                              child: TextField(
-                                  controller: thresholdC,
-                                  decoration: const InputDecoration(
-                                      labelText: "Low Stock Alert",
-                                      hintText: "e.g. 5"))),
-                        ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              id == null ? 'Add Product Wizard' : 'Edit Product',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              currentStep == 0
+                                  ? 'Step 1: Product Information & Branch'
+                                  : currentStep == 1
+                                      ? 'Step 2: Pricing & Stock Levels'
+                                      : 'Step 3: Batch, Expiry & Review',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.event_note_rounded),
-                        title: Text(expiryDate == null
-                            ? "Set Expiry Date"
-                            : "Expires: ${DateFormat('dd MMM yyyy').format(expiryDate!)}"),
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                              context: context,
-                              initialDate: expiryDate ?? DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime(2040));
-                          if (picked != null) setS(() => expiryDate = picked);
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Step Progress Tracker
+                  Row(
+                    children: [
+                      _buildStepPill(
+                        stepIndex: 0,
+                        title: "1. Info",
+                        currentStep: currentStep,
+                        onTap: () => setS(() => currentStep = 0),
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: currentStep > 0 ? Colors.white : Colors.white30,
+                        ),
+                      ),
+                      _buildStepPill(
+                        stepIndex: 1,
+                        title: "2. Pricing",
+                        currentStep: currentStep,
+                        onTap: () {
+                          if (nameC.text.trim().isNotEmpty) {
+                            setS(() => currentStep = 1);
+                          }
                         },
                       ),
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: currentStep > 1 ? Colors.white : Colors.white30,
+                        ),
+                      ),
+                      _buildStepPill(
+                        stepIndex: 2,
+                        title: "3. Review",
+                        currentStep: currentStep,
+                        onTap: () {
+                          if (nameC.text.trim().isNotEmpty && buyC.text.trim().isNotEmpty && qtyC.text.trim().isNotEmpty) {
+                            setS(() => currentStep = 2);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    // STEP 0: Product Info & Branch
+                    if (currentStep == 0) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.secondary.withOpacity(0.2)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.lightbulb_outline_rounded, color: AppColors.secondary, size: 20),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "Enter the product name and optional barcode. You can scan existing retail barcodes directly using your camera.",
+                                style: TextStyle(fontSize: 12, color: AppColors.primary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 16),
-                      // ── Branch Selector (respects user branch permissions) ─────
+                      TextField(
+                        controller: nameC,
+                        enabled: !isBatchEdit,
+                        autofocus: true,
+                        onChanged: (_) => setS(() {}),
+                        decoration: const InputDecoration(
+                          labelText: "Product Name*",
+                          hintText: "e.g. Paracetamol 500mg",
+                          prefixIcon: Icon(Icons.shopping_bag_outlined, color: AppColors.secondary),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: barC,
+                        onChanged: (_) => setS(() {}),
+                        decoration: InputDecoration(
+                          labelText: "Barcode (Optional)",
+                          hintText: "Scan or enter barcode number",
+                          prefixIcon: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.secondary),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.camera_alt_outlined, color: AppColors.secondary),
+                            tooltip: "Scan with Camera",
+                            onPressed: () => _launchScanner(barC).then((_) => setS(() {})),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Branch Selector
                       StreamBuilder<List<Map<String, dynamic>>>(
-                        stream: _db.watchBranches(u.shopId).toMainThread(),
+                        stream: _cachedWatch(
+                          'add_item_branches_${u.shopId}',
+                          () => _db.watchBranches(u.shopId),
+                        ),
                         builder: (c, snap) {
                           final allBranches = (snap.data ?? []).where((b) => b['id'] != 'all').toList();
                           if (allBranches.isEmpty) return const SizedBox.shrink();
 
-                          // Filter to only branches this user can access
                           final allIds = allBranches.map((b) => b['id'].toString()).toList();
                           final allowedIds = u.getAssignedBranchIds(allIds);
                           final branches = allowedIds.contains('all')
@@ -5758,26 +6243,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                           if (branches.isEmpty) return const SizedBox.shrink();
 
-                          // If user only has access to one branch, auto-assign and hide dropdown
                           if (branches.length == 1) {
                             final singleBranch = branches.first;
                             if (selectedBranchId != singleBranch['id'].toString()) {
                               Future.microtask(() => setS(() => selectedBranchId = singleBranch['id'].toString()));
                             }
                             return Container(
-                              margin: const EdgeInsets.only(top: 4),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                                 border: Border.all(color: AppColors.border),
                                 color: Theme.of(context).colorScheme.surface,
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.store_rounded, size: 16, color: AppColors.textSecondary),
+                                  const Icon(Icons.storefront_rounded, size: 18, color: AppColors.secondary),
                                   const SizedBox(width: 8),
-                                  Text(singleBranch['name'].toString(),
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    "Branch: ${singleBranch['name']}",
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
                                   const Spacer(),
                                   const Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
                                 ],
@@ -5788,137 +6273,367 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text("Product Branch*", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                              Container(
-                                margin: const EdgeInsets.only(top: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.border),
+                              const Text("Assigned Branch*", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                value: branches.any((b) => b['id'] == selectedBranchId) ? selectedBranchId : branches.first['id'],
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  prefixIcon: Icon(Icons.storefront_rounded, color: AppColors.secondary, size: 18),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: branches.any((b) => b['id'] == selectedBranchId) ? selectedBranchId : branches.first['id'],
-                                    isExpanded: true,
-                                    items: branches.map((b) => DropdownMenuItem(
-                                      value: b['id'] as String,
-                                      child: Text(b['name'] as String),
-                                    )).toList(),
-                                    onChanged: (v) {
-                                      if (v != null) setS(() => selectedBranchId = v);
-                                    },
-                                  ),
-                                ),
+                                items: branches.map((b) => DropdownMenuItem(
+                                  value: b['id'] as String,
+                                  child: Text(b['name'] as String, style: const TextStyle(fontSize: 13)),
+                                )).toList(),
+                                onChanged: (v) {
+                                  if (v != null) setS(() => selectedBranchId = v);
+                                },
                               ),
                             ],
                           );
                         },
                       ),
                     ],
-                  ),
+
+                    // STEP 1: Pricing & Stock Levels
+                    if (currentStep == 1) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: buyC,
+                              enabled: !lockBuyingPrice,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              autofocus: true,
+                              onChanged: (_) => setS(() {}),
+                              decoration: InputDecoration(
+                                labelText: "Buying Cost*",
+                                prefixText: "ETB ",
+                                prefixIcon: const Icon(Icons.payments_outlined, color: AppColors.secondary, size: 18),
+                                suffixIcon: lockBuyingPrice ? const Icon(Icons.lock_outline, size: 16) : null,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: sellC,
+                              enabled: !lockSellingPrice,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              onChanged: (_) => setS(() {}),
+                              decoration: InputDecoration(
+                                labelText: "Selling Price",
+                                prefixText: "ETB ",
+                                prefixIcon: const Icon(Icons.sell_outlined, color: AppColors.secondary, size: 18),
+                                suffixIcon: lockSellingPrice ? const Icon(Icons.lock_outline, size: 16) : null,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (buyVal > 0 && sellVal > 0) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: profit >= 0 ? AppColors.success.withOpacity(0.08) : AppColors.danger.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: profit >= 0 ? AppColors.success.withOpacity(0.3) : AppColors.danger.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Profit: ETB ${profit.toStringAsFixed(2)} / unit",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: profit >= 0 ? AppColors.success : AppColors.danger,
+                                ),
+                              ),
+                              Text(
+                                "${margin >= 0 ? '+' : ''}${margin.toStringAsFixed(1)}% margin",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: margin >= 0 ? AppColors.success : AppColors.danger,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: qtyC,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              onChanged: (_) => setS(() {}),
+                              decoration: const InputDecoration(
+                                labelText: "Initial Quantity*",
+                                prefixIcon: Icon(Icons.inventory_2_outlined, color: AppColors.secondary, size: 18),
+                                suffixText: "Units",
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: thresholdC,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setS(() {}),
+                              decoration: const InputDecoration(
+                                labelText: "Low Stock Alert",
+                                prefixIcon: Icon(Icons.notifications_active_outlined, color: AppColors.secondary, size: 18),
+                                hintText: "Default 5",
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    // STEP 2: Expiry & Review
+                    if (currentStep == 2) ...[
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime(2040),
+                          );
+                          if (picked != null) setS(() => expiryDate = picked);
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: "Expiry Date (Optional)",
+                            prefixIcon: Icon(Icons.event_note_rounded, color: AppColors.secondary, size: 18),
+                          ),
+                          child: Text(
+                            expiryDate == null ? "Tap to set expiry date" : DateFormat('dd MMM yyyy').format(expiryDate!),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: expiryDate == null ? AppColors.textSecondary : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Complete Product Review Card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary.withOpacity(0.05),
+                              AppColors.secondary.withOpacity(0.06),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    nameC.text.trim().isEmpty ? "(No Name Entered)" : nameC.text.trim(),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    "Branch: ${selectedBranchId.toUpperCase()}",
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (barC.text.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text("Barcode: ${barC.text}", style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                            ],
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Pricing", style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 2),
+                                    Text("Buy: ETB ${buyC.text.isEmpty ? '0.00' : buyC.text} | Sell: ETB ${sellC.text.isEmpty ? '0.00' : sellC.text}",
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text("Stock & Alert", style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 2),
+                                    Text("Qty: ${qtyC.text.isEmpty ? '0' : qtyC.text} (Alert: ${thresholdC.text})",
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            if (expiryDate != null) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  if (expiryDate != null)
+                                    Text("Expires: ${DateFormat('dd MMM yyyy').format(expiryDate!)}", style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                actions: [
+              ),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            actions: [
+              Row(
+                children: [
                   TextButton(
-                      onPressed: () => Navigator.pop(c),
-                      child: const Text("Cancel")),
-                  ElevatedButton(
-                    onPressed: () async {
-                      if (nameC.text.isEmpty ||
-                          buyC.text.isEmpty ||
-                          qtyC.text.isEmpty) {
-                        rootScaffoldMessengerKey.currentState!.showSnackBar(
-                            const SnackBar(
-                                content:
-                                    Text("Please fill mandatory fields (*)"),
-                                duration: Duration(seconds: 2)));
-                        return;
-                      }
-                      
-                      
-
-                      if (id == null) {
-                        final isDup = await _checkDuplicateBranchItem(u.shopId, selectedBranchId, nameC.text, barC.text);
-                        if (isDup) {
-                          final choice = await _showDuplicateChoiceDialog(nameC.text);
-                          if (choice == null) return;
-                          createAsNew = choice == "new";
-                        }
-                      }
-
-                      try {
-                        LoadingOverlay.show(context);
-                        final productMap = {
-                          'name': nameC.text.trim(),
-                          'barcode': barC.text.trim(),
-                          'batchNumber': batchC.text.trim(),
-                          'buyingPrice': double.tryParse(buyC.text) ?? 0.0,
-                          'sellingPrice': double.tryParse(sellC.text) ?? 0.0,
-                          'quantity': double.tryParse(qtyC.text.trim()) ?? 0,
-                          'lowStockThreshold':
-                              int.tryParse(thresholdC.text) ?? 5,
-                          'expiryDate': expiryDate,
-                          'shopId': u.shopId,
-                          'branchId': selectedBranchId,
-                          'lastUpdated': DateTime.now().toIso8601String(),
-                        };
-
-                        if (id == null) {
-                          await _repo.registerItem(u, productMap, forceNew: createAsNew);
-                          if (u.roles.contains(UserRole.inventoryStaff)) {
-                            await _db.addNotification({
-                              'shopId': u.shopId,
-                              'title': 'New Medicine Added',
-                              'message': "New medicine '${nameC.text}' added by Staff. Please set buying/selling price.",
-                              'type': 'inventory_alert'
-                            });
-                          }
-                        } else {
-                          if (isBatchEdit && item != null && item.containsKey('id')) {
-                            // Update specific batch record (persistence fix)
-                            final batchId = item['id'].toString();
-                            await _db.update('batches', batchId, {
-                              'buyingPrice': double.tryParse(buyC.text) ?? 0.0,
-                              'sellingPrice': double.tryParse(sellC.text) ?? 0.0,
-                              'quantity': double.tryParse(qtyC.text.trim()) ?? 0.0,
-                              'expiry': expiryDate?.toIso8601String(),
-                              'batchNumber': batchC.text.trim(),
-                              'lastUpdated': DateTime.now().toIso8601String(),
-                            });
-                            // Update product shared metadata or other fields if needed, 
-                            // but forceRecalculate usually handles stock/price sync
-                            await _db.update('products', id!, {
-                              'name': nameC.text.trim(),
-                              'barcode': barC.text.trim(),
-                              'lowStockThreshold': int.tryParse(thresholdC.text) ?? 5,
-                              'branchId': selectedBranchId, // Ensure correct branch context is set
-                            });
-                            // Trigger recalibration of main product stock/expiry from all batches
-                            await _repo.forceRecalculate(u.shopId, id!);
-                          } else {
-                            await _db.update('products', id!, productMap);
-                          }
-                          await _repo.recordAuditLog(u.shopId, u.username, 'EDIT_PRODUCT', 'Updated product: ${nameC.text}');
-                        }
-
-
-                        if (c.mounted) {
-                          LoadingOverlay.hide(context);
-                          _showSnackBar('Product Added Instantly!');
-                          Navigator.pop(c);
-                        }
-                      } catch (e) {
-                        if (c.mounted) LoadingOverlay.hide(context);
-                        _showSnackBar(e.toString(), isError: true);
-                      }
-                    },
-                    child: Text(id == null ? "Add Product" : "Save Changes"),
+                    onPressed: () => Navigator.pop(c),
+                    child: const Text("Cancel"),
                   ),
+                  if (currentStep > 0) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => setS(() => currentStep--),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                      label: const Text("Back"),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (currentStep < 2)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {
+                        if (currentStep == 0) {
+                          if (nameC.text.trim().isEmpty) {
+                            rootScaffoldMessengerKey.currentState!.showSnackBar(
+                              const SnackBar(content: Text("Please enter a product name to continue")),
+                            );
+                            return;
+                          }
+                          setS(() => currentStep = 1);
+                        } else if (currentStep == 1) {
+                          if (buyC.text.trim().isEmpty || qtyC.text.trim().isEmpty) {
+                            rootScaffoldMessengerKey.currentState!.showSnackBar(
+                              const SnackBar(content: Text("Please enter buying price and stock quantity")),
+                            );
+                            return;
+                          }
+                          setS(() => currentStep = 2);
+                        }
+                      },
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                      label: const Text("Next Step", style: TextStyle(fontWeight: FontWeight.bold)),
+                    )
+                  else
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: submitProduct,
+                      icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                      label: Text(id == null ? "Add Product" : "Save Changes", style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                 ],
-              )),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
+  Widget _buildStepPill({
+    required int stepIndex,
+    required String title,
+    required int currentStep,
+    required VoidCallback onTap,
+  }) {
+    final bool isActive = currentStep == stepIndex;
+    final bool isCompleted = currentStep > stepIndex;
 
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive
+              ? Colors.white
+              : isCompleted
+                  ? Colors.white.withOpacity(0.3)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isActive ? AppColors.primary : Colors.white24,
+              ),
+              child: Center(
+                child: isCompleted
+                    ? const Icon(Icons.check, size: 12, color: Colors.white)
+                    : Text(
+                        "${stepIndex + 1}",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isActive ? Colors.white : Colors.white70,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                color: isActive ? AppColors.primary : Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildBadge(String label, Color color) {
     return Container(
@@ -6380,23 +7095,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(32, 24, 32, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Debt Collection (Unpaid Sales)",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text("Manage credit customers and track summaries", 
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-            ],
-          ),
-        ),
+        const SizedBox(height: 16),
         Expanded(
           child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _db.watchSales(user.shopId, branchId: _selectedBranchId == 'all' ? null : _selectedBranchId).toMainThread(),
+            stream: _cachedWatch(
+              'debt_sales_$_selectedBranchId',
+              () => _db.watchSales(user.shopId,
+                  branchId: _selectedBranchId == 'all' ? null : _selectedBranchId),
+            ),
             builder: (ctx, snap) {
+              if (snap.hasError) {
+                return const _StreamLoadFailure(
+                    message: 'Could not load customer debt.');
+              }
               if (!snap.hasData)
                 return const Center(child: CircularProgressIndicator());
               final allSales = snap.data!;
@@ -6519,9 +7230,68 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
 
 
+  String _humanizeAuditDetails(String action, String details) {
+    switch (action) {
+      case 'SALE':
+        {
+          final qtyMatch = RegExp(r'(\d+(?:\.\d+)?) units of "?([^".[]+)"?').firstMatch(details);
+          final amtMatch = RegExp(r'Total Price: ([\d.]+)').firstMatch(details);
+          final amtAttemptMatch = RegExp(r'Attempted Amount[^:]*: ([\d.]+)').firstMatch(details);
+          final isRejected = details.contains('Rejected') || details.contains('REJECTED');
+          final isPending = details.contains('Pending synchronization');
+          final productName = qtyMatch?.group(2)?.trim() ?? 'Item';
+          final qty = qtyMatch?.group(1) ?? '?';
+          final amount = amtMatch?.group(1) ?? amtAttemptMatch?.group(1);
+          final amtStr = amount != null ? ' — ETB $amount' : '';
+          if (isRejected) return 'Sale rejected: $qty units of $productName$amtStr';
+          if (isPending) return 'Sale pending sync: $qty units of $productName$amtStr';
+          return 'Sold $qty × $productName$amtStr';
+        }
+      case 'DEBT_PAYMENT':
+        {
+          final custSale = RegExp(r'Debt Sale to (.+?):').firstMatch(details);
+          final custPay = RegExp(r'Payment from (.+?) of ([\d.]+)').firstMatch(details);
+          if (custSale != null) return 'Debt sale → ${custSale.group(1)}';
+          if (custPay != null) return 'Payment from ${custPay.group(1)}: ETB ${custPay.group(2)}';
+          return 'Customer debt transaction';
+        }
+      case 'DELETE_ITEM':
+        {
+          final nameMatch = RegExp(r'Deleted product: (.+?) \| ID:').firstMatch(details);
+          return nameMatch != null ? 'Deleted: ${nameMatch.group(1)}' : 'Product deleted';
+        }
+      case 'BRANCH_TRANSFER':
+        {
+          final m = RegExp(r'Transferred ([\d.]+) units of (.+?) from (\S+) to (\S+)').firstMatch(details);
+          if (m != null) return 'Transferred ${m.group(1)} × ${m.group(2)}: ${m.group(3)} → ${m.group(4)}';
+          return details;
+        }
+      case 'ADD_PRODUCT':
+        return details.replaceFirst('Added Product: ', 'Added: ');
+      case 'EDIT_PRODUCT':
+        {
+          final m = RegExp(r'"product":"([^"]+)"').firstMatch(details);
+          return m != null ? 'Edited: ${m.group(1)}' : 'Product edited';
+        }
+      case 'RESTOCK':
+        return details;
+      case 'LOGIN':
+        {
+          final m = RegExp(r'User (.+?) logged').firstMatch(details);
+          return m != null ? 'Login: ${m.group(1)}' : details;
+        }
+      default:
+        // Strip technical UUIDs and long IDs from generic details
+        return details.replaceAll(RegExp(r'\| ID: [a-zA-Z0-9_-]{8,}'), '').trim();
+    }
+  }
+
   Widget _buildAuditLogTab(AppUser user) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _db.watchAuditLogs(user.shopId).toMainThread(),
+      stream: _cachedWatch(
+        'audit_logs_${user.shopId}',
+        () => _db.watchAuditLogs(user.shopId),
+      ),
       builder: (ctx, snap) {
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         
@@ -6586,7 +7356,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     const SizedBox(width: 8),
                     StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _db.watchUsers(user.shopId).toMainThread(),
+                      stream: _cachedWatch(
+                        'audit_users_${user.shopId}',
+                        () => _db.watchUsers(user.shopId),
+                      ),
                       builder: (ctx, userSnap) {
                         List<String> usernames = ['All Users'];
                         if (userSnap.hasData) {
@@ -6681,18 +7454,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    () {
-                                      // For debt entries: show a short summary, full detail is in the tap dialog
-                                      if (action == 'DEBT_PAYMENT') {
-                                        final raw = d['details']?.toString() ?? '';
-                                        final custSale = RegExp(r'Debt Sale to (.+?):').firstMatch(raw);
-                                        final custPay  = RegExp(r'Payment from (.+?) of').firstMatch(raw);
-                                        if (custSale != null) return 'Debt Sale → ${custSale.group(1)}';
-                                        if (custPay  != null) return 'Payment from ${custPay.group(1)}';
-                                        return 'Customer Debt';
-                                      }
-                                      return d['details']?.toString().toTitleCase() ?? '';
-                                    }(),
+                                    _humanizeAuditDetails(action, d['details']?.toString() ?? ''),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -7150,7 +7912,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (ctx) => SizedBox(
         height: MediaQuery.of(ctx).size.height * 0.7,
         child: MobileScanner(
-          controller: _scannerController,
+          controller: _scanner,
           onDetect: (capture) {
             final List<Barcode> barcodes = capture.barcodes;
             if (barcodes.isNotEmpty) {
@@ -7270,6 +8032,814 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 // `!semantics.parentDataDirty` assertion crash. By extracting this
 // into its own StatefulWidget we guarantee clean rebuild semantics.
 // ─────────────────────────────────────────────────────────────────
+/// Step-by-step staff account creation, styled exactly like the sign-up flow
+/// (same shell, card, fields, progress bar, strength meter and buttons).
+class _AddStaffWizard extends StatefulWidget {
+  final AppUser adminUser;
+  final DatabaseService db;
+  final Stream<List<Map<String, dynamic>>> branchesStream;
+
+  const _AddStaffWizard({
+    required this.adminUser,
+    required this.db,
+    required this.branchesStream,
+  });
+
+  @override
+  State<_AddStaffWizard> createState() => _AddStaffWizardState();
+}
+
+class _AddStaffWizardState extends State<_AddStaffWizard> {
+  static const int _stepCount = 4;
+  static const List<String> _stepLabels = [
+    'Account',
+    'Role',
+    'Permissions',
+    'Review',
+  ];
+
+  int _step = 0;
+  String? _error;
+  bool _saving = false;
+
+  final _usernameC = TextEditingController();
+  final _emailC = TextEditingController();
+  final _passC = TextEditingController();
+  final _confirmC = TextEditingController();
+  bool _obscure = true;
+
+  String _role = 'inventoryStaff';
+  String _branchAccessType = 'single';
+  String? _assignedBranchId;
+  final Map<String, bool> _perms = <String, bool>{};
+  final Map<String, bool> _checkedBranches = <String, bool>{};
+
+  bool _hasUppercase = false;
+  bool _hasDigits = false;
+  bool _hasSpecialCharacters = false;
+  bool _hasMinLength = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _assignedBranchId = widget.adminUser.branchId;
+    _applyRoleDefaults(_role);
+    _passC.addListener(_validatePassword);
+    _confirmC.addListener(_refreshConfirmMatch);
+  }
+
+  @override
+  void dispose() {
+    _usernameC.dispose();
+    _emailC.dispose();
+    _passC.dispose();
+    _confirmC.dispose();
+    super.dispose();
+  }
+
+  void _refreshConfirmMatch() {
+    if (mounted) setState(() {});
+  }
+
+  void _validatePassword() {
+    final p = _passC.text;
+    setState(() {
+      _hasUppercase = p.contains(RegExp(r'[A-Z]'));
+      _hasDigits = p.contains(RegExp(r'[0-9]'));
+      _hasSpecialCharacters = p.contains(RegExp(r'[!@#$%^&*(),.?\":{}|<>]'));
+      _hasMinLength = p.length >= 8;
+    });
+  }
+
+  void _applyRoleDefaults(String role) {
+    for (final p in AppUser.allPermissions) {
+      _perms[p] = false;
+    }
+    if (role == 'admin') {
+      for (final p in AppUser.allPermissions) {
+        _perms[p] = true;
+      }
+    } else if (role == 'manager') {
+      _perms[AppUser.pManageInventory] = true;
+      _perms[AppUser.pManageSales] = true;
+      _perms[AppUser.pManagePurchases] = true;
+      _perms[AppUser.pManageCustomers] = true;
+      _perms[AppUser.pManageStockTransfers] = true;
+      _perms[AppUser.pViewReports] = true;
+      _perms[AppUser.pViewFinancialData] = true;
+      _perms[AppUser.pManageSettings] = true;
+      _perms[AppUser.pManageBranches] = true;
+      _perms[AppUser.pViewNotifications] = true;
+    } else if (role == 'cashier') {
+      _perms[AppUser.pManageSales] = true;
+      _perms[AppUser.pManageCustomers] = true;
+    } else {
+      _perms[AppUser.pManageInventory] = true;
+      _perms[AppUser.pManageStockTransfers] = true;
+    }
+  }
+
+  String _roleLabel(String role) {
+    switch (role) {
+      case 'admin':
+        return 'Admin';
+      case 'manager':
+        return 'Manager';
+      case 'cashier':
+        return 'Cashier';
+      default:
+        return 'Inventory Staff';
+    }
+  }
+
+  String get _stepTitle {
+    switch (_step) {
+      case 1:
+        return 'Role & branch access';
+      case 2:
+        return 'Permissions';
+      case 3:
+        return 'Review & confirm';
+      default:
+        return 'Create staff account';
+    }
+  }
+
+  String get _stepSubtitle {
+    switch (_step) {
+      case 1:
+        return 'Choose what this account can do and which branch it belongs to.';
+      case 2:
+        return 'Fine-tune access. Defaults for the selected role are pre-filled.';
+      case 3:
+        return 'Check the details before creating the account.';
+      default:
+        return 'Add a team member. They can sign in as soon as you finish.';
+    }
+  }
+
+  String? _stepIssue(int step) {
+    if (step == 0) {
+      if (_usernameC.text.trim().length < 3) {
+        return 'Username must be at least 3 characters long';
+      }
+      final email = _emailC.text.trim();
+      if (email.isEmpty || !AuthService().isValidEmail(email)) {
+        return 'Please enter a valid email address.';
+      }
+      if (_passC.text.isEmpty || _confirmC.text.isEmpty) {
+        return 'Please fill in all fields';
+      }
+      if (_passC.text != _confirmC.text) {
+        return 'Passwords do not match';
+      }
+      if (!_hasUppercase ||
+          !_hasDigits ||
+          !_hasSpecialCharacters ||
+          !_hasMinLength) {
+        return 'Password does not meet requirements';
+      }
+      return null;
+    }
+    if (step == 1) {
+      if (_branchAccessType == 'single' &&
+          (_assignedBranchId == null || _assignedBranchId!.isEmpty)) {
+        return 'Please choose the branch this account belongs to.';
+      }
+      return null;
+    }
+    return null;
+  }
+
+  void _goToStep(int step) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _step = step.clamp(0, _stepCount - 1);
+      _error = null;
+    });
+  }
+
+  void _nextStep() {
+    FocusScope.of(context).unfocus();
+    final issue = _stepIssue(_step);
+    if (issue != null) {
+      setState(() => _error = issue);
+      return;
+    }
+    setState(() {
+      _error = null;
+      _step++;
+    });
+  }
+
+  Future<void> _createAccount() async {
+    final issue = _stepIssue(0);
+    if (issue != null) {
+      setState(() {
+        _error = issue;
+        _step = 0;
+      });
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final username = _usernameC.text.trim();
+      if (await widget.db.isUsernameTaken(username)) {
+        setState(() => _error =
+            'Username "$username" is already taken. Please choose another.');
+        return;
+      }
+
+      final finalPerms = <String, bool>{..._perms};
+      if (_branchAccessType == 'all') {
+        finalPerms['branch_access_all'] = true;
+      } else if (_branchAccessType == 'multiple') {
+        finalPerms['branch_access_all'] = false;
+        _checkedBranches.forEach((bId, value) {
+          finalPerms['branch_access_$bId'] = value;
+        });
+        if (_assignedBranchId != null) {
+          finalPerms['branch_access_$_assignedBranchId'] = true;
+        }
+      } else {
+        finalPerms['branch_access_all'] = false;
+        if (_assignedBranchId != null) {
+          finalPerms['branch_access_$_assignedBranchId'] = true;
+        }
+      }
+
+      final hasTransfer = finalPerms[AppUser.pManageStockTransfers] == true;
+      if (hasTransfer && _branchAccessType == 'single') {
+        setState(() => _error =
+            '"Manage Stock Transfers" requires access to multiple branches.');
+        return;
+      }
+
+      await AuthService().createStaffAccount(
+        email: _emailC.text.trim(),
+        password: _passC.text,
+        username: username,
+        fullName: username,
+        shopId: widget.adminUser.shopId,
+        branchId: _assignedBranchId ?? 'main',
+        branchName: 'Assigned Branch',
+        role: _role,
+        permissions: finalPerms,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      rootScaffoldMessengerKey.currentState?.showSnackBar(const SnackBar(
+        content: Text('Staff account created successfully!'),
+        backgroundColor: AppColors.success,
+      ));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AuthPalette.of(context);
+    final isLastStep = _step == _stepCount - 1;
+
+    return AuthShell(
+      maxWidth: 500,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AuthCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AuthIconButton(
+                      icon: _step == 0
+                          ? Icons.close_rounded
+                          : Icons.arrow_back_rounded,
+                      tooltip: _step == 0 ? 'Cancel' : 'Previous step',
+                      onTap: () {
+                        if (_step == 0) {
+                          Navigator.of(context).pop();
+                        } else {
+                          _goToStep(_step - 1);
+                        }
+                      },
+                    ),
+                    const Spacer(),
+                    const ThemeToggleButton(),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                AuthStepProgress(
+                  step: _step,
+                  total: _stepCount,
+                  labels: _stepLabels,
+                ),
+                const SizedBox(height: 20),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  child: Column(
+                    key: ValueKey<String>('staff_heading_$_step'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _stepTitle,
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: palette.title,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _stepSubtitle,
+                        style: TextStyle(
+                            fontSize: 13, height: 1.4, color: palette.body),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.04, 0),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: Column(
+                      key: ValueKey<String>('staff_step_$_step'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildStep(palette),
+                    ),
+                  ),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  alignment: Alignment.topCenter,
+                  child: _error == null
+                      ? const SizedBox(width: double.infinity)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: AuthErrorBanner(message: _error!)
+                              .animate()
+                              .shake(),
+                        ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    if (_step > 0) ...[
+                      Expanded(
+                        child: AuthSecondaryButton(
+                          label: 'Back',
+                          onTap: () => _goToStep(_step - 1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      flex: _step > 0 ? 2 : 1,
+                      child: AuthPrimaryButton(
+                        label: isLastStep ? 'Create Account' : 'Continue',
+                        loading: _saving,
+                        onPressed: isLastStep ? _createAccount : _nextStep,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const AuthFooterNote(text: 'Your data is secure with us'),
+              ],
+            ),
+          )
+              .animate()
+              .fadeIn(duration: 450.ms)
+              .slideY(begin: 0.035, end: 0, curve: Curves.easeOutCubic),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildStep(AuthPalette palette) {
+    switch (_step) {
+      case 1:
+        return [
+          AuthDropdown<String>(
+            value: _role,
+            icon: Icons.badge_outlined,
+            items: const [
+              DropdownMenuItem(value: 'admin', child: Text('Admin')),
+              DropdownMenuItem(value: 'manager', child: Text('Manager')),
+              DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
+              DropdownMenuItem(
+                  value: 'inventoryStaff', child: Text('Inventory Staff')),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _role = v;
+                _applyRoleDefaults(v);
+              });
+            },
+          ),
+          const SizedBox(height: 14),
+          AuthDropdown<String>(
+            value: _branchAccessType,
+            icon: Icons.lan_outlined,
+            items: const [
+              DropdownMenuItem(value: 'single', child: Text('Single Branch')),
+              DropdownMenuItem(
+                  value: 'multiple', child: Text('Multiple Branches')),
+              DropdownMenuItem(value: 'all', child: Text('All Branches')),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() {
+                _branchAccessType = v;
+                if (v == 'all') _assignedBranchId = 'main';
+              });
+            },
+          ),
+          const SizedBox(height: 14),
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: widget.branchesStream,
+            builder: (ctx, snap) {
+              final branches = (snap.data ?? const <Map<String, dynamic>>[])
+                  .where((b) => b['id'] != 'all')
+                  .toList();
+              if (branches.isEmpty) {
+                return Text(
+                  'Using the default Main Branch.',
+                  style: TextStyle(fontSize: 12, color: palette.body),
+                );
+              }
+              if (_branchAccessType == 'all') {
+                return Text(
+                  'This account will have access to every branch.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: palette.body,
+                  ),
+                );
+              }
+              if (_branchAccessType == 'single') {
+                final ids = branches.map((b) => b['id'].toString()).toList();
+                final value =
+                    ids.contains(_assignedBranchId) ? _assignedBranchId! : ids.first;
+                if (_assignedBranchId != value) {
+                  _assignedBranchId = value;
+                }
+                return AuthDropdown<String>(
+                  value: value,
+                  icon: Icons.storefront_outlined,
+                  items: branches
+                      .map((b) => DropdownMenuItem(
+                            value: b['id'].toString(),
+                            child: Text(b['name'].toString(),
+                                overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _assignedBranchId = v),
+                );
+              }
+              return Container(
+                decoration: BoxDecoration(
+                  color: palette.field,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: palette.fieldBorder),
+                ),
+                child: Column(
+                  children: branches.map((b) {
+                    final bId = b['id'].toString();
+                    return CheckboxListTile(
+                      dense: true,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(
+                        b['name'].toString(),
+                        style: TextStyle(fontSize: 12.5, color: palette.title),
+                      ),
+                      value: _checkedBranches[bId] ?? false,
+                      onChanged: (v) => setState(() {
+                        _checkedBranches[bId] = v ?? false;
+                        if (v == true &&
+                            (_assignedBranchId == null ||
+                                _assignedBranchId == 'all')) {
+                          _assignedBranchId = bId;
+                        }
+                      }),
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+        ];
+      case 2:
+        return [
+          ...AppUser.permissionGroups.entries.expand((entry) => [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+                  child: Text(
+                    entry.key,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      color: palette.accent,
+                    ),
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: palette.field,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: palette.fieldBorder),
+                  ),
+                  child: Column(
+                    children: entry.value
+                        .map((p) => CheckboxListTile(
+                              dense: true,
+                              controlAffinity:
+                                  ListTileControlAffinity.leading,
+                              title: Text(
+                                p,
+                                style: TextStyle(
+                                    fontSize: 12.5, color: palette.title),
+                              ),
+                              value: _perms[p] ?? false,
+                              onChanged: (v) =>
+                                  setState(() => _perms[p] = v ?? false),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ]),
+        ];
+      case 3:
+        final enabledPerms = _perms.values.where((v) => v).length;
+        return [
+          _reviewRow(
+            palette,
+            'Username',
+            _usernameC.text.trim(),
+          ),
+          _reviewRow(palette, 'Email', _emailC.text.trim()),
+          _reviewRow(palette, 'Role', _roleLabel(_role)),
+          _reviewRow(
+            palette,
+            'Branch access',
+            _branchAccessType == 'all'
+                ? 'All branches'
+                : (_branchAccessType == 'multiple'
+                    ? 'Multiple branches'
+                    : 'Single branch'),
+          ),
+          _reviewRow(palette, 'Permissions', '$enabledPerms enabled'),
+        ];
+      default:
+        return [
+          AuthTextField(
+            controller: _usernameC,
+            hint: 'Username',
+            icon: Icons.person_outline_rounded,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username],
+          ),
+          const SizedBox(height: 14),
+          AuthTextField(
+            controller: _emailC,
+            hint: 'Email address',
+            icon: Icons.mail_outline_rounded,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
+          ),
+          const SizedBox(height: 14),
+          AuthTextField(
+            controller: _passC,
+            hint: 'Password',
+            icon: Icons.lock_outline_rounded,
+            obscure: _obscure,
+            onToggleObscure: () => setState(() => _obscure = !_obscure),
+            autofillHints: const [AutofillHints.newPassword],
+          ),
+          const SizedBox(height: 10),
+          _buildStrengthMeter(palette),
+          const SizedBox(height: 12),
+          _buildPasswordRequirements(palette),
+          const SizedBox(height: 16),
+          AuthTextField(
+            controller: _confirmC,
+            hint: 'Confirm password',
+            icon: Icons.lock_reset_rounded,
+            obscure: _obscure,
+            autofillHints: const [AutofillHints.newPassword],
+          ),
+          _buildConfirmMatch(palette),
+        ];
+    }
+  }
+
+  Widget _reviewRow(AuthPalette palette, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12.5, color: palette.body),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: palette.title,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStrengthMeter(AuthPalette palette) {
+    final met = [_hasMinLength, _hasUppercase, _hasDigits, _hasSpecialCharacters]
+        .where((m) => m)
+        .length;
+    final fraction = met / 4;
+    final color = met <= 1
+        ? palette.danger
+        : met == 2
+            ? palette.warning
+            : met == 3
+                ? palette.accent
+                : palette.success;
+    final label = met == 0
+        ? 'Password strength'
+        : met <= 1
+            ? 'Weak password'
+            : met == 2
+                ? 'Fair password'
+                : met == 3
+                    ? 'Good password'
+                    : 'Strong password';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Stack(
+                children: [
+                  Container(
+                      height: 5,
+                      width: constraints.maxWidth,
+                      color: palette.divider),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    height: 5,
+                    width: constraints.maxWidth * fraction,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 7),
+        AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 200),
+          style: TextStyle(
+            fontFamily: authFontFamily(context),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: met == 0 ? palette.muted : color,
+          ),
+          child: Text(label),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasswordRequirements(AuthPalette palette) {
+    final items = <(String, bool)>[
+      ('At least 8 characters', _hasMinLength),
+      ('One uppercase letter', _hasUppercase),
+      ('One number', _hasDigits),
+      ('One special character', _hasSpecialCharacters),
+    ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items.map((item) {
+        final met = item.$2;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: met ? palette.accentSoft : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: met
+                  ? palette.accent.withValues(alpha: 0.4)
+                  : palette.fieldBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                met ? Icons.check_circle_rounded : Icons.circle_outlined,
+                size: 13,
+                color: met ? palette.accent : palette.muted,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                item.$1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: met ? FontWeight.w600 : FontWeight.w400,
+                  color: met ? palette.title : palette.muted,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildConfirmMatch(AuthPalette palette) {
+    final text = _confirmC.text;
+    final matches = text.isNotEmpty && text == _passC.text;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      alignment: Alignment.topLeft,
+      child: text.isEmpty
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    matches ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    size: 13,
+                    color: matches ? palette.success : palette.danger,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    matches ? 'Passwords match' : 'Passwords do not match',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: matches ? palette.success : palette.danger,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
 class _InventoryTabView extends StatefulWidget {
   final AppUser user;
   final DatabaseService db;
@@ -7371,7 +8941,9 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 600;
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: widget.db.watchProducts(widget.user.shopId, branchId: widget.branchId == 'all' ? null : widget.branchId).toMainThread(),
+      // Use the cached stream from initState/didUpdateWidget instead of
+      // creating a new query subscription on every rebuild (each keystroke).
+      stream: _inventoryStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) return Center(child: Text("Inventory Error: ${snapshot.error}"));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -7422,72 +8994,10 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
             Column(
               children: [
                 if (_isSelectMode) _buildSelectionBar(allDocs, isMobile),
+                _buildSearchHeader(isMobile, filtersList),
                 Expanded(
                   child: CustomScrollView(
                     slivers: [
-                SliverAppBar(
-                  floating: true,
-                  pinned: false,
-                  elevation: 0,
-                  toolbarHeight: 64,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  automaticallyImplyLeading: false,
-                  flexibleSpace: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: isMobile ? double.infinity : 450,
-                          child: TextField(
-                            controller: _searchC,
-                            onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-                            onSubmitted: (v) {
-                              if (v.isNotEmpty) {
-                                setState(() => _searchQuery = v.toLowerCase());
-                              }
-                            },
-                            decoration: InputDecoration(
-                              hintText: "Search items...",
-                              prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                                onPressed: () {
-                                    widget.onScanSearch(_searchC).then((v) {
-                                      if (_searchC.text.isNotEmpty) {
-                                        setState(() => _searchQuery = _searchC.text.toLowerCase());
-                                      }
-                                    });
-                                },
-                              ),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                              fillColor: Theme.of(context).colorScheme.surface,
-                              filled: true,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          height: 36,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.border.withOpacity(0.5)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _filter,
-                              items: filtersList.map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 12)))).toList(),
-                              onChanged: (v) => setState(() => _filter = v!),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
                 if (items.isEmpty)
                   SliverFillRemaining(child: _buildEmptyState())
                 else
@@ -7505,9 +9015,20 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
             ),
           ],
         ),
-            if (!isMobile)
+            if (isMobile)
               Positioned(
-                bottom: 16, right: 32,
+                bottom: 16,
+                left: 12,
+                right: 12,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: _buildDesktopBottomBar(),
+                ),
+              )
+            else
+              Positioned(
+                bottom: 16,
+                right: 32,
                 child: _buildDesktopBottomBar(),
               ),
           ],
@@ -7534,6 +9055,71 @@ class _InventoryTabViewState extends State<_InventoryTabView> {
           const SizedBox(width: 8),
           if (widget.user.hasPermission(AppUser.pTransferStock))
             _buildHeaderButton(onPressed: widget.onTransfer, icon: Icons.swap_horiz_rounded, label: "Transfer", color: AppColors.secondary),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchHeader(bool isMobile, List<String> filtersList) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchC,
+              onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+              onSubmitted: (v) {
+                if (v.isNotEmpty) {
+                  setState(() => _searchQuery = v.toLowerCase());
+                }
+              },
+              decoration: InputDecoration(
+                hintText: "Search items...",
+                prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                  onPressed: () {
+                    widget.onScanSearch(_searchC).then((v) {
+                      if (_searchC.text.isNotEmpty) {
+                        setState(() => _searchQuery = _searchC.text.toLowerCase());
+                      }
+                    });
+                  },
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                fillColor: Theme.of(context).colorScheme.surface,
+                filled: true,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border.withOpacity(0.5)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: filtersList.contains(_filter) ? _filter : 'All',
+                items: filtersList
+                    .map((f) => DropdownMenuItem(
+                          value: f,
+                          child: Text(f, style: const TextStyle(fontSize: 12)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _filter = v);
+                },
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -8415,6 +10001,930 @@ class _ImportProgressDialogState extends State<_ImportProgressDialog> {
           const SizedBox(height: 16),
           Text(_status, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         ],
+      ),
+    );
+  }
+}
+
+
+class _ConnectionBlinkerDot extends StatefulWidget {
+  const _ConnectionBlinkerDot({super.key});
+
+  @override
+  State<_ConnectionBlinkerDot> createState() => _ConnectionBlinkerDotState();
+}
+
+class _ConnectionBlinkerDotState extends State<_ConnectionBlinkerDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  StreamSubscription<bool>? _sub;
+  Timer? _probeTimer;
+  bool _isOnline = false;
+
+  Future<void> _probe() async {
+    final online = await ConnectionService().checkBackendReachability(force: true);
+    if (!mounted) return;
+    if (online != _isOnline) {
+      setState(() => _isOnline = online);
+      if (online) {
+        if (!_controller.isAnimating) _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _isOnline = ConnectionService().isOnline;
+    Future.microtask(() => _probe());
+    _probeTimer = Timer.periodic(const Duration(seconds: 15), (_) => _probe());
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.25, end: 1.0).animate(_controller);
+
+    _sub = ConnectionService().onStatusChanged.listen((online) {
+      // A reported success is not proof of reachability: re-probe instead of
+      // flipping to green on the cached flag.
+      if (!online && mounted) {
+        setState(() => _isOnline = false);
+        _controller.stop();
+      } else if (online) {
+        _probe();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _probeTimer?.cancel();
+    _sub?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _isOnline ? AppColors.success : AppColors.danger;
+    final dot = Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.5),
+                blurRadius: 4,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+        );
+    return Tooltip(
+      message: _isOnline ? "System Online" : "System Offline",
+      child: _isOnline ? FadeTransition(opacity: _animation, child: dot) : dot,
+    );
+  }
+}
+
+class _InteractiveTransferStockDialog extends StatefulWidget {
+  final AppUser user;
+  final DatabaseService db;
+  final InventoryRepository repo;
+
+  const _InteractiveTransferStockDialog({
+    required this.user,
+    required this.db,
+    required this.repo,
+  });
+
+  @override
+  State<_InteractiveTransferStockDialog> createState() => _InteractiveTransferStockDialogState();
+}
+
+class _InteractiveTransferStockDialogState extends State<_InteractiveTransferStockDialog> {
+  String? _sourceBranchId;
+  String? _destBranchId;
+  String? _selectedItemId;
+  String? _selectedItemName;
+  double _availableStock = 0.0;
+  String? _selectedBatchId;
+  final TextEditingController _qtyC = TextEditingController();
+  double _transferQty = 0.0;
+  bool _isTransferring = false;
+
+  @override
+  void dispose() {
+    _qtyC.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: widget.db.watchBranches(widget.user.shopId).toMainThread(),
+      builder: (c, branchSnap) {
+        final rawBranches = branchSnap.data ?? [];
+        final allIds = rawBranches
+            .where((b) => b['id'] != 'all')
+            .map((b) => b['id'].toString())
+            .toSet()
+            .toList();
+        final allowedIds = widget.user.getAssignedBranchIds(allIds);
+        final branchMap = <String, Map<String, dynamic>>{};
+        for (var b in rawBranches) {
+          final bid = b['id'].toString();
+          if (bid == 'all') continue;
+          if (!allowedIds.contains('all') && !allowedIds.contains(bid)) continue;
+          branchMap.putIfAbsent(bid, () => b);
+        }
+        final branches = branchMap.values.toList();
+
+        if (branches.length < 2) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text("Transfer Stock Between Branches"),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 48),
+                SizedBox(height: 16),
+                Text(
+                  "You currently have access to only one branch. Contact your administrator to enable transfers between branches.",
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+          );
+        }
+
+        if (_sourceBranchId == null && branches.isNotEmpty) {
+          _sourceBranchId = branches.first['id'].toString();
+        }
+
+        final sourceBranchName = branches.firstWhere(
+          (b) => b['id'].toString() == _sourceBranchId,
+          orElse: () => {'name': 'Source'},
+        )['name']?.toString() ?? 'Source';
+
+        final destBranchName = _destBranchId != null
+            ? branches.firstWhere(
+                (b) => b['id'].toString() == _destBranchId,
+                orElse: () => {'name': 'Select'},
+              )['name']?.toString() ?? 'Select'
+            : 'Select';
+
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: EdgeInsets.zero,
+          title: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, Color(0xFF1E3A8A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 24)
+                      .animate(onPlay: (controller) => controller.repeat(reverse: true))
+                      .scale(begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1), duration: 1200.ms),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Inter-Branch Stock Transfer",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        "Move inventory safely between shop branches",
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  // Interactive Visual Transfer Route Card
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.05),
+                          AppColors.secondary.withOpacity(0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.secondary.withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        // Source Card
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.storefront_rounded, size: 14, color: AppColors.secondary),
+                                  SizedBox(width: 4),
+                                  Text("FROM", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                sourceBranchName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Animated Navy Arrow
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18)
+                              .animate(onPlay: (controller) => controller.repeat(reverse: true))
+                              .moveX(begin: -2, end: 2, duration: 800.ms),
+                        ),
+                        const SizedBox(width: 8),
+                        // Destination Card
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  const Text("TO", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.storefront_rounded, size: 14, color: _destBranchId != null ? AppColors.secondary : AppColors.textSecondary),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                destBranchName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: _destBranchId != null ? AppColors.primary : AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Branch Selectors
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Source Branch*", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('source_$_sourceBranchId'),
+                              value: _sourceBranchId,
+                              isExpanded: true,
+                              items: branches.map((b) => DropdownMenuItem(
+                                value: b['id'].toString(),
+                                child: Text(b['name'], style: const TextStyle(fontSize: 13)),
+                              )).toList(),
+                              onChanged: (v) {
+                                setState(() {
+                                  _sourceBranchId = v;
+                                  if (_destBranchId == v) _destBranchId = null;
+                                  _selectedItemId = null;
+                                  _selectedItemName = null;
+                                  _availableStock = 0.0;
+                                  _selectedBatchId = null;
+                                  _qtyC.clear();
+                                  _transferQty = 0.0;
+                                });
+                              },
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.outbox_rounded, size: 18, color: AppColors.secondary),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Destination Branch*", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              key: ValueKey('dest_$_destBranchId'),
+                              value: _destBranchId,
+                              isExpanded: true,
+                              items: branches
+                                  .where((b) => b['id'].toString() != _sourceBranchId)
+                                  .map((b) => DropdownMenuItem(
+                                    value: b['id'].toString(),
+                                    child: Text(b['name'], style: const TextStyle(fontSize: 13)),
+                                  )).toList(),
+                              onChanged: (v) => setState(() => _destBranchId = v),
+                              decoration: const InputDecoration(
+                                hintText: "Select Destination",
+                                prefixIcon: Icon(Icons.move_to_inbox_rounded, size: 18, color: AppColors.secondary),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Product Selector
+                  if (_sourceBranchId != null) ...[
+                    const Text("Select Product*", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: widget.db.watchProducts(widget.user.shopId, branchId: _sourceBranchId).toMainThread(),
+                      builder: (c, snap) {
+                        final products = (snap.data ?? []).where((p) => (p['quantity'] ?? 0) > 0).toList();
+                        if (products.isEmpty) {
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 18),
+                                SizedBox(width: 8),
+                                Expanded(child: Text("No items with positive stock found in this source branch.", style: TextStyle(fontSize: 12))),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return DropdownButtonFormField<String>(
+                          value: _selectedItemId,
+                          isExpanded: true,
+                          items: products.map((p) {
+                            final q = (p['quantity'] is num) ? (p['quantity'] as num).toDouble() : (double.tryParse((p['quantity'] ?? 0).toString()) ?? 0.0);
+                            return DropdownMenuItem(
+                              value: p['id'].toString(),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(child: Text(p['name'], style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.secondary.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text("$q avail", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.secondary)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            setState(() {
+                              _selectedItemId = v;
+                              _selectedBatchId = null;
+                              final match = products.firstWhere((p) => p['id'].toString() == v, orElse: () => {});
+                              _selectedItemName = match['name']?.toString() ?? 'Item';
+                              _availableStock = (match['quantity'] is num) ? (match['quantity'] as num).toDouble() : (double.tryParse((match['quantity'] ?? 0).toString()) ?? 0.0);
+                              _qtyC.clear();
+                              _transferQty = 0.0;
+                            });
+                          },
+                          decoration: const InputDecoration(
+                            hintText: "Select Product to Transfer",
+                            prefixIcon: Icon(Icons.inventory_2_outlined, size: 18, color: AppColors.secondary),
+                          ),
+                        );
+                      },
+                    ),
+
+                    if (_selectedItemId != null) ...[
+                      const SizedBox(height: 14),
+                      // Batch Selector
+                      const Text("Select Batch (Optional)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(height: 6),
+                      StreamBuilder<List<Map<String, dynamic>>>(
+                        stream: widget.db.watchBatchesByItem(widget.user.shopId, _selectedItemId!, branchId: _sourceBranchId).toMainThread(),
+                        builder: (c, snap) {
+                          final batches = (snap.data ?? []).where((b) => (b['quantity'] ?? 0.0) > 0).toList();
+                          batches.sort((a, b) {
+                            final da = parseDT(a['expiry'] ?? a['exp'] ?? a['expiryDate']);
+                            final db = parseDT(b['expiry'] ?? b['exp'] ?? b['expiryDate']);
+                            if (da == null && db == null) return 0;
+                            if (da == null) return 1;
+                            if (db == null) return -1;
+                            return da.compareTo(db);
+                          });
+
+                          return DropdownButtonFormField<String?>(
+                            value: _selectedBatchId,
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text("Auto (FEFO - Recommended First-Expiry)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
+                              ...batches.map((b) {
+                                final ed = b['expiry'] ?? b['exp'] ?? b['expiryDate'];
+                                final dVal = ed != null ? parseDT(ed) : null;
+                                final expStr = dVal != null ? DateFormat('dd MMM yy').format(dVal) : 'No Expiry';
+                                return DropdownMenuItem(
+                                  value: b['id'].toString(),
+                                  child: Text("Exp: $expStr | Qty: ${b['quantity']}", style: const TextStyle(fontSize: 12)),
+                                );
+                              }),
+                            ],
+                            onChanged: (v) => setState(() => _selectedBatchId = v),
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.layers_outlined, size: 18, color: AppColors.secondary),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Transfer Quantity & Interactive Quick Chips
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Transfer Quantity*", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text("Max Available: $_availableStock", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.secondary)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _qtyC,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          hintText: "Enter quantity to move",
+                          prefixIcon: const Icon(Icons.format_list_numbered_rounded, size: 18, color: AppColors.secondary),
+                          suffixText: "Units",
+                          suffixIcon: _qtyC.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 16),
+                                  onPressed: () {
+                                    _qtyC.clear();
+                                    setState(() => _transferQty = 0.0);
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (v) => setState(() {
+                          _transferQty = double.tryParse(v) ?? 0.0;
+                        }),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Quick Selection Chips
+                      Wrap(
+                        spacing: 8,
+                        children: [5.0, 10.0, 25.0, _availableStock].where((val) => val > 0 && val <= _availableStock).toSet().map((val) {
+                          final isAll = val == _availableStock;
+                          return ActionChip(
+                            label: Text(
+                              isAll ? "All ($val)" : "+$val",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isAll ? Colors.white : AppColors.primary,
+                              ),
+                            ),
+                            backgroundColor: isAll ? AppColors.secondary : AppColors.secondary.withOpacity(0.08),
+                            side: BorderSide(color: AppColors.secondary.withOpacity(0.4)),
+                            onPressed: () {
+                              setState(() {
+                                _transferQty = val;
+                                _qtyC.text = val == val.roundToDouble() ? val.toInt().toString() : val.toString();
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+
+                      if (_destBranchId != null && _transferQty > 0) ...[
+                        const SizedBox(height: 14),
+                        // Live Transfer Preview Summary
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 22),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  "Moving $_transferQty units of '$_selectedItemName' from $sourceBranchName to $destBranchName",
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          actions: [
+            TextButton(
+              onPressed: _isTransferring ? null : () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: _isTransferring
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.send_rounded, size: 18),
+              label: Text(_isTransferring ? "Transferring..." : "Transfer Stock", style: const TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: (_sourceBranchId != null &&
+                      _destBranchId != null &&
+                      _selectedItemId != null &&
+                      _transferQty > 0 &&
+                      _transferQty <= _availableStock &&
+                      !_isTransferring)
+                  ? () async {
+                      setState(() => _isTransferring = true);
+                      try {
+                        final products = await widget.db.query('products', where: 'id = ?', whereArgs: [_selectedItemId!], limit: 1);
+                        final itemName = products.isNotEmpty ? products.first['name'] : 'Item';
+                        await widget.repo.transferStock(
+                          admin: widget.user,
+                          itemId: _selectedItemId!,
+                          itemName: itemName,
+                          fromBranchId: _sourceBranchId!,
+                          toBranchId: _destBranchId!,
+                          quantity: _transferQty,
+                          batchId: _selectedBatchId,
+                        );
+                        if (mounted) Navigator.pop(context);
+                        rootScaffoldMessengerKey.currentState!.showSnackBar(
+                          const SnackBar(
+                            content: Text('Stock transferred successfully!'),
+                            backgroundColor: AppColors.success,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      } catch (e) {
+                        if (mounted) setState(() => _isTransferring = false);
+                        rootScaffoldMessengerKey.currentState!.showSnackBar(
+                          SnackBar(
+                            content: Text('Transfer Failed: $e'),
+                            backgroundColor: AppColors.danger,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Verification required before deleting a shop. Google is always offered;
+/// accounts that also have a GM Inventory Everywhere password can use it instead.
+class _ShopDeleteVerificationDialog extends StatefulWidget {
+  const _ShopDeleteVerificationDialog({
+    required this.allowPassword,
+    required this.auth,
+  });
+
+  final bool allowPassword;
+  final AuthService auth;
+
+  @override
+  State<_ShopDeleteVerificationDialog> createState() =>
+      _ShopDeleteVerificationDialogState();
+}
+
+class _ShopDeleteVerificationDialogState
+    extends State<_ShopDeleteVerificationDialog> {
+  final _passwordC = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passwordC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _withGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final idToken = await widget.auth.freshGoogleIdToken();
+      final token =
+          await widget.auth.verifyAccountDeletion(googleIdToken: idToken);
+      if (mounted) Navigator.pop(context, token);
+    } catch (e) {
+      if (mounted) {
+        setState(() =>
+            _error = e.toString().replaceFirst('Exception: ', '').trim());
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _withPassword() async {
+    if (_passwordC.text.isEmpty) {
+      setState(() => _error = 'Enter your password.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final token =
+          await widget.auth.verifyAccountDeletion(password: _passwordC.text);
+      if (mounted) Navigator.pop(context, token);
+    } catch (e) {
+      if (mounted) {
+        setState(() =>
+            _error = e.toString().replaceFirst('Exception: ', '').trim());
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      icon: const Icon(Icons.verified_user_outlined, size: 24),
+      title: const Text("Verify it's you",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+              "Deleting the shop removes its records permanently. Confirm your identity to continue.",
+              style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _busy ? null : _withGoogle,
+              icon: const Icon(Icons.account_circle_outlined, size: 18),
+              label: Text(_busy ? 'Waiting for Google…' : 'Continue with Google'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          if (widget.allowPassword) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordC,
+              obscureText: true,
+              decoration: InputDecoration(
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                hintText: 'Or enter your GM Inventory Everywhere password',
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _busy ? null : _withPassword,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Verify with password'),
+              ),
+            ),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!,
+                style: const TextStyle(color: AppColors.danger, fontSize: 12)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: _busy ? null : () => Navigator.pop(context),
+            child: const Text("Cancel")),
+      ],
+    );
+  }
+}
+
+
+/// Shown when a live query fails, so the screen never spins forever.
+class _StreamLoadFailure extends StatelessWidget {
+  const _StreamLoadFailure({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, color: scheme.error, size: 28),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Reopen this tab to try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown instead of a section that the current plan does not include.
+class _PlanLockedView extends StatelessWidget {
+  const _PlanLockedView({required this.feature});
+
+  final Feature feature;
+
+  String get _featureName {
+    switch (feature) {
+      case Feature.purchaseTracking:
+        return 'Purchases';
+      case Feature.multiBranchManagement:
+        return 'Multi-branch management';
+      case Feature.auditLogs:
+        return 'Audit logs';
+      case Feature.advancedReports:
+        return 'Advanced reports';
+      case Feature.analyticsDashboard:
+        return 'Analytics';
+      default:
+        return 'This feature';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.lock_outline_rounded,
+                      color: scheme.primary, size: 30),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  '$_featureName is not in your plan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Upgrade to Business or Enterprise to use it. Your current '
+                  'plan stays active until you change it.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const SubscriptionScreen()),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('View plans',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

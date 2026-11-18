@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Sale {
   final String id;
   final String shopId;
@@ -38,9 +36,17 @@ class Sale {
       sellingPriceAtTime: (map['sellingPriceAtTime'] ?? 0.0).toDouble(),
       buyingPriceAtTime: (map['buyingPriceAtTime'] ?? 0.0).toDouble(),
       totalPrice: (map['totalPrice'] ?? 0.0).toDouble(),
-      date: map['date'] != null ? (map['date'] as Timestamp).toDate() : (map['timestamp'] != null ? (map['timestamp'] as Timestamp).toDate() : DateTime.now()),
+      date: _parseDate(map['date'] ?? map['timestamp']),
       userId: map['userId'] ?? map['staffId'],
     );
+  }
+
+  static DateTime _parseDate(Object? value) {
+    if (value is DateTime) return value;
+    if (value == null) return DateTime.now();
+    return DateTime.tryParse(value.toString()) ??
+        DateTime.tryParse(value.toString().replaceFirst('Timestamp(', '').replaceAll(')', '')) ??
+        DateTime.now();
   }
 
   Map<String, dynamic> toMap() {
@@ -52,7 +58,7 @@ class Sale {
       'sellingPriceAtTime': sellingPriceAtTime,
       'buyingPriceAtTime': buyingPriceAtTime,
       'totalPrice': totalPrice,
-      'date': FieldValue.serverTimestamp(),
+      'date': date.toIso8601String(),
       'userId': userId,
     };
   }
